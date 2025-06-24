@@ -1,11 +1,14 @@
 import Entypo from '@expo/vector-icons/Entypo';
 import Feather from '@expo/vector-icons/Feather';
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, Pressable } from 'react-native';
+
 
 import dayjs from 'dayjs'
+import { Link } from 'expo-router';
 const EventListItem = ({event}) => {
   return (
-    <View className="gap-3 m-3 pb-3 border-b-2 border-gray-100 ">
+    <Link href={`/${event.id}`} asChild>
+    <Pressable className="gap-3 m-3 pb-3 border-b-2 border-gray-100 ">
       {/* Card Top Section: Texts + Image */}
       <View className="flex-row">
         {/* Event Details */}
@@ -32,7 +35,9 @@ const EventListItem = ({event}) => {
         <Feather name="share" size={20} color="gray" />
         <Feather name="bookmark" size={20} color="gray" />
       </View>
-    </View>
+    </Pressable>
+    </Link>
+    
   );
 };
 
