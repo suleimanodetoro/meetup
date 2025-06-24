@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View, Image, TouchableOpacity } from 'react-native';
+import { Text, View, Image, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import dayjs from 'dayjs';
@@ -56,6 +56,14 @@ export default function EventPage() {
           <Text className="text-lg" numberOfLines={3}>
             {event.description}
           </Text>
+          {/* Footer */}
+      <View className="absolute bottom-0 left-0 right-0 flex-row items-center justify-between border-t-2 border-gray-300 p-5 pb-10">
+        <Text className="text-xl font-semibold">Free</Text>
+
+        <Pressable className="rounded-md bg-red-500 p-5 px-8">
+          <Text className="text-lg font-bold text-white">Join and RSVP</Text>
+        </Pressable>
+      </View>
         </View>
       </SafeAreaView>
     </>
