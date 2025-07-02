@@ -1,5 +1,6 @@
-import '../global.css';
+// app/_layout.tsx
 
+import '../global.css';
 import { Stack } from 'expo-router';
 import AuthProvider from './contexts/AuthProvider';
 
@@ -15,6 +16,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="[id]" options={{ headerShown: false }} />
       </Stack>
     </AuthProvider>
   );
