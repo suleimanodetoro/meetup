@@ -9,7 +9,10 @@
       "output": "static",
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router", "expo-web-browser"],
+    "plugins": [
+      "expo-router",
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
@@ -22,9 +25,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.suleimanao.MeetupClone",
+      "infoPlist":{
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select an avatar image."
+      }
     },
     "android": {
       "adaptiveIcon": {
