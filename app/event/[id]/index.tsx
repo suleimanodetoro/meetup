@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import dayjs from 'dayjs';
 import { supabase } from '~/utils/supabase';
-import { useAuth } from './contexts/AuthProvider';
+import { useAuth } from '~/app/contexts/AuthProvider';
 
 interface Event {
   id: string;
@@ -140,6 +140,9 @@ export default function EventPage() {
           <Text className="text-lg" numberOfLines={3}>
             {event.description}
           </Text>
+          <Link href={`/event/${event.id}/attendance`} className="text-lg" numberOfLines={3}>
+            View Attendance
+          </Link>
         </View>
 
         {/* Footer */}

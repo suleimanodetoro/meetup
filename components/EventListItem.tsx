@@ -39,7 +39,7 @@ const EventListItem = ({ event }: EventListItemProps) => {
   };
 
   return (
-    <Link href={`/${event.id}`} asChild>
+    <Link href={`/event/${event.id}`} asChild>
       <Pressable className="m-3 gap-3 border-b-2 border-gray-100 pb-3">
         <View className="flex-row">
           <View className="flex-1 gap-2">
