@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
-import { FlatList, ActivityIndicator, Text, View } from 'react-native';
-import { useEffect, useState } from 'react';
+import * as Location from "expo-location"
+import { FlatList, ActivityIndicator, Text, View, Alert } from 'react-native';
+import { use, useEffect, useState } from 'react';
 
 import EventListItem from '~/components/EventListItem';
 import { supabase } from '~/utils/supabase';
@@ -10,11 +11,28 @@ export default function Home() {
   const [events, setEvents] = useState<NearbyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [location,setLocation] = useState<Location.LocationObject | null>(null)
+
+  useEffect(()=>{
+    (async () =>{
+      const {status} = await Location.requestForegroundPermissionsAsync();
+      if(status !== "granted"){
+        Alert.alert('Permission to access location was denied ');
+        return;
+      }
+      const location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+
+    })();
+  },[])
 
   useEffect(() => {
-    fetchNearbyEvents();
-  }, []);
-  
+    if (location) {
+      fetchNearbyEvents();
+    }
+    
+  }, [location]);
+
     // 🔧 Currently unused — fetches all events without filtering
   // const fetchAllEvents = async () => {
   //   setLoading(true);
@@ -34,13 +52,17 @@ export default function Home() {
   // };
 
   const fetchNearbyEvents = async () => {
+    if (!location) {
+      return;
+      
+    }
     setLoading(true);
     setError(null);
 
     try {
       const { data, error } = await supabase.rpc('nearby_events', {
-        lat: 9.0145526,
-        long: 7.5589706,
+        lat: location?.coords.latitude!,
+        long: location?.coords.longitude!,
       });
 
       if (error) {
