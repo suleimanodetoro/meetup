@@ -5,14 +5,13 @@ import { TabBarIcon } from '../../components/TabBarIcon';
 import { useAuth } from '../contexts/AuthProvider';
 
 export default function TabLayout() {
-  const {isAuthenticated} = useAuth();
-  console.log("is authenticated: "+isAuthenticated); //false here when not logged in yes?
+  const { isAuthenticated } = useAuth();
+  console.log('is authenticated: ' + isAuthenticated); //false here when not logged in yes?
   if (!isAuthenticated) {
-    return <Redirect href={"/login"} /> //why don't I see the log in screen? logic wrong?
+    return <Redirect href={'/login'} />; //why don't I see the log in screen? logic wrong?
   }
-  
+
   return (
-    
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: 'black',
@@ -27,6 +26,13 @@ export default function TabLayout() {
               <HeaderButton />
             </Link>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: 'Create',
+          tabBarIcon: ({ color }) => <TabBarIcon name="plus" color={color} />,
         }}
       />
       <Tabs.Screen

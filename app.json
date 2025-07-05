@@ -31,7 +31,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.suleimanao.MeetupClone",
-      "infoPlist":{
+      "infoPlist": {
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to select an avatar image."
       }
     },
@@ -39,7 +39,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.suleimanao.MeetupClone"
     }
   }
 }
