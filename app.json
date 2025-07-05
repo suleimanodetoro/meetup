@@ -17,6 +17,12 @@
           {
             "photosPersimission": "This app needs to access your photos library to let you upload it online"
           }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+        }
       ]
     ],
     "experiments": {

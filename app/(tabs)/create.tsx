@@ -32,6 +32,7 @@ export default function CreateEvent() {
           date: date.toISOString(),
           user_id: user.id,
           image_uri: imageUrl,
+          location_point: 'POINT(7.4507264 9.0600467)'
         },
       ])
       .select()
