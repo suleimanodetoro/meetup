@@ -12,19 +12,13 @@ import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import dayjs from 'dayjs';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/app/contexts/AuthProvider';
+import { Attendance, Event } from '~/types/db';
 
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  location: string;
-  image_uri: string;
-}
+
 
 export default function EventPage() {
   const [event, setEvent] = useState<Event | null>(null);
-  const [attendance, setAttendance] = useState<any>(null);
+  const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
