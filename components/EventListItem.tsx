@@ -1,41 +1,25 @@
 import Feather from '@expo/vector-icons/Feather';
-import { View, Text, Image, Pressable } from 'react-native';
 import dayjs from 'dayjs';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { View, Text, Image, Pressable } from 'react-native';
 import { supabase } from '~/utils/supabase';
+import SupaImage from './SupaImage';
 
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  location: string;
-  image_uri: string;
-}
-
-interface EventListItemProps {
-  event: Event;
-}
-
-const EventListItem = ({ event }: EventListItemProps) => {
+export default function EventListItem({ event }) {
   const [numberOfAttendees, setNumberOfAttendees] = useState(0);
+
   useEffect(() => {
-    if (event?.id) {
-      fetchNumberOfAttendees();
-    }
-  }, [event?.id]);
+    fetchNumberOfAttendees();
+  }, [event.id]);
 
   const fetchNumberOfAttendees = async () => {
-    const { count, error } = await supabase
+    const { count } = await supabase
       .from('attendance')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', event.id);
-      if (error) {
-        console.error('Failed to count attendees:', error.message);
-        return;
-      }
-      setNumberOfAttendees(count || 0);
+
+    setNumberOfAttendees(count);
   };
 
   return (
@@ -49,14 +33,19 @@ const EventListItem = ({ event }: EventListItemProps) => {
             <Text className="text-xl font-bold" numberOfLines={2}>
               {event.title}
             </Text>
+
             <Text className="text-gray-700">{event.location}</Text>
           </View>
 
-          <Image className="aspect-video w-2/5 rounded-xl" source={{ uri: event.image_uri }} />
+          {/* Event image */}
+          {event.image_uri && (
+            <SupaImage path={event.image_uri} className="aspect-video w-2/5 rounded-xl" />
+          )}
         </View>
 
+        {/* Footer */}
         <View className="flex-row gap-3">
-        <Text className="mr-auto text-gray-700">{numberOfAttendees} going</Text>
+          <Text className="mr-auto text-gray-700">{numberOfAttendees} going</Text>
 
           <Feather name="share" size={20} color="gray" />
           <Feather name="bookmark" size={20} color="gray" />
@@ -64,6 +53,4 @@ const EventListItem = ({ event }: EventListItemProps) => {
       </Pressable>
     </Link>
   );
-};
-
-export default EventListItem;
+}
