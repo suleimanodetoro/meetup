@@ -11,7 +11,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+          {
+            "photosPersimission": "This app needs to access your photos library to let you upload it online"
+          }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -32,7 +38,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.suleimanao.MeetupClone",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select an avatar image."
       }
     },
     "android": {
