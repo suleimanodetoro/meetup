@@ -14,14 +14,22 @@
       "expo-web-browser",
       [
         "expo-image-picker",
-          {
-            "photosPersimission": "This app needs to access your photos library to let you upload it online"
-          }
+        {
+          "photosPersimission": "This app needs to access your photos library to let you upload it online"
+        }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location.",
+          "locationWhenInUsePermission": "Show current location on map."
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "sk.eyJ1Ijoic3VsZWltYW5vZGV0b3JvIiwiYSI6ImNtY3QwNXJpdzAwMTQya3F6NWZ5dTl1aXQifQ.dPHjgcY3MFr2Ffvk1yWt7A",
+          "RNMapboxMapsVersion": "11.0.0"
         }
       ]
     ],
@@ -43,8 +51,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.suleimanao.MeetupClone",
-      "infoPlist": {
-      }
+      "infoPlist": {}
     },
     "android": {
       "adaptiveIcon": {
