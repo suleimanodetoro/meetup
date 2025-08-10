@@ -1,4 +1,4 @@
-// ~/screens/CreateEvent.js
+// app/(tabs)/create.tsx
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View, TextInput, Button, Pressable, Alert, ScrollView } from 'react-native';

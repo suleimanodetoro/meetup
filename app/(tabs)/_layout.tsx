@@ -1,44 +1,77 @@
-import { Link, Redirect, Tabs } from 'expo-router';
-
-import { HeaderButton } from '../../components/HeaderButton';
-import { TabBarIcon } from '../../components/TabBarIcon';
-import { useAuth } from '../contexts/AuthProvider';
+// app/(tabs)/_layout.tsx
+import { Tabs } from 'expo-router';
+import { TabBarIcon } from '~/components/TabBarIcon';
+import { View } from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const { isAuthenticated } = useAuth();
-  console.log('is authenticated: ' + isAuthenticated); //false here when not logged in yes?
-  if (!isAuthenticated) {
-    return <Redirect href={'/login'} />; //why don't I see the log in screen? logic wrong?
-  }
-
+  // No auth logic here - just the tab structure
+  // All navigation control is handled by the root NavigationController
+  
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: 'black',
+        tabBarActiveTintColor: '#e91e63',
+        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 0,
+          elevation: 0,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <HeaderButton />
-            </Link>
-          ),
+          title: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: 'Map',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <TabBarIcon name="map-marker" color={color} />,
         }}
       />
       <Tabs.Screen
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color }) => <TabBarIcon name="plus" color={color} />,
+          headerShown: false,
+          tabBarIcon: ({ color }) => (
+            <View
+              style={{
+                backgroundColor: '#e91e63',
+                padding: 12,
+                borderRadius: 30,
+                marginTop: -20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+              <FontAwesome5 name="plus" size={24} color="white" />
+            </View>
+          ),
+          tabBarLabel: () => null,
+        }}
+      />
+      <Tabs.Screen
+        name="chats"
+        options={{
+          title: 'Chats',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <TabBarIcon name="comment" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
+          headerShown: false,
           tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
         }}
       />

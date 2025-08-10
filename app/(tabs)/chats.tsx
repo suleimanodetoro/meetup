@@ -1,0 +1,5 @@
+//app/(tabs)/chats.tsx
+import { Text } from 'react-native';
+export default function ChatScreen() {
+  return <Text>Chat Screen</Text>;
+}

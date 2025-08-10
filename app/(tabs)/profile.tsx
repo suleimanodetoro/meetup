@@ -1,3 +1,4 @@
+// app/(tabs)/profile.tsx
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Pressable, TextInput, View, Text } from 'react-native';
@@ -15,7 +16,7 @@ export default function Profile() {
 
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
 
   useEffect(() => {
     if (session) getProfile();
@@ -36,10 +37,10 @@ export default function Profile() {
       }
 
       if (data) {
-        setUsername(data.username);
-        setWebsite(data.website);
-        setAvatarUrl(data.avatar_url);
-        setFullName(data.full_name);
+        setUsername(data.username || '');
+        setWebsite(data.website || '');
+        setAvatarUrl(data.avatar_url || '');
+        setFullName(data.full_name || '');
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -59,6 +60,7 @@ export default function Profile() {
     username: string;
     website: string;
     avatar_url: string;
+    full_name: string;
   }) {
     try {
       setLoading(true);
@@ -70,7 +72,7 @@ export default function Profile() {
         website,
         avatar_url,
         full_name,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase.from('profiles').upsert(updates);
@@ -97,14 +99,14 @@ export default function Profile() {
           url={avatarUrl}
           onUpload={(url: string) => {
             setAvatarUrl(url);
-            updateProfile({ username, website, avatar_url: url });
+            updateProfile({ username, website, avatar_url: url, full_name: fullName });
           }}
         />
       </View>
 
       <TextInput
         editable={false}
-        value={session.user.email}
+        value={session?.user?.email || ''}
         placeholder="email"
         autoCapitalize="none"
         className="rounded-md border border-gray-200 p-3 text-gray-600"
@@ -143,7 +145,7 @@ export default function Profile() {
         <Text className="text-lg font-bold text-red-500">Save</Text>
       </Pressable>
 
-      <Button title="Sign out" onPress={() => supabase.auth.signOut()} />
+      <Button title="Sign out" onPress={() => signOut()} />
     </View>
   );
 }

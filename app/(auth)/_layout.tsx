@@ -1,20 +1,22 @@
+
 // app/(auth)/_layout.tsx
-import { Redirect, Stack } from 'expo-router';
-import { useAuth } from '../contexts/AuthProvider';
+import { Stack } from 'expo-router';
 
 export default function AuthLayout() {
-  const { isAuthenticated } = useAuth();
-
-  if (isAuthenticated) {
-    return <Redirect href="/" />;
-  }
-
+  // No logic here - just define the stack structure
+  // All navigation logic is handled by the root NavigationController
+  
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'fade',
-      }}
-    />
+        animation: 'slide_from_right',
+      }}>
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="signin" />
+      <Stack.Screen name="onboarding-basic" />
+      <Stack.Screen name="onboarding-nationality" />
+      <Stack.Screen name="onboarding-gender" />
+    </Stack>
   );
 }
