@@ -17,6 +17,7 @@ type AuthContextType = {
   hasCompletedOnboarding: boolean;
   isLoading: boolean;
   refreshOnboardingStatus: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   hasCompletedOnboarding: false,
   isLoading: true,
   refreshOnboardingStatus: async () => {},
+  signOut: async () => {},
 });
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
@@ -33,19 +35,42 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simple function to check onboarding - no callbacks, no deps
+  // Function to check onboarding status
   const checkOnboardingStatus = async (userId: string) => {
     try {
       console.log('Checking onboarding status for:', userId);
       
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('onboarding_completed, onboarding_step')
         .eq('id', userId)
         .single();
 
+      if (error) {
+        console.error('Error fetching profile:', error);
+        // If profile doesn't exist, create it
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating...');
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              onboarding_completed: false,
+              onboarding_step: 0,
+            });
+          
+          if (insertError) {
+            console.error('Error creating profile:', insertError);
+          }
+          setHasCompletedOnboarding(false);
+          return false;
+        }
+        setHasCompletedOnboarding(false);
+        return false;
+      }
+
       const isOnboarded = profile?.onboarding_completed === true;
-      console.log('Profile onboarding status:', isOnboarded);
+      console.log('Profile onboarding status:', isOnboarded, 'Step:', profile?.onboarding_step);
       setHasCompletedOnboarding(isOnboarded);
       return isOnboarded;
       
@@ -63,7 +88,23 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Single useEffect that runs ONCE
+  // Sign out function
+  const signOut = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear local state
+      setSession(null);
+      setHasCompletedOnboarding(false);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -94,7 +135,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []); // Empty array - run ONCE
+  }, []);
 
   if (isLoading) {
     return (
@@ -113,6 +154,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         hasCompletedOnboarding,
         isLoading,
         refreshOnboardingStatus,
+        signOut,
       }}
     >
       {children}

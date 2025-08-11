@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Using a more comprehensive list of countries for better search results.
 const COUNTRIES = [
     { name: 'Afghanistan', code: 'AF', flag: '🇦🇫' },
-    { name: 'Albania', code: 'AL', flag: '�🇱' },
+    { name: 'Albania', code: 'AL', flag: '🇦🇱' },
     { name: 'Algeria', code: 'DZ', flag: '🇩🇿' },
     { name: 'Andorra', code: 'AD', flag: '🇦🇩' },
     { name: 'Angola', code: 'AO', flag: '🇦🇴' },
