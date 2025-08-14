@@ -18,7 +18,12 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
-    const currentRoute = segments[1]; // Get the specific route within the group
+    const currentRoute = segments[0]; // Get the first segment
+    const currentSubRoute = segments[1]; // Get the specific route within the group
+    
+    // Define allowed root-level routes for authenticated users
+    const allowedAuthenticatedRoutes = ['edit-profile', 'add-trip', 'settings', 'event'];
+    const isAllowedRoute = allowedAuthenticatedRoutes.includes(currentRoute);
 
     console.log('Navigation check:', {
       isAuthenticated,
@@ -26,6 +31,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       inAuthGroup,
       inTabsGroup,
       currentRoute,
+      currentSubRoute,
+      isAllowedRoute,
       segments
     });
 
@@ -40,8 +47,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     } else if (!hasCompletedOnboarding) {
       // User is signed in but hasn't completed onboarding
       // They should be in auth group but on onboarding screens
-      const isOnOnboardingScreen = currentRoute?.startsWith('onboarding');
-      const isOnAuthScreen = currentRoute === 'welcome' || currentRoute === 'signin';
+      const isOnOnboardingScreen = currentSubRoute?.startsWith('onboarding');
+      const isOnAuthScreen = currentSubRoute === 'welcome' || currentSubRoute === 'signin';
       
       if (!inAuthGroup || isOnAuthScreen) {
         console.log('Redirecting to onboarding (authenticated but not completed)');
@@ -50,12 +57,13 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       // If they're already on an onboarding screen, let them continue
     } else {
       // User is signed in and has completed onboarding
-      if (!inTabsGroup) {
+      // Only redirect if not in tabs AND not on an allowed route
+      if (!inTabsGroup && !isAllowedRoute) {
         console.log('Redirecting to home (authenticated and onboarded)');
         router.replace('/(tabs)');
       }
     }
-  }, [isAuthenticated, hasCompletedOnboarding, isLoading, segments, rootNavigationState?.key]);
+  }, [isAuthenticated, hasCompletedOnboarding, isLoading, segments, rootNavigationState?.key, router]);
 
   if (isLoading) {
     return (
@@ -75,6 +83,10 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(auth)" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="add-trip" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="event/[id]" />
         </Stack>
       </NavigationController>
     </AuthProvider>
