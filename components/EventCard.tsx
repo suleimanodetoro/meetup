@@ -1,8 +1,7 @@
 // components/EventCard.tsx
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image } from 'react-native';
 import { Link } from 'expo-router';
-import SupaImage from './SupaImage';
 import { Event } from '~/types/db';
 import dayjs from 'dayjs';
 
@@ -11,12 +10,26 @@ type EventCardProps = {
 };
 
 const EventCard = ({ event }: EventCardProps) => {
+  // Debug log to verify URL
+  console.log('Event image URL:', event.image_uri);
+  
   return (
     <Link href={`/event/${event.id}`} asChild>
       <Pressable style={{ width: 280, marginRight: 16 }}>
-        <SupaImage
-          path={event.image_uri}
-          className="w-full h-32 rounded-lg bg-gray-200"
+        <Image
+          source={{ 
+            uri: event.image_uri || 'https://placehold.co/280x128/e91e63/white?text=No+Image' 
+          }}
+          style={{
+            width: '100%',
+            height: 128,
+            borderRadius: 8,
+            backgroundColor: '#e0e0e0',
+          }}
+          resizeMode="cover"
+          defaultSource={{ 
+            uri: 'https://placehold.co/280x128/e0e0e0/white?text=Loading' 
+          }}
         />
         <View style={{ marginTop: 8 }}>
           <Text
