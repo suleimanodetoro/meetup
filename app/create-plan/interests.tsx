@@ -15,31 +15,27 @@ import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 const INTERESTS = [
-  { id: 'adventure', label: 'Adventure', emoji: '🏃' },
-  { id: 'au-pair', label: 'Au Pair', emoji: '🌍' },
-  { id: 'backpacking', label: 'Backpacking', emoji: '🎒' },
-  { id: 'beach', label: 'Beach', emoji: '🏖️' },
-  { id: 'budget-travel', label: 'Budget Travel', emoji: '💰' },
-  { id: 'camping', label: 'Camping', emoji: '⛺' },
-  { id: 'cruise', label: 'Cruise', emoji: '🚢' },
-  { id: 'digital-nomad', label: 'Digital Nomad', emoji: '💻' },
-  { id: 'diving', label: 'Diving', emoji: '🤿' },
-  { id: 'hiking', label: 'Hiking', emoji: '🥾' },
-  { id: 'hostel', label: 'Hostel', emoji: '🛏️' },
-  { id: 'interrail', label: 'Interrail', emoji: '🚂' },
-  { id: 'living-abroad', label: 'Living Abroad', emoji: '🏠' },
-  { id: 'luxury-travel', label: 'Luxury Travel', emoji: '✨' },
-  { id: 'nature', label: 'Nature', emoji: '🌿' },
-  { id: 'night-life', label: 'Night Life', emoji: '🌃' },
-  { id: 'road-trip', label: 'Road Trip', emoji: '🚗' },
-  { id: 'skiing', label: 'Skiing', emoji: '⛷️' },
-  { id: 'sailing', label: 'Sailing', emoji: '⛵' },
-  { id: 'solo-travel', label: 'Solo Travel', emoji: '🎒' },
-  { id: 'surfing', label: 'Surfing', emoji: '🏄' },
-  { id: 'study-abroad', label: 'Study Abroad', emoji: '📚' },
-  { id: 'van-life', label: 'Van Life', emoji: '🚐' },
-  { id: 'volunteer', label: 'Volunteer', emoji: '🤝' },
-  { id: 'work-exchange', label: 'Work Exchange', emoji: '💼' },
+  { id: 'music', label: 'Music', emoji: '🎶' },
+  { id: 'gaming', label: 'Esports', emoji: '🎮' },
+  { id: 'dance', label: 'Dance Nights', emoji: '💃' },
+  { id: 'fitness', label: 'Group Fitness', emoji: '🏋️‍♂️' },
+  { id: 'yoga', label: 'Yoga & Mindfulness', emoji: '🧘‍♀️' },
+  { id: 'foodie', label: 'Food', emoji: '🍣' },
+  { id: 'coffee', label: 'Coffee & Chill', emoji: '☕' },
+  { id: 'arts', label: 'Arts & Crafts', emoji: '🎨' },
+  { id: 'photography', label: 'Photography Walks', emoji: '📸' },
+  { id: 'boardgames', label: 'Game Nights', emoji: '🎲' },
+  { id: 'karaoke', label: 'Karaoke', emoji: '🎤' },
+  { id: 'outdoor', label: 'Outdoor', emoji: '🌳' },
+  { id: 'volunteer', label: 'Volunteering', emoji: '🤝' },
+  { id: 'film', label: 'Movie Nights', emoji: '🎬' },
+  { id: 'fashion', label: 'Fashion', emoji: '🛍️' },
+  { id: 'tech', label: 'Tech Meetups', emoji: '💻' },
+  { id: 'skate', label: 'Skateboarding', emoji: '🛹' },
+  { id: 'sports', label: 'Sports', emoji: '⚽' },
+  { id: 'bookclub', label: 'Book Club', emoji: '📚' },
+  { id: 'creative', label: 'Writing', emoji: '✍️' },
+  { id: 'thrill', label: 'Adventure', emoji: '🏎️' },
 ];
 
 export default function InterestsScreen() {
@@ -105,7 +101,7 @@ export default function InterestsScreen() {
                   <Text style={[
                     styles.chipLabel,
                     isSelected && styles.chipLabelSelected,
-                  ]}>
+                  ]} numberOfLines={1}>
                     {interest.label}
                   </Text>
                 </Pressable>
@@ -188,6 +184,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     gap: 8,
+  maxWidth: '50%',
+  overflow: 'hidden'
+
   },
   chipSelected: {
     backgroundColor: '#4A90E2',

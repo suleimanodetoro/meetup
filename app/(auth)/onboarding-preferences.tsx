@@ -15,9 +15,9 @@ export default function OnboardingPreferencesScreen() {
   const [meetPreference, setMeetPreference] = useState('travel-together');
 
   const meetOptions = [
-    { id: 'travel-together', label: 'Travel together', emoji: '✈️' },
+    { id: 'go-together', label: 'Go together', emoji: '✈️' },
     { id: 'meet-there', label: 'Meet while I\'m there', emoji: '📍' },
-    { id: 'message-first', label: 'Message before making plans', emoji: '💬' },
+    { id: 'chat-first', label: 'Message before making plans', emoji: '💬' },
     { id: 'no-plans', label: 'No plans to meet yet', emoji: '✨' }
   ];
 

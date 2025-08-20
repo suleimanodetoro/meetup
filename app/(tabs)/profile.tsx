@@ -10,12 +10,11 @@ import {
   Dimensions,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
   StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Canvas } from '@react-three/fiber/native';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
@@ -29,7 +28,6 @@ const SHEET_MIN_HEIGHT = SCREEN_HEIGHT * 0.6;
 // Simple Globe Component using Three.js
 function Globe() {
   const meshRef = useRef<any>();
-  
   return (
     <mesh ref={meshRef} rotation={[0.3, 0, 0]}>
       <sphereGeometry args={[2, 32, 32]} />
@@ -39,23 +37,24 @@ function Globe() {
 }
 
 // Visit Hero Card Component
-function VisitHeroCard({ visit }: { visit: Visit & { daysUntil: number } }) {
+function VisitHeroCard({ visit, onPress }: { visit: Visit & { daysUntil: number }, onPress: () => void }) {
   return (
-    <Pressable style={{
-      width: '100%',
-      height: 200,
-      borderRadius: 20,
-      overflow: 'hidden',
-      backgroundColor: '#E3F2FD',
-    }}>
-      {/* Placeholder background - in real app would be city image */}
+    <Pressable 
+      onPress={onPress}  // ← ADD THIS!
+      style={{
+        width: '100%',
+        height: 200,
+        borderRadius: 20,
+        overflow: 'hidden',
+        backgroundColor: '#E3F2FD',
+      }}
+    >
       <LinearGradient
         colors={['#56CCF2', '#2F80ED']}
         style={{ flex: 1, padding: 16, justifyContent: 'space-between' }}
       >
         {/* Top row */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {/* Country flag chip */}
           <View style={{
             backgroundColor: 'rgba(255,255,255,0.9)',
             paddingHorizontal: 12,
@@ -66,8 +65,6 @@ function VisitHeroCard({ visit }: { visit: Visit & { daysUntil: number } }) {
           }}>
             <Text style={{ fontSize: 16 }}>{getCountryFlag(visit.country_code)}</Text>
           </View>
-          
-          {/* Days until chip */}
           <View style={{
             backgroundColor: 'rgba(255,255,255,0.9)',
             paddingHorizontal: 12,
@@ -100,7 +97,7 @@ function VisitHeroCard({ visit }: { visit: Visit & { daysUntil: number } }) {
           }}>
             {new Date(visit.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(visit.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </Text>
-          
+
           {/* Others going chip */}
           <View style={{
             flexDirection: 'row',
@@ -112,7 +109,6 @@ function VisitHeroCard({ visit }: { visit: Visit & { daysUntil: number } }) {
             paddingVertical: 4,
             borderRadius: 20,
           }}>
-            {/* Overlapping avatars */}
             <View style={{ flexDirection: 'row', marginRight: 8 }}>
               {[1, 2, 3].map((i) => (
                 <View
@@ -146,7 +142,6 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
       width: 280,
       marginRight: 16,
     }}>
-      {/* Image placeholder */}
       <View style={{
         height: 180,
         borderRadius: 16,
@@ -158,8 +153,6 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
           colors={['#667eea', '#764ba2']}
           style={{ flex: 1 }}
         />
-        
-        {/* Joined badge */}
         {plan.isJoined && (
           <View style={{
             position: 'absolute',
@@ -178,8 +171,7 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
           </View>
         )}
       </View>
-      
-      {/* Title */}
+
       <Text style={{
         fontSize: 18,
         fontWeight: 'bold',
@@ -187,14 +179,12 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
       }} numberOfLines={2}>
         {plan.title}
       </Text>
-      
-      {/* Bottom row */}
+
       <View style={{
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        {/* Location */}
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -203,10 +193,8 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
           <Text style={{ fontSize: 16 }}>{getCountryFlag(plan.country_code)}</Text>
           <Text style={{ fontSize: 14, color: '#666' }}>{plan.country || plan.city}</Text>
         </View>
-        
-        {/* Participants */}
+
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* Overlapping avatars */}
           <View style={{ flexDirection: 'row', marginRight: 6 }}>
             {[1, 2, 3].map((i) => (
               <View
@@ -231,12 +219,11 @@ function PlanCard({ plan }: { plan: Event & { isJoined: boolean } }) {
 }
 
 export default function ProfileScreen() {
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
   const scrollY = useRef(new Animated.Value(0)).current;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [upcomingVisits, setUpcomingVisits] = useState<any[]>([]);
   const [joinedPlans, setJoinedPlans] = useState<any[]>([]);
-  const [friends, setFriends] = useState<any[]>([]);
   const [stats, setStats] = useState({ plans: 0, visits: 0, visited: 1 });
   const [loading, setLoading] = useState(true);
 
@@ -245,83 +232,110 @@ export default function ProfileScreen() {
   }, [session]);
 
   const fetchProfileData = async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      setLoading(true);
-      
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (profileData) {
-        setProfile(profileData);
-      }
-      
-      // Fetch upcoming visits
-      const { data: visits } = await supabase
-        .from('visits')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .gte('start_date', new Date().toISOString())
-        .order('start_date', { ascending: true });
-      
-      if (visits) {
-        // Calculate days until for each visit
-        const visitsWithDays = visits.map(v => ({
-          ...v,
-          daysUntil: Math.ceil((new Date(v.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-        }));
-        setUpcomingVisits(visitsWithDays);
-        setStats(prev => ({ ...prev, visits: visits.length }));
-      }
-      
-      // Fetch joined plans (events user is attending)
-      const { data: attendance } = await supabase
-        .from('attendance')
-        .select('event_id')
-        .eq('user_id', session.user.id);
-      
-      if (attendance && attendance.length > 0) {
-        const eventIds = attendance.map(a => a.event_id);
-        const { data: events } = await supabase
-          .from('events')
-          .select('*')
-          .in('id', eventIds);
-        
-        if (events) {
-          const eventsWithJoined = events.map(e => ({ ...e, isJoined: true }));
-          setJoinedPlans(eventsWithJoined);
-          setStats(prev => ({ ...prev, plans: events.length }));
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!session?.user?.id) return;
 
-  // Animation interpolations
+  try {
+    setLoading(true);
+
+    // Fetch profile data
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+    if (profileData) setProfile(profileData);
+
+    // DEBUGGING: Check user ID and all visits
+    console.log('=== DEBUGGING VISITS ===');
+    console.log('Current user ID from session:', session.user.id);
+    console.log('Session object:', session);
+
+    // First, let's see ALL visits in the database (for debugging)
+    const { data: allVisitsInDB, error: allVisitsError } = await supabase
+      .from('visits')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    console.log('ALL visits in database:', allVisitsInDB);
+    console.log('Error fetching all visits:', allVisitsError);
+
+    // Now check visits for current user specifically
+    const { data: userVisits, error: userVisitsError } = await supabase
+      .from('visits')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('start_date', { ascending: true });
+
+    console.log('User-specific visits:', userVisits);
+    console.log('User visits error:', userVisitsError);
+
+    // Check if user exists in any visits
+    const userExists = allVisitsInDB?.some(visit => visit.user_id === session.user.id);
+    console.log('Does current user exist in ANY visits?', userExists);
+
+    // Show which user IDs exist in database
+    const uniqueUserIds = [...new Set(allVisitsInDB?.map(v => v.user_id) || [])];
+    console.log('User IDs that have visits in DB:', uniqueUserIds);
+
+    // Apply date filter for upcoming visits
+    const today = new Date().toISOString().split('T')[0];
+    const upcomingUserVisits = userVisits?.filter(v => v.start_date >= today) || [];
+
+    console.log('Today date:', today);
+    console.log('Upcoming visits for user:', upcomingUserVisits);
+
+    if (upcomingUserVisits) {
+      const visitsWithDays = upcomingUserVisits.map(v => ({
+        ...v,
+        daysUntil: Math.ceil((new Date(v.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      }));
+      setUpcomingVisits(visitsWithDays);
+      setStats(prev => ({ ...prev, visits: upcomingUserVisits.length }));
+    }
+
+    console.log('=== END DEBUGGING ===');
+
+    // Rest of your existing code...
+    const { data: attendance } = await supabase
+      .from('attendance')
+      .select('event_id')
+      .eq('user_id', session.user.id);
+    
+    if (attendance && attendance.length > 0) {
+      const eventIds = attendance.map(a => a.event_id);
+      const { data: events } = await supabase
+        .from('events')
+        .select('*')
+        .in('id', eventIds)
+        .order('date', { ascending: true });
+      if (events) setJoinedPlans(events);
+    }
+  } catch (error) {
+    console.error('Error fetching profile data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Animations
   const globeOpacity = scrollY.interpolate({
     inputRange: [0, 200],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
-
   const sheetTranslateY = scrollY.interpolate({
     inputRange: [0, 200],
     outputRange: [0, -GLOBE_HEIGHT + 80],
     extrapolate: 'clamp',
   });
-
   const headerOpacity = scrollY.interpolate({
     inputRange: [150, 200],
     outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const inverseHeaderOpacity = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
@@ -340,8 +354,8 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#0A1929' }}>
       <StatusBar barStyle="light-content" />
-      
-      {/* Globe Background */}
+
+      {/* Globe Background (kept visually the same) */}
       <Animated.View style={{
         position: 'absolute',
         top: 0,
@@ -349,14 +363,15 @@ export default function ProfileScreen() {
         right: 0,
         height: GLOBE_HEIGHT,
         opacity: globeOpacity,
+        // no zIndex bump here, so the globe itself won't float above the sheet
       }}>
         <Canvas>
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} />
           <Globe />
         </Canvas>
-        
-        {/* Top overlays in Globe state */}
+
+        {/* Brand pill only (buttons moved to overlay for reliable taps) */}
         <View style={{
           position: 'absolute',
           top: 60,
@@ -365,7 +380,6 @@ export default function ProfileScreen() {
           flexDirection: 'row',
           justifyContent: 'space-between',
         }}>
-          {/* Brand pill */}
           <View style={{
             backgroundColor: 'rgba(255,255,255,0.9)',
             paddingHorizontal: 16,
@@ -387,10 +401,50 @@ export default function ProfileScreen() {
             </View>
             <Text style={{ fontSize: 16, fontWeight: '600' }}>Thirdspace</Text>
           </View>
-          
-          {/* Icon buttons */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable style={{
+        </View>
+      </Animated.View>
+
+      {/* 🔝 Top-right Controls Overlay (above sheet, fades out as header fades in) */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          top: 60,
+          right: 20,
+          zIndex: 30,        // ensures taps always reach these
+          opacity: inverseHeaderOpacity,
+        }}
+      >
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Pressable style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'relative',
+          }}>
+            <Ionicons name="notifications-outline" size={24} color="#333" />
+            <View style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              backgroundColor: '#FF3B30',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <Text style={{ color: 'white', fontSize: 8, fontWeight: 'bold' }}>1</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/settings')}
+            hitSlop={12}
+            style={{
               width: 44,
               height: 44,
               borderRadius: 22,
@@ -398,36 +452,8 @@ export default function ProfileScreen() {
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              {/* Notification badge */}
-              <View style={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                width: 12,
-                height: 12,
-                borderRadius: 6,
-                backgroundColor: '#FF3B30',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}>
-                <Text style={{ color: 'white', fontSize: 8, fontWeight: 'bold' }}>1</Text>
-              </View>
-            </Pressable>
-            
-            <Pressable 
-              onPress={() => router.push('/settings')}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}>
-              <Ionicons name="settings-outline" size={24} color="#333" />
-            </Pressable>
-          </View>
+            <Ionicons name="settings-outline" size={24} color="#333" />
+          </Pressable>
         </View>
       </Animated.View>
 
@@ -442,11 +468,10 @@ export default function ProfileScreen() {
         paddingBottom: 20,
         paddingHorizontal: 20,
         opacity: headerOpacity,
-        zIndex: 10,
+        zIndex: 20,
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            {/* Avatar */}
             <View style={{
               width: 60,
               height: 60,
@@ -456,8 +481,8 @@ export default function ProfileScreen() {
               alignItems: 'center',
             }}>
               {profile?.avatar_url ? (
-                <Image 
-                  source={{ uri: profile.avatar_url }} 
+                <Image
+                  source={{ uri: profile.avatar_url }}
                   style={{ width: 60, height: 60, borderRadius: 30 }}
                 />
               ) : (
@@ -466,12 +491,12 @@ export default function ProfileScreen() {
                 </Text>
               )}
             </View>
-            
+
             <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
               {profile?.full_name || 'Traveler'}
             </Text>
           </View>
-          
+
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Pressable style={{
               width: 40,
@@ -483,9 +508,10 @@ export default function ProfileScreen() {
             }}>
               <Ionicons name="notifications-outline" size={20} color="#333" />
             </Pressable>
-            
-            <Pressable 
+
+            <Pressable
               onPress={() => router.push('/settings')}
+              hitSlop={12}
               style={{
                 width: 40,
                 height: 40,
@@ -517,6 +543,7 @@ export default function ProfileScreen() {
           borderTopRightRadius: 30,
           paddingTop: 60,
           transform: [{ translateY: sheetTranslateY }],
+          // no zIndex here; the overlay controls sit above via zIndex:30
         }}>
           {/* Avatar overlapping sheet edge (Globe state) */}
           <View style={{
@@ -533,8 +560,8 @@ export default function ProfileScreen() {
             alignItems: 'center',
           }}>
             {profile?.avatar_url ? (
-              <Image 
-                source={{ uri: profile.avatar_url }} 
+              <Image
+                source={{ uri: profile.avatar_url }}
                 style={{ width: 92, height: 92, borderRadius: 46 }}
               />
             ) : (
@@ -574,8 +601,7 @@ export default function ProfileScreen() {
                 <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
                   {profile?.full_name || 'Traveler'}
                 </Text>
-                
-                {/* Verification badge */}
+
                 {isVerified ? (
                   <View style={{
                     backgroundColor: '#E8F5E9',
@@ -604,13 +630,12 @@ export default function ProfileScreen() {
                   </View>
                 )}
               </View>
-              
+
               <Pressable onPress={() => router.push('/edit-profile')}>
                 <Text style={{ fontSize: 16, color: '#4A90E2' }}>Edit Profile ›</Text>
               </Pressable>
             </View>
-            
-            {/* Country */}
+
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
               <Text style={{ fontSize: 20 }}>{getCountryFlag(profile?.nationality_code || 'NG')}</Text>
               <Text style={{ fontSize: 16, color: '#666' }}>
@@ -619,7 +644,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Boxed Stats (Full profile state) */}
+          {/* Boxed Stats */}
           <View style={{
             flexDirection: 'row',
             paddingHorizontal: 30,
@@ -663,12 +688,20 @@ export default function ProfileScreen() {
                 <Text style={{ fontSize: 16, color: '#4A90E2' }}>See all ›</Text>
               </Pressable>
             </View>
-            
+
             {upcomingVisits.length > 0 ? (
-              <View style={{ paddingHorizontal: 30 }}>
-                <VisitHeroCard visit={upcomingVisits[0]} />
-              </View>
-            ) : (
+  <View style={{ paddingHorizontal: 30 }}>
+    <VisitHeroCard
+      visit={upcomingVisits[0]}
+      onPress={() =>
+        router.push({
+          pathname: '/visit/[id]',
+          params: { id: String(upcomingVisits[0].id) }, // ensure it's a string
+        })
+      }
+    />
+  </View>
+) : (
               <View style={{ alignItems: 'center', paddingVertical: 40, paddingHorizontal: 30 }}>
                 <Text style={{ fontSize: 60, marginBottom: 20 }}>🌍</Text>
                 <Text style={{ fontSize: 18, color: '#333', marginBottom: 20, textAlign: 'center' }}>
@@ -706,7 +739,7 @@ export default function ProfileScreen() {
                 <Text style={{ fontSize: 16, color: '#4A90E2' }}>See all ›</Text>
               </Pressable>
             </View>
-            
+
             {joinedPlans.length > 0 ? (
               <ScrollView
                 horizontal
@@ -748,7 +781,7 @@ export default function ProfileScreen() {
                 <Text style={{ fontSize: 16, color: '#4A90E2' }}>See all ›</Text>
               </Pressable>
             </View>
-            
+
             <View style={{
               marginHorizontal: 30,
               backgroundColor: '#F5F5F5',
