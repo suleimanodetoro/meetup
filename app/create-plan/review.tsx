@@ -1,14 +1,14 @@
 // app/create-plan/review.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  ScrollView,
   Pressable,
   SafeAreaView,
-  ScrollView,
   ActivityIndicator,
-  Image,
   Alert,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,43 +18,20 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
 import { decode } from 'base64-arraybuffer';
 
-// keep your helper
-const extractBase64 = (s: string) => {
-  if (!s) return '';
-  if (s.startsWith('data:')) {
-    const i = s.indexOf(',');
-    return i >= 0 ? s.slice(i + 1) : s;
-  }
-  return s;
-};
-
 export default function ReviewScreen() {
   const { formData, resetForm } = useCreatePlan();
   const { session } = useAuth();
   const [creating, setCreating] = useState(false);
+  const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+  
+  // Log formData to debug
+  console.log('Review formData:', formData);
 
-  const formatDate = (date?: Date) =>
-    date
-      ? date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      : 'Not set';
-
-  const formatTime = (date?: Date) =>
-    date ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Not set';
-
-  const calculateTotalCost = () => {
-    if (formData.costs.some(c => c.name === 'No expected cost')) return 'Free';
-    const total = formData.costs
-      .filter(c => c.amount && !c.isOptional)
-      .reduce((sum, c) => sum + (c.amount || 0), 0);
-    return total === 0 ? 'Free' : `$${total.toFixed(2)}`;
-  };
-
-  // show the actual image
-  const imagePreviewUri = useMemo(() => {
-    if (formData?.imageUri) return formData.imageUri;
-    if (formData?.imageBase64) return `data:image/jpeg;base64,${formData.imageBase64}`;
-    return undefined;
-  }, [formData?.imageUri, formData?.imageBase64]);
+  useEffect(() => {
+    if (formData.imageBase64) {
+      setImagePreviewUri(`data:image/jpeg;base64,${formData.imageBase64}`);
+    }
+  }, [formData.imageBase64]);
 
   const handleCreatePlan = async () => {
     if (!session?.user?.id) {
@@ -63,65 +40,56 @@ export default function ReviewScreen() {
     }
 
     setCreating(true);
+    
+    // Debug logging
+    console.log('Starting plan creation with formData:', {
+      title: formData.title,
+      description: formData.description,
+      hasVenues: formData.venues?.length,
+      hasDestinations: formData.destinations?.length,
+      hasInterests: formData.interests?.length,
+      hasCosts: formData.costs?.length,
+    });
+    
     try {
-      // Step 1: upload image (if any)
-      let imageUrl: string | null = null;
-
+      // Step 1: Upload image if exists
+      let imageUrl = null;
       if (formData.imageBase64) {
-        const fileExt = 'jpg';
-        const fileName = `event-${session.user.id}-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}.${fileExt}`;
-
-        const rawB64 = extractBase64(formData.imageBase64).replace(/\s/g, '');
-
-        let bytes: Uint8Array;
-        try {
-          const raw = decode(rawB64); // ArrayBuffer
-          bytes = new Uint8Array(raw); // RN-safe ArrayBufferView
-        } catch (e) {
-          throw new Error('Could not decode image data.');
-        }
-
-        if (bytes.byteLength > 9 * 1024 * 1024) {
-          throw new Error('Image too large. Please pick a smaller image (< 9MB).');
-        }
-
+        const fileName = `plan-${Date.now()}-${session.user.id}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(fileName, bytes, {
+          .upload(fileName, decode(formData.imageBase64), {
             contentType: 'image/jpeg',
-            upsert: false,
-            cacheControl: '3600',
+            upsert: true,
           });
 
-        if (uploadError) throw new Error(uploadError.message || 'Image upload failed.');
+        if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
 
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-        imageUrl = publicUrl ?? null;
+        const { data: publicData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+        imageUrl = publicData.publicUrl;
       }
 
-      // Step 2: build & insert event
+      // Step 2: Create the event (with safe array access)
+      const venues = formData.venues || [];
+      const destinations = formData.destinations || [];
+      const costs = formData.costs || [];
+      const interests = formData.interests || [];
+      
       const eventData = {
         title: formData.title,
         description: formData.description,
-        date: formData.startDate.toISOString(),
-        end_date: formData.isOneDay ? null : formData.endDate?.toISOString(),
-        image_uri: imageUrl,
         user_id: session.user.id,
-        interests: formData.interests,
-        is_one_day: formData.isOneDay,
-        is_all_day: formData.isAllDay,
-        guidelines_accepted: formData.guidelinesAccepted,
-        guidelines_accepted_at: new Date().toISOString(),
-        city: formData.venues[0]?.city || null,
-        location_name: formData.venues[0]?.name || null,
-        country: formData.venues[0]?.country || null,
-        country_code: formData.venues[0]?.country_code || null,
-        location_point:
-          formData.venues[0]?.lat && formData.venues[0]?.lng
-            ? `POINT(${formData.venues[0].lng} ${formData.venues[0].lat})`
-            : null,
+        date: formData.startDate.toISOString(),
+        end_date: formData.endDate?.toISOString() || formData.startDate.toISOString(),
+        interests: interests,
+        city: venues[0]?.city || destinations[0]?.city || 'Unknown',
+        location_name: venues[0]?.name || null,
+        country: venues[0]?.country || destinations[0]?.country || 'Unknown',
+        country_code: venues[0]?.country_code || destinations[0]?.country_code || 'XX',
+        image_uri: imageUrl,
+        is_private: false,
       };
 
       const { data: event, error: eventError } = await supabase
@@ -130,12 +98,21 @@ export default function ReviewScreen() {
         .select()
         .single();
 
-      if (eventError) throw new Error(`Failed to create event: ${eventError.message}`);
-      if (!event) throw new Error('No event data returned from database');
+      if (eventError) {
+        console.error('Event creation error:', eventError);
+        throw new Error(`Failed to create event: ${eventError.message}`);
+      }
+      
+      if (!event) {
+        console.error('No event data returned');
+        throw new Error('No event data returned from database');
+      }
+      
+      console.log('Event created successfully:', event.id);
 
-      // Step 3: add venues
-      if (formData.venues.length > 0) {
-        const venuesData = formData.venues.map((venue, index) => ({
+      // Step 3: Add venues
+      if (venues.length > 0) {
+        const venuesData = venues.map((venue, index) => ({
           event_id: event.id,
           venue_name: venue.name,
           venue_address: venue.address,
@@ -149,29 +126,99 @@ export default function ReviewScreen() {
         await supabase.from('event_venues').insert(venuesData);
       }
 
-      // Step 4: add costs
-      if (formData.costs.length > 0 && !formData.costs.some(c => c.name === 'No expected cost')) {
-        const costsData = formData.costs
-          .filter(c => c.name.trim())
+      // Step 4: Add costs
+      if (costs.length > 0 && !costs.some(c => c.name === 'No expected cost')) {
+        const costsData = costs
+          .filter(c => c.name && c.name.trim())
           .map(cost => ({
             event_id: event.id,
             item_name: cost.name,
-            amount: cost.amount,
-            is_optional: cost.isOptional,
-            link_url: cost.link,
+            amount: cost.amount || 0,
+            is_optional: cost.isOptional || false,
+            link_url: cost.link || null,
           }));
-        await supabase.from('event_costs').insert(costsData);
+        if (costsData.length > 0) {
+          await supabase.from('event_costs').insert(costsData);
+        }
       }
 
-      // success: reset + send to start of stack (tabs root)
-      resetForm();
-      router.replace('/(tabs)');
+      // Step 5: IMPORTANT - Add creator as attendee (this triggers conversation creation)
+      const { error: attendanceError } = await supabase
+        .from('attendance')
+        .insert({
+          event_id: event.id,
+          user_id: session.user.id,
+        });
+
+      if (attendanceError && attendanceError.code !== '23505') { // Ignore if already exists
+        console.error('Failed to join event:', attendanceError);
+      }
+
+      // Step 6: Manually ensure conversation exists (in case trigger failed)
+      // Check if conversation was created
+      const { data: conversation, error: convCheckError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('event_id', event.id)
+        .single();
+
+      if (!conversation && !convCheckError) {
+        // Create conversation manually if trigger didn't work
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            type: 'group',
+            name: formData.title,
+            event_id: event.id,
+            avatar_url: imageUrl
+          })
+          .select()
+          .single();
+
+        if (!convError && newConv) {
+          // Add creator as participant
+          await supabase
+            .from('conversation_participants')
+            .insert({
+              conversation_id: newConv.id,
+              user_id: session.user.id,
+            });
+        }
+      }
+
+      // Step 7: Navigate WITHOUT resetting form immediately
+      const eventId = event.id;
+      console.log('Navigating to event:', eventId);
+      
+      // Use replace to avoid navigation stack issues
+      router.replace(`/event/${eventId}`);
+      
+      // Don't reset the form - let the navigation complete first
 
     } catch (error: any) {
       Alert.alert('Creation Failed', error?.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setCreating(false);
     }
+  };
+
+  const calculateTotalCost = () => {
+    const costs = formData.costs || [];
+    if (costs.length === 0 || costs.some(c => c.name === 'No expected cost')) {
+      return 'Free';
+    }
+    
+    const total = costs
+      .filter(c => !c.isOptional && c.amount)
+      .reduce((sum, c) => sum + (c.amount || 0), 0);
+    
+    const optionalCount = costs.filter(c => c.isOptional).length;
+    
+    if (total === 0 && optionalCount > 0) {
+      return 'Optional costs only';
+    }
+    
+    return `$${total.toFixed(2)}${optionalCount > 0 ? ' + optional' : ''}`;
   };
 
   const EditButton = ({ onPress }: { onPress: () => void }) => (
@@ -210,90 +257,96 @@ export default function ReviewScreen() {
 
             <Text className="text-lg font-semibold text-gray-900">{formData.title}</Text>
 
-            {imagePreviewUri ? (
-              <View className="mt-3 overflow-hidden rounded-xl bg-gray-100">
-                <Image source={{ uri: imagePreviewUri }} className="h-44 w-full" resizeMode="cover" />
-              </View>
-            ) : (
-              <View className="mt-3 flex-row items-center gap-2">
-                <Ionicons name="image" size={16} color="#4A90E2" />
-                <Text className="text-sm text-indigo-500">No image</Text>
-              </View>
+            {imagePreviewUri && (
+              <Image
+                source={{ uri: imagePreviewUri }}
+                className="mt-3 h-48 w-full rounded-xl"
+                resizeMode="cover"
+              />
             )}
           </View>
 
           {/* About */}
           <View className="mt-4 rounded-2xl bg-gray-50 p-5">
             <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">About</Text>
+              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                About
+              </Text>
               <EditButton onPress={() => router.push('/create-plan/about')} />
             </View>
-            <Text className="text-[15px] leading-6 text-gray-900">{formData.description}</Text>
+            <Text className="text-gray-700">{formData.description}</Text>
           </View>
 
           {/* Date */}
           <View className="mt-4 rounded-2xl bg-gray-50 p-5">
             <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">Date</Text>
+              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                Date
+              </Text>
               <EditButton onPress={() => router.push('/create-plan/date')} />
             </View>
-            <Text className="text-lg font-semibold text-gray-900">
-              {formData.isOneDay
-                ? formatDate(formData.startDate)
-                : `${formatDate(formData.startDate)} - ${formatDate(formData.endDate)}`}
+            <Text className="text-gray-700">
+              {formData.startDate.toLocaleDateString()}
+              {formData.endDate && formData.endDate !== formData.startDate
+                ? ` - ${formData.endDate.toLocaleDateString()}`
+                : ''}
             </Text>
-            {!formData.isAllDay && (
-              <Text className="mt-1 text-sm text-gray-600">
-                {formatTime(formData.startDate)}
-                {!formData.isOneDay && formData.endDate ? ` - ${formatTime(formData.endDate)}` : ''}
-              </Text>
-            )}
-            <View className="mt-2 flex-row gap-2">
-              {formData.isOneDay && (
-                <View className="rounded-full bg-indigo-50 px-3 py-1">
-                  <Text className="text-xs font-semibold text-indigo-600">One-day</Text>
-                </View>
-              )}
-              {formData.isAllDay && (
-                <View className="rounded-full bg-indigo-50 px-3 py-1">
-                  <Text className="text-xs font-semibold text-indigo-600">All-day</Text>
-                </View>
-              )}
-            </View>
           </View>
 
           {/* Destinations */}
-          <View className="mt-4 rounded-2xl bg-gray-50 p-5">
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                Destinations ({formData.venues.length})
-              </Text>
-              <EditButton onPress={() => router.push('/create-plan/destinations')} />
-            </View>
-            {formData.venues.map((venue, index) => (
-              <View key={index} className="mb-2">
-                <Text className="text-[15px] text-gray-900">• {venue.name}</Text>
-                {venue.city ? <Text className="text-sm text-gray-600">{venue.city}</Text> : null}
+          {formData.destinations && formData.destinations.length > 0 && (
+            <View className="mt-4 rounded-2xl bg-gray-50 p-5">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Destinations
+                </Text>
+                <EditButton onPress={() => router.push('/create-plan/destinations')} />
               </View>
-            ))}
-          </View>
-
-          {/* Interests */}
-          <View className="mt-4 rounded-2xl bg-gray-50 p-5">
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                Interests ({formData.interests.length})
-              </Text>
-              <EditButton onPress={() => router.push('/create-plan/interests')} />
+              {formData.destinations.map((dest, index) => (
+                <Text key={index} className="text-gray-700">
+                  • {dest.city}, {dest.country}
+                </Text>
+              ))}
             </View>
-            <View className="flex-row flex-wrap gap-2">
-              {formData.interests.map(interest => (
-                <View key={interest} className="rounded-full bg-white px-3 py-1">
-                  <Text className="text-sm text-gray-800">{interest}</Text>
+          )}
+
+          {/* Venues */}
+          {formData.venues && formData.venues.length > 0 && (
+            <View className="mt-4 rounded-2xl bg-gray-50 p-5">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Venues
+                </Text>
+                <EditButton onPress={() => router.push('/create-plan/destinations')} />
+              </View>
+              {formData.venues.map((venue, index) => (
+                <View key={index} className="mb-2">
+                  <Text className="text-gray-900 font-medium">{venue.name}</Text>
+                  {venue.address && <Text className="text-sm text-gray-600">{venue.address}</Text>}
+                  {venue.city && <Text className="text-sm text-gray-600">{venue.city}</Text>}
                 </View>
               ))}
             </View>
-          </View>
+          )}
+
+          {/* Interests */}
+          {formData.interests && formData.interests.length > 0 && (
+            <View className="mt-4 rounded-2xl bg-gray-50 p-5">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Interests
+                </Text>
+                <EditButton onPress={() => router.push('/create-plan/interests')} />
+              </View>
+              <View className="flex-row flex-wrap gap-2">
+                {formData.interests.map((interest, index) => (
+                  <View key={index} className="rounded-full bg-indigo-100 px-3 py-1">
+                    <Text className="text-sm text-indigo-700">{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Costs */}
           <View className="mt-4 rounded-2xl bg-gray-50 p-5">
@@ -305,7 +358,7 @@ export default function ReviewScreen() {
             </View>
             <Text className="text-lg font-semibold text-gray-900">{calculateTotalCost()}</Text>
 
-            {formData.costs.length > 0 && !formData.costs.some(c => c.name === 'No expected cost') && (
+            {formData.costs && formData.costs.length > 0 && !formData.costs.some(c => c.name === 'No expected cost') && (
               <View className="mt-3 border-t border-gray-200 pt-3">
                 {formData.costs.map((cost, index) => (
                   <View key={index} className="mb-2 flex-row items-baseline justify-between">
@@ -323,27 +376,39 @@ export default function ReviewScreen() {
           </View>
 
           {/* Guidelines */}
-          <View className="mt-4 flex-row items-center gap-3 rounded-2xl bg-green-50 p-5">
-            <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
-            <Text className="text-[15px] text-green-700">Guidelines accepted</Text>
-          </View>
+          {formData.guidelines && (
+            <View className="mt-4 rounded-2xl bg-gray-50 p-5">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Guidelines
+                </Text>
+                <EditButton onPress={() => router.push('/create-plan/guidelines')} />
+              </View>
+              <Text className="text-gray-700">{formData.guidelines}</Text>
+            </View>
+          )}
+
+          {/* Guidelines Accepted */}
+          {formData.guidelinesAccepted && (
+            <View className="mt-4 flex-row items-center gap-3 rounded-2xl bg-green-50 p-5">
+              <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+              <Text className="text-[15px] text-green-700">Guidelines accepted</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* Create Button */}
-      <View className="border-t border-gray-200 bg-white px-5 pb-8">
+      <View className="border-t border-gray-200 bg-white px-5 pb-8 pt-4">
         <Pressable
           onPress={handleCreatePlan}
           disabled={creating}
           className={`items-center justify-center rounded-2xl py-4 ${creating ? 'bg-indigo-400' : 'bg-indigo-600'}`}
         >
           {creating ? (
-            <View className="flex-row items-center">
-              <ActivityIndicator />
-              <Text className="ml-2 font-semibold text-white">Creating…</Text>
-            </View>
+            <ActivityIndicator color="white" />
           ) : (
-            <Text className="font-semibold text-white">Create Plan</Text>
+            <Text className="text-center text-lg font-semibold text-white">Create Plan</Text>
           )}
         </Pressable>
       </View>

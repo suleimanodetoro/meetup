@@ -1,4 +1,4 @@
-// app/visit/[id].tsx - FIXED with proper imports and debugging
+// app/visit/[id].tsx
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, StatusBar, Pressable, Text, ActivityIndicator } from 'react-native';
 import Mapbox, { Camera, MapView } from '@rnmapbox/maps';

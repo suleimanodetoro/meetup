@@ -11,7 +11,7 @@ type EventCardProps = {
 
 const EventCard = ({ event }: EventCardProps) => {
   // Debug log to verify URL
-  console.log('Event image URL:', event.image_uri);
+  // console.log('Event image URL:', event.image_uri);
   
   return (
     <Link href={`/event/${event.id}`} asChild>

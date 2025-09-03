@@ -248,6 +248,11 @@ export default function SettingsScreen() {
 
           {/* Spacer */}
           <View style={{ height: 20 }} />
+          {/* Privacy Settings */}
+<SettingRow
+  label="Privacy Settings"
+  onPress={() => router.push('/settings/privacy')}
+/>
 
           {/* Report an issue */}
           <SettingRow

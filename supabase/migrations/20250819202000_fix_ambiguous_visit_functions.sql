@@ -1,0 +1,227 @@
+-- supabase/migrations/20250819202000_fix_ambiguous_visit_functions.sql
+-- Fixes ambiguous column references in visit detail functions
+
+-- ============================================
+-- 1. Drop existing broken functions
+-- ============================================
+DROP FUNCTION IF EXISTS public.get_visit_details(bigint);
+DROP FUNCTION IF EXISTS public.get_visit_users(bigint, int);
+DROP FUNCTION IF EXISTS public.get_visit_plans(bigint);
+
+-- ============================================
+-- 2. Create fixed get_visit_details function
+-- ============================================
+CREATE OR REPLACE FUNCTION public.get_visit_details(visit_id_param bigint)
+RETURNS TABLE(
+  id bigint,
+  city text,
+  country text,
+  country_code text,
+  start_date date,
+  end_date date,
+  user_count bigint,
+  plan_count bigint
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    v.id,
+    v.city,
+    v.country,
+    v.country_code,
+    v.start_date,
+    v.end_date,
+    (SELECT COUNT(DISTINCT v2.user_id) 
+     FROM public.visits v2
+     WHERE v2.city = v.city 
+     AND daterange(v2.start_date, v2.end_date, '[]') && daterange(v.start_date, v.end_date, '[]')
+    ) as user_count,
+    (SELECT COUNT(*) 
+     FROM public.events e2
+     WHERE e2.city = v.city 
+     AND e2.date::date BETWEEN v.start_date AND v.end_date
+    ) as plan_count
+  FROM public.visits v
+  WHERE v.id = visit_id_param;
+END;
+$$;
+
+-- ============================================
+-- 3. Create fixed get_visit_users function
+-- ============================================
+CREATE OR REPLACE FUNCTION public.get_visit_users(
+  visit_id_param bigint, 
+  limit_param int DEFAULT NULL
+)
+RETURNS TABLE(
+  user_id uuid,
+  full_name text,
+  avatar_url text,
+  bio text,
+  nationality_code text,
+  is_verified boolean,
+  visit_start date,
+  visit_end date,
+  overlap_days int
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  target_visit RECORD;
+BEGIN
+  -- Get the target visit details
+  SELECT v.id, v.city, v.country, v.country_code, v.start_date, v.end_date, v.user_id 
+  INTO target_visit 
+  FROM public.visits v 
+  WHERE v.id = visit_id_param;
+  
+  RETURN QUERY
+  SELECT 
+    p.id as user_id,
+    p.full_name,
+    p.avatar_url,
+    p.bio,
+    p.nationality_code,
+    COALESCE(p.onboarding_completed, false) as is_verified,
+    v2.start_date as visit_start,
+    v2.end_date as visit_end,
+    (LEAST(v2.end_date::date, target_visit.end_date::date) - 
+     GREATEST(v2.start_date::date, target_visit.start_date::date) + 1)::int as overlap_days
+  FROM public.visits v2
+  JOIN public.profiles p ON v2.user_id = p.id
+  WHERE v2.city = target_visit.city
+    AND v2.user_id != target_visit.user_id
+    AND daterange(v2.start_date, v2.end_date, '[]') && daterange(target_visit.start_date, target_visit.end_date, '[]')
+  ORDER BY overlap_days DESC, v2.created_at DESC
+  LIMIT limit_param;
+END;
+$$;
+
+-- ============================================
+-- 4. Create fixed get_visit_plans function
+-- ============================================
+CREATE OR REPLACE FUNCTION public.get_visit_plans(visit_id_param bigint)
+RETURNS TABLE(
+  event_id bigint,
+  title text,
+  description text,
+  image_uri text,
+  date timestamp with time zone,
+  location_name text,
+  cost numeric,
+  attendee_count bigint,
+  host_name text,
+  host_avatar text
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  target_visit RECORD;
+BEGIN
+  -- Get the target visit details with specific columns
+  SELECT v.id, v.city, v.country, v.country_code, v.start_date, v.end_date 
+  INTO target_visit 
+  FROM public.visits v 
+  WHERE v.id = visit_id_param;
+  
+  RETURN QUERY
+  SELECT 
+    e.id as event_id,
+    e.title,
+    e.description,
+    e.image_uri,
+    e.date,
+    e.location_name,
+    e.cost,
+    (SELECT COUNT(*) FROM public.attendance a WHERE a.event_id = e.id) as attendee_count,
+    p.full_name as host_name,
+    p.avatar_url as host_avatar
+  FROM public.events e
+  LEFT JOIN public.profiles p ON e.user_id = p.id
+  WHERE e.city = target_visit.city
+    AND e.date BETWEEN target_visit.start_date::timestamp AND (target_visit.end_date + interval '1 day')::timestamp
+  ORDER BY attendee_count DESC, e.created_at DESC;
+END;
+$$;
+
+-- ============================================
+-- 5. Grant permissions
+-- ============================================
+GRANT EXECUTE ON FUNCTION public.get_visit_details(bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_visit_users(bigint, int) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_visit_plans(bigint) TO authenticated;
+
+-- ============================================
+-- 6. Handle user_subscriptions table (skip if exists)
+-- ============================================
+DO $$
+BEGIN
+  -- Check if table exists
+  IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_subscriptions') THEN
+    CREATE TABLE public.user_subscriptions (
+      id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+      user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+      subscription_type text CHECK (subscription_type IN ('free', 'premium', 'pro')) DEFAULT 'free',
+      started_at timestamp with time zone DEFAULT now(),
+      expires_at timestamp with time zone,
+      is_active boolean DEFAULT true,
+      stripe_customer_id text,
+      stripe_subscription_id text,
+      created_at timestamp with time zone DEFAULT now(),
+      updated_at timestamp with time zone DEFAULT now(),
+      UNIQUE(user_id)
+    );
+    
+    -- Enable RLS
+    ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
+    
+    -- Create policy only if it doesn't exist
+    CREATE POLICY "Users can view their own subscription" 
+      ON public.user_subscriptions
+      FOR SELECT 
+      USING (auth.uid() = user_id);
+    
+    RAISE NOTICE 'Created user_subscriptions table';
+  ELSE
+    RAISE NOTICE 'user_subscriptions table already exists, skipping creation';
+  END IF;
+  
+  -- Create indexes if they don't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_user_subscriptions_user_id') THEN
+    CREATE INDEX idx_user_subscriptions_user_id ON public.user_subscriptions(user_id);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_user_subscriptions_active') THEN
+    CREATE INDEX idx_user_subscriptions_active ON public.user_subscriptions(is_active);
+  END IF;
+END $$;
+
+-- ============================================
+-- 7. Insert default free subscription for users who don't have one
+-- ============================================
+INSERT INTO public.user_subscriptions (user_id, subscription_type, is_active)
+SELECT id, 'free', true
+FROM public.profiles
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.user_subscriptions 
+  WHERE user_subscriptions.user_id = profiles.id
+)
+ON CONFLICT (user_id) DO NOTHING;
+
+-- ============================================
+-- 8. Verification message
+-- ============================================
+DO $$
+BEGIN
+  RAISE NOTICE 'Migration 20250819202000_fix_ambiguous_visit_functions completed successfully';
+  RAISE NOTICE 'Fixed: get_visit_details() - resolved ambiguous city column';
+  RAISE NOTICE 'Fixed: get_visit_users() - resolved date calculation and ambiguous columns';
+  RAISE NOTICE 'Fixed: get_visit_plans() - resolved ambiguous event_id column';
+  RAISE NOTICE 'Handled: user_subscriptions table (created or skipped if exists)';
+  RAISE NOTICE 'All users have been assigned free tier subscriptions';
+END $$;

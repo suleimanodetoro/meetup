@@ -12,6 +12,12 @@ interface VenueData {
   lng?: number;
 }
 
+interface DestinationData {
+  city: string;
+  country: string;
+  country_code?: string;
+}
+
 interface CostItem {
   name: string;
   amount?: number;
@@ -29,9 +35,12 @@ interface PlanFormData {
   isOneDay: boolean;
   isAllDay: boolean;
   venues: VenueData[];
+  destinations: DestinationData[];
   interests: string[];
   costs: CostItem[];
+  guidelines?: string;
   guidelinesAccepted: boolean;
+  maxAttendees?: number;
 }
 
 interface CreatePlanContextType {
@@ -52,9 +61,12 @@ const initialFormData: PlanFormData = {
   isOneDay: false,
   isAllDay: false,
   venues: [],
+  destinations: [],
   interests: [],
   costs: [],
+  guidelines: '',
   guidelinesAccepted: false,
+  maxAttendees: 10,
 };
 
 const CreatePlanContext = createContext<CreatePlanContextType | undefined>(undefined);
@@ -91,11 +103,12 @@ export function CreatePlanProvider({ children }: { children: ReactNode }) {
       case 4: // Date
         return formData.isOneDay || (formData.endDate !== undefined && formData.endDate >= formData.startDate);
       case 5: // Destinations
-        return formData.venues.length > 0 && formData.venues.length <= 3;
+        return (formData.venues && formData.venues.length > 0 && formData.venues.length <= 3) ||
+               (formData.destinations && formData.destinations.length > 0);
       case 6: // Interests
-        return formData.interests.length > 0 && formData.interests.length <= 5;
+        return formData.interests && formData.interests.length > 0 && formData.interests.length <= 5;
       case 7: // Costs
-        return formData.costs.length > 0 || formData.costs.some(c => c.name === 'No expected cost');
+        return formData.costs && (formData.costs.length > 0 || formData.costs.some(c => c.name === 'No expected cost'));
       case 8: // Guidelines
         return formData.guidelinesAccepted;
       default:
@@ -135,4 +148,4 @@ export const useCreatePlan = () => {
 };
 
 // Export types for use in other files
-export type { VenueData, CostItem, PlanFormData };
+export type { VenueData, DestinationData, CostItem, PlanFormData };
