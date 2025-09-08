@@ -1,4 +1,8 @@
 // app/search-users.tsx
+/*TO DO LATER:
+
+FIX DUPLICATE KEY ERROR WHEN The same user appears in both recentSearches and suggestedUsers arrays, causing duplicate keys when React renders the list.
+// */ 
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {

@@ -1,0 +1,151 @@
+// components/PersonCard.tsx
+import React, { useMemo, useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Image,
+  Dimensions,
+} from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { getCountryFlag } from '~/utils/countryFlags';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface PersonCardProps {
+  person: {
+    id: string;
+    full_name?: string;
+    avatar_url?: string;
+    birth_date?: string | Date;
+    nationality_code?: string;
+    location?: string;
+    is_online?: boolean; // TODO: Implement presence
+  };
+}
+
+export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
+  const [imageError, setImageError] = useState(false);
+
+  // Reset image error when avatar changes
+  useEffect(() => {
+    setImageError(false);
+  }, [person.avatar_url]);
+
+  const age = useMemo(() => {
+    if (!person.birth_date) return null;
+    try {
+      const birth = new Date(person.birth_date);
+      if (isNaN(birth.getTime())) return null;
+
+      const today = new Date();
+      let a = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+
+      // Sanity bounds
+      return a >= 0 && a < 120 ? a : null;
+    } catch {
+      return null;
+    }
+  }, [person.birth_date]);
+
+  return (
+    <Pressable
+      onPress={() => router.push(`/profile/${person.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`Open profile ${person.full_name ?? 'Traveler'}`}
+      hitSlop={8}
+      style={{
+        width: (SCREEN_WIDTH - 48) / 3,
+        marginRight: 12,
+      }}
+    >
+      <View
+        style={{
+          width: '100%',
+          aspectRatio: 0.75,
+          borderRadius: 16,
+          overflow: 'hidden',
+          marginBottom: 8,
+          backgroundColor: '#E0E0E0',
+        }}
+      >
+        {person.avatar_url && !imageError ? (
+          <Image
+            source={{ uri: person.avatar_url }}
+            style={{ width: '100%', height: '100%' }}
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons name="person" size={40} color="#999" />
+          </View>
+        )}
+
+        {/* Country flag overlay */}
+        {!!person.nationality_code && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              backgroundColor: 'white',
+              paddingHorizontal: 6,
+              paddingVertical: 3,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>
+              {getCountryFlag(person.nationality_code)}
+            </Text>
+          </View>
+        )}
+
+        {/* Presence indicator — enable when real presence exists
+        {person.is_online && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              right: 8,
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              backgroundColor: '#4CAF50',
+              borderWidth: 2,
+              borderColor: 'white',
+            }}
+          />
+        )}
+        */}
+      </View>
+
+      <Text
+        style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }}
+        numberOfLines={1}
+      >
+        {person.full_name || 'Traveler'}
+      </Text>
+
+      {typeof age === 'number' && (
+        <Text style={{ fontSize: 13, color: '#666' }}>{age} years old</Text>
+      )}
+
+      {!!person.location && (
+        <Text style={{ fontSize: 12, color: '#999' }} numberOfLines={1}>
+          {person.location}
+        </Text>
+      )}
+    </Pressable>
+  );
+});
+
+export default PersonCard;

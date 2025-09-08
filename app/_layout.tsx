@@ -1,12 +1,11 @@
 // app/_layout.tsx
 import '../global.css';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import AuthProvider, { useAuth } from './contexts/AuthProvider';
 import { CreatePlanProvider } from './contexts/CreatePlanContext';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useRouter, useSegments, useRootNavigationState } from 'expo-router';
 
 function NavigationController({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompletedOnboarding, isLoading } = useAuth();
@@ -15,59 +14,58 @@ function NavigationController({ children }: { children: React.ReactNode }) {
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
+    // Wait for auth + navigation to be ready
     if (isLoading) return;
     if (!rootNavigationState?.key) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(tabs)';
-    const currentRoute = segments[0];
-    
-    // More comprehensive route checking
+    const first = segments[0] ?? '';
+    const inAuthGroup = first === '(auth)';
+    const inTabsGroup = first === '(tabs)';
+
+    // First visible segment (folder name) — used for allow-listing deep links
+    const currentRoute = first;
+
+    // Dynamic (parameterized) top-level folders
     const dynamicRoutes = ['event', 'chat', 'visit', 'profile'];
-    const staticRoutes = ['edit-profile', 'add-trip', 'settings', 'create-plan'];
-    
-    // Check if it's a dynamic route (with parameters)
-    const isDynamicRoute = dynamicRoutes.includes(currentRoute);
-    const isStaticRoute = staticRoutes.includes(currentRoute);
-    const isAllowedRoute = isDynamicRoute || isStaticRoute;
 
-    console.log('Navigation check:', {
-      isAuthenticated,
-      hasCompletedOnboarding,
-      inAuthGroup,
-      inTabsGroup,
-      currentRoute,
-      isAllowedRoute,
-      isDynamicRoute,
-      segments,
-    });
+    // Static top-level folders/pages (include parents for nested pages)
+    const staticRoutes = [
+      'edit-profile',
+      'add-trip',
+      'settings',       // covers settings/privacy
+      'create-plan',    // covers create-plan/* steps
+      'search-users',
+      'friend-requests',
+      'modal',
+    ];
 
-    // Navigation logic with better error handling
-    try {
-      if (!isAuthenticated) {
-        if (!inAuthGroup) {
-          console.log('Redirecting to welcome (not authenticated)');
-          router.replace('/welcome');
-        }
-      } else if (!hasCompletedOnboarding) {
-        const isOnOnboardingScreen = segments[0] === '(auth)' && segments[1]?.startsWith('onboarding');
-        
-        if (!isOnOnboardingScreen && !inAuthGroup) {
-          console.log('Redirecting to onboarding (authenticated but not completed)');
-          router.replace('/onboarding-basic');
-        }
-      } else {
-        // User is authenticated and onboarded
-        // Only redirect if they're truly on an invalid route
-        if (!inTabsGroup && !isAllowedRoute && !inAuthGroup) {
-          console.log('Redirecting to home - invalid route');
-          router.replace('/(tabs)');
-        }
-        // If we're on a valid route, do nothing - let the screen handle any errors
-      }
-    } catch (error) {
-      console.error('Navigation error:', error);
-      // Don't redirect on error - let the screen handle it
+    const isAllowedRoute =
+      dynamicRoutes.includes(currentRoute) || staticRoutes.includes(currentRoute);
+
+    // ----- Unauthenticated: keep them inside (auth) -----
+    if (!isAuthenticated) {
+      if (!inAuthGroup) router.replace('/welcome'); // lives in (auth)
+      return;
+    }
+
+    // ----- Authenticated but not onboarded: send to onboarding, even from (auth) -----
+    if (!hasCompletedOnboarding) {
+      const onOnboarding =
+        inAuthGroup && (segments[1]?.startsWith('onboarding') ?? false);
+      if (!onOnboarding) router.replace('/onboarding-basic'); // lives in (auth)
+      return;
+    }
+
+    // ----- Authenticated + onboarded -----
+    // If we’re still on any (auth) screen (e.g., /signin), leave immediately.
+    if (inAuthGroup) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    // If not in tabs and not on an allowed deep link, send home.
+    if (!inTabsGroup && !isAllowedRoute) {
+      router.replace('/(tabs)');
     }
   }, [
     isAuthenticated,
@@ -78,15 +76,10 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     router,
   ]);
 
-  if (isLoading) {
+  if (isLoading || !rootNavigationState?.key) {
     return (
-      <View style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'white',
-      }}>
-        <ActivityIndicator size="large" color="#4A90E2" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
       </View>
     );
   }
@@ -101,66 +94,27 @@ export default function RootLayout() {
         <CreatePlanProvider>
           <NavigationController>
             <Stack screenOptions={{ headerShown: false }}>
+              {/* App groups */}
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="(auth)" />
+
+              {/* Dynamic deep-linkable routes */}
+              <Stack.Screen name="event/[id]" />
+              <Stack.Screen name="visit/[id]" />
+              <Stack.Screen name="chat/[eventId]" />
+              <Stack.Screen name="chat/dm/[conversationId]" />
+              <Stack.Screen name="profile/[userId]" />
+
+              {/* Common static routes */}
               <Stack.Screen name="edit-profile" />
               <Stack.Screen name="add-trip" />
               <Stack.Screen name="settings" />
-              
-              {/* Folder-based route for event */}
-              <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="settings/privacy" />
+              <Stack.Screen name="search-users" />
+              <Stack.Screen name="friend-requests" />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
 
-              {/* create-plan screens */}
-              <Stack.Screen
-                name="create-plan/name"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/image"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/about"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/date"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/destinations"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/interests"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/costs"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/guidelines"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-              <Stack.Screen
-                name="create-plan/review"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-
-              {/* visit route */}
-              <Stack.Screen
-                name="visit/[id]"
-                options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }}
-              />
-
-              {/* chat screens */}
-              <Stack.Screen
-                name="chat/[eventId]"
-                options={{ headerShown: false, presentation: 'card' }}
-              />
-              <Stack.Screen name="chat/dm/[conversationId]" options={{ headerShown: false }} />
-              <Stack.Screen name="profile/[userId]" options={{ headerShown: false }} />
+              {/* 404 */}
+              <Stack.Screen name="+not-found" />
             </Stack>
           </NavigationController>
         </CreatePlanProvider>
