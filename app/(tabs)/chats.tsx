@@ -1,5 +1,5 @@
 // app/(tabs)/chats.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { router } from 'expo-router';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { useChatSubscriptions } from '~/hooks/useChatSubscriptions';
 
 type ChatItem = {
   conversation_id: number;
@@ -42,9 +42,6 @@ export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  
-  // Store subscription reference to prevent multiple subscriptions
-  const subscriptionRef = useRef<RealtimeChannel | null>(null);
 
   // Fetch conversations with proper error handling
   const fetchConversations = useCallback(async () => {
@@ -94,71 +91,26 @@ export default function ChatsScreen() {
     }
   }, [session?.user?.id]);
 
-  // Setup realtime subscription with proper cleanup
-  const setupSubscription = useCallback(() => {
-    if (!session?.user?.id) return;
-
-    // Clean up existing subscription first
-    if (subscriptionRef.current) {
-      console.log('Cleaning up existing subscription');
-      supabase.removeChannel(subscriptionRef.current);
-      subscriptionRef.current = null;
-    }
-
-    console.log('Setting up new chat list subscription');
-    
-    // Create new subscription
-    const channel = supabase
-      .channel(`chat_list_${session.user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          console.log('New message received, refreshing chat list');
-          fetchConversations();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversation_participants',
-          filter: `user_id=eq.${session.user.id}`,
-        },
-        () => {
-          console.log('Participant change, refreshing chat list');
-          fetchConversations();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Chat list subscription status:', status);
-      });
-
-    subscriptionRef.current = channel;
-  }, [session?.user?.id, fetchConversations]);
+  // Use the centralized subscription hook
+  const { cleanupSubscriptions } = useChatSubscriptions({
+    onConversationUpdate: useCallback(() => {
+      console.log('Chat list update detected, refreshing...');
+      fetchConversations();
+    }, [fetchConversations]),
+  });
 
   // Initial load effect
   useEffect(() => {
     if (session?.user?.id) {
       fetchConversations();
       fetchPendingRequests();
-      setupSubscription();
     }
 
-    // Cleanup function
+    // Cleanup handled by the hook
     return () => {
-      if (subscriptionRef.current) {
-        console.log('Cleaning up subscription on unmount');
-        supabase.removeChannel(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
+      cleanupSubscriptions();
     };
-  }, [session?.user?.id]); // Only depend on session, not activeTab
+  }, [session?.user?.id]);
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -186,19 +138,42 @@ export default function ChatsScreen() {
     }
   };
 
-  // Filter chats based on active tab
+  // Filter chats based on active tab and search query
   const getFilteredChats = useCallback(() => {
     if (!chats) return [];
     
+    let filtered = chats;
+    
+    // Filter by tab
     switch (activeTab) {
       case 'dms':
-        return chats.filter(item => item.conversation_type === 'dm');
+        filtered = chats.filter(item => item.conversation_type === 'dm');
+        break;
       case 'plans':
-        return chats.filter(item => item.conversation_type === 'group');
-      default:
-        return chats;
+        filtered = chats.filter(item => item.conversation_type === 'group');
+        break;
     }
-  }, [chats, activeTab]);
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.conversation_name?.toLowerCase().includes(query) ||
+        item.last_message_content?.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [chats, activeTab, searchQuery]);
+
+  // Navigate to chat
+  const navigateToChat = useCallback((item: ChatItem) => {
+    if (item.conversation_type === 'group' && item.event_id) {
+      router.push(`/chat/${item.event_id}`);
+    } else {
+      router.push(`/chat/dm/${item.conversation_id}`);
+    }
+  }, []);
 
   // Render chat item
   const renderChatItem = ({ item }: { item: ChatItem }) => {
@@ -207,20 +182,11 @@ export default function ChatsScreen() {
     const lastMessageTime = item.last_message_at;
     const lastMessageContent = item.last_message_content || '';
     const unreadCount = item.unread_count || 0;
-    const conversationId = item.conversation_id;
-    const eventId = item.event_id;
-    const conversationType = item.conversation_type;
     
     return (
       <Pressable
         style={styles.chatItem}
-        onPress={() => {
-          if (conversationType === 'group' && eventId) {
-            router.push(`/chat/${eventId}`);
-          } else {
-            router.push(`/chat/dm/${conversationId}`);
-          }
-        }}>
+        onPress={() => navigateToChat(item)}>
         <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
@@ -238,12 +204,15 @@ export default function ChatsScreen() {
                 unreadCount > 0 && styles.unreadMessage
               ]} 
               numberOfLines={1}>
-              {item.last_message_user_name && `${item.last_message_user_name}: `}
+              {item.last_message_user_name && item.conversation_type === 'group' && 
+                `${item.last_message_user_name}: `}
               {lastMessageContent}
             </Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>{unreadCount}</Text>
+                <Text style={styles.unreadCount}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
               </View>
             )}
           </View>
@@ -259,25 +228,35 @@ export default function ChatsScreen() {
   const renderEmptyState = () => {
     let emptyMessage = '';
     let emptySubtext = '';
+    let emptyIcon = 'chatbubbles-outline';
 
-    switch (activeTab) {
-      case 'dms':
-        emptyMessage = 'No direct messages yet';
-        emptySubtext = 'Start a conversation with someone!';
-        break;
-      case 'plans':
-        emptyMessage = 'No plan chats yet';
-        emptySubtext = 'Join or create a plan to start chatting';
-        break;
-      default:
-        emptyMessage = 'No conversations yet';
-        emptySubtext = 'Start chatting with other travelers!';
+    if (searchQuery.trim()) {
+      emptyMessage = 'No results found';
+      emptySubtext = `No conversations match "${searchQuery}"`;
+      emptyIcon = 'search-outline';
+    } else {
+      switch (activeTab) {
+        case 'dms':
+          emptyMessage = 'No direct messages yet';
+          emptySubtext = 'Start a conversation with someone!';
+          emptyIcon = 'chatbubble-outline';
+          break;
+        case 'plans':
+          emptyMessage = 'No plan chats yet';
+          emptySubtext = 'Join or create a plan to start chatting';
+          emptyIcon = 'people-outline';
+          break;
+        default:
+          emptyMessage = 'No conversations yet';
+          emptySubtext = 'Start chatting with other travelers!';
+          emptyIcon = 'chatbubbles-outline';
+      }
     }
 
     return (
       <View style={styles.emptyContainer}>
-        {/* Friend Requests Card */}
-        {pendingRequestsCount > 0 && activeTab === 'all' && (
+        {/* Friend Requests Card - only show when not searching */}
+        {pendingRequestsCount > 0 && activeTab === 'all' && !searchQuery.trim() && (
           <Pressable 
             style={styles.friendRequestCard}
             onPress={() => router.push('/friend-requests')}>
@@ -301,16 +280,66 @@ export default function ChatsScreen() {
 
         <View style={styles.emptyState}>
           <Ionicons 
-            name={activeTab === 'dms' ? 'chatbubbles-outline' : 'people-outline'} 
+            name={emptyIcon} 
             size={60} 
             color="#ccc" 
           />
           <Text style={styles.emptyTitle}>{emptyMessage}</Text>
           <Text style={styles.emptySubtitle}>{emptySubtext}</Text>
+          
+          {/* Quick action buttons when empty */}
+          {!searchQuery.trim() && (
+            <View style={styles.emptyActions}>
+              {activeTab !== 'plans' && (
+                <Pressable 
+                  style={styles.emptyActionButton}
+                  onPress={() => router.push('/search-users')}>
+                  <Ionicons name="person-add-outline" size={20} color="#007AFF" />
+                  <Text style={styles.emptyActionText}>Find Friends</Text>
+                </Pressable>
+              )}
+              {activeTab !== 'dms' && (
+                <Pressable 
+                  style={styles.emptyActionButton}
+                  onPress={() => router.push('/explore')}>
+                  <Ionicons name="compass-outline" size={20} color="#007AFF" />
+                  <Text style={styles.emptyActionText}>Explore Plans</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       </View>
     );
   };
+
+  // Header component with friend request badge
+  const renderHeader = () => (
+    <>
+      {/* Friend Requests Card - show at top when there are chats */}
+      {pendingRequestsCount > 0 && filteredChats.length > 0 && !searchQuery.trim() && (
+        <Pressable 
+          style={[styles.friendRequestCard, styles.friendRequestCardInList]}
+          onPress={() => router.push('/friend-requests')}>
+          <View style={styles.friendRequestIcon}>
+            <Ionicons name="person-add" size={24} color="#007AFF" />
+            {pendingRequestsCount > 0 && (
+              <View style={styles.requestBadge}>
+                <Text style={styles.requestBadgeText}>{pendingRequestsCount}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.friendRequestContent}>
+            <Text style={styles.friendRequestTitle}>Friend Requests</Text>
+            <Text style={styles.friendRequestSubtitle}>
+              {pendingRequestsCount} pending request{pendingRequestsCount !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#999" />
+        </Pressable>
+      )}
+    </>
+  );
 
   if (loading) {
     return (
@@ -331,7 +360,11 @@ export default function ChatsScreen() {
           <Pressable 
             style={styles.headerButton}
             onPress={() => setShowSearch(!showSearch)}>
-            <Ionicons name="search" size={24} color="#000" />
+            <Ionicons 
+              name={showSearch ? "close" : "search"} 
+              size={24} 
+              color="#000" 
+            />
           </Pressable>
           <Pressable 
             style={styles.headerButton}
@@ -351,7 +384,13 @@ export default function ChatsScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
+            returnKeyType="search"
           />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -363,6 +402,11 @@ export default function ChatsScreen() {
           <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
             All
           </Text>
+          {activeTab !== 'all' && chats.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{chats.length}</Text>
+            </View>
+          )}
         </Pressable>
         <Pressable 
           style={[styles.tab, activeTab === 'dms' && styles.activeTab]}
@@ -370,6 +414,13 @@ export default function ChatsScreen() {
           <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>
             DMs
           </Text>
+          {activeTab !== 'dms' && chats.filter(c => c.conversation_type === 'dm').length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>
+                {chats.filter(c => c.conversation_type === 'dm').length}
+              </Text>
+            </View>
+          )}
         </Pressable>
         <Pressable 
           style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
@@ -377,6 +428,13 @@ export default function ChatsScreen() {
           <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
             Plans
           </Text>
+          {activeTab !== 'plans' && chats.filter(c => c.conversation_type === 'group').length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>
+                {chats.filter(c => c.conversation_type === 'group').length}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
@@ -386,10 +444,14 @@ export default function ChatsScreen() {
         renderItem={renderChatItem}
         keyExtractor={(item) => `${item.conversation_id}`}
         contentContainerStyle={filteredChats.length === 0 && styles.emptyListContent}
+        ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={10}
       />
     </SafeAreaView>
   );
@@ -423,6 +485,7 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     marginLeft: 20,
+    padding: 4,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -449,6 +512,8 @@ const styles = StyleSheet.create({
   tab: {
     marginRight: 25,
     paddingBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -460,6 +525,20 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#007AFF',
+    fontWeight: '600',
+  },
+  tabBadge: {
+    marginLeft: 6,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    color: '#666',
     fontWeight: '600',
   },
   chatItem: {
@@ -538,6 +617,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 10,
   },
+  friendRequestCardInList: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
   friendRequestIcon: {
     position: 'relative',
     marginRight: 15,
@@ -586,5 +669,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  emptyActions: {
+    flexDirection: 'row',
+    marginTop: 30,
+    gap: 15,
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    gap: 8,
+  },
+  emptyActionText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

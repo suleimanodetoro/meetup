@@ -1,6 +1,5 @@
 // app/chat/dm/[conversationId].tsx
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,59 +12,74 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-
-import { format, isToday, isYesterday } from 'date-fns';
-import {
-  Message,
-  MessageWithDetails,
-  Profile,
-  Conversation,
-  TypingIndicator,
-} from '~/types/messaging';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { format } from 'date-fns';
+import { Message, Profile, Conversation } from '~/types/messaging';
+import { useAuth } from '../../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { useChatSubscriptions } from '~/hooks/useChatSubscriptions';
+
+interface MessageWithUser extends Message {
+  user?: Profile;
+  reply_to?: MessageWithUser;
+}
 
 export default function DMChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const { session } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   
-  const [messages, setMessages] = useState<MessageWithDetails[]>([]);
+  const [messages, setMessages] = useState<MessageWithUser[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [otherUser, setOtherUser] = useState<Profile | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Profile[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [otherUserTyping, setOtherUserTyping] = useState(false);
-  const [isOnline, setIsOnline] = useState(false);
-  const [lastSeen, setLastSeen] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    if (session?.user?.id && conversationId) {
-      fetchConversationDetails();
-      fetchMessages();
-      subscribeToMessages();
-      subscribeToTyping();
-      subscribeToPresence();
-    }
-  }, [session, conversationId]);
+  // Use the subscription hook with proper callbacks
+  const { cleanupSubscriptions } = useChatSubscriptions({
+    conversationId: Number(conversationId),
+    onNewMessage: useCallback((newMessage: MessageWithUser) => {
+      setMessages(prev => {
+        // Check if message already exists to prevent duplicates
+        const exists = prev.some(m => m.id === newMessage.id);
+        if (exists) return prev;
+        return [...prev, newMessage];
+      });
+      
+      // Scroll to bottom for new messages
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }, []),
+    onTypingUpdate: useCallback((users: Profile[]) => {
+      setTypingUsers(users);
+    }, []),
+  });
 
+  // Fetch conversation and participant details
   const fetchConversationDetails = async () => {
+    if (!conversationId || !session?.user?.id) return;
+
     try {
       // Fetch conversation with participants
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select(`
           *,
-          participants:conversation_participants(
-            *,
-            profile:profiles(*)
+          conversation_participants!inner(
+            user_id,
+            joined_at,
+            last_read_at,
+            profiles:user_id(*)
           )
         `)
         .eq('id', conversationId)
@@ -73,31 +87,30 @@ export default function DMChatScreen() {
         .single();
 
       if (convError) throw convError;
-      
       setConversation(convData);
 
-      // Find the other user
-      const otherParticipant = convData.participants.find(
-        p => p.user_id !== session?.user?.id
+      // Find the other user in the conversation
+      const otherParticipant = convData.conversation_participants.find(
+        (p: any) => p.user_id !== session.user.id
       );
       
-      if (otherParticipant?.profile) {
-        setOtherUser(otherParticipant.profile);
-        
-        // Check if they're online
-        checkUserOnlineStatus(otherParticipant.user_id);
+      if (otherParticipant?.profiles) {
+        setOtherUser(otherParticipant.profiles);
       }
-
-      // Mark messages as read
-      markMessagesAsRead();
-    } catch (error) {
-      console.error('Error fetching conversation:', error);
-      Alert.alert('Error', 'Failed to load conversation');
-      router.back();
+    } catch (error: any) {
+      console.error('Error fetching conversation details:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load conversation. Please try again.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
     }
   };
 
+  // Fetch messages
   const fetchMessages = async () => {
+    if (!conversationId) return;
+
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -107,233 +120,125 @@ export default function DMChatScreen() {
           reply_to:messages!reply_to_id(
             *,
             user:profiles(*)
-          ),
-          read_receipts:message_read_receipts(
-            user:profiles(*)
           )
         `)
         .eq('conversation_id', conversationId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+
       setMessages(data || []);
-    } catch (error) {
+      
+      // Mark messages as read
+      await markMessagesAsRead();
+      
+      // Scroll to bottom after messages load
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    } catch (error: any) {
       console.error('Error fetching messages:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // Mark messages as read
   const markMessagesAsRead = async () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !conversationId) return;
 
     try {
-      // Update last read timestamp
       await supabase
         .from('conversation_participants')
         .update({ last_read_at: new Date().toISOString() })
         .eq('conversation_id', conversationId)
         .eq('user_id', session.user.id);
-
-      // Mark individual messages as read
-      await supabase.rpc('mark_conversation_as_read', {
-        p_conversation_id: parseInt(conversationId),
-        p_user_id: session.user.id
-      });
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
   };
 
-  const checkUserOnlineStatus = async (userId: string) => {
-    // Check last activity or presence
-    // This would integrate with your presence system
-    const channel = supabase.channel('online-users');
-    const presenceState = await channel.presenceState();
-    
-    const userPresence = Object.values(presenceState).flat().find(
-      (presence: any) => presence.user_id === userId
-    );
-    
-    setIsOnline(!!userPresence);
-    if (!userPresence) {
-      // Fetch last seen from database
-      const { data } = await supabase
-        .from('profiles')
-        .select('last_seen_at')
-        .eq('id', userId)
-        .single();
-      
-      setLastSeen(data?.last_seen_at);
-    }
-  };
-
-  const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`dm_chat:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload) => {
-          // Fetch full message with user data
-          const { data } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              user:profiles(*),
-              reply_to:messages!reply_to_id(
-                *,
-                user:profiles(*)
-              )
-            `)
-            .eq('id', payload.new.id)
-            .single();
-
-          if (data) {
-            setMessages(prev => [...prev, data]);
-            
-            // Mark as read if from other user
-            if (data.user_id !== session?.user?.id) {
-              markMessagesAsRead();
-            }
-            
-            // Auto-scroll to bottom
-            setTimeout(() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToTyping = () => {
-    const channel = supabase
-      .channel(`typing:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicators',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload) => {
-          if (payload.new && payload.new.user_id !== session?.user?.id) {
-            setOtherUserTyping(true);
-            // Auto-hide after 3 seconds
-            setTimeout(() => setOtherUserTyping(false), 3000);
-          } else if (payload.eventType === 'DELETE') {
-            setOtherUserTyping(false);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToPresence = () => {
-    if (!otherUser?.id) return;
-
-    const channel = supabase
-      .channel('online-users')
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const isUserOnline = Object.values(state).flat().some(
-          (presence: any) => presence.user_id === otherUser.id
-        );
-        setIsOnline(isUserOnline);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
+  // Send message
   const sendMessage = async () => {
-    if (!inputText.trim() || !session?.user?.id || !conversation) return;
+    if (!inputText.trim() || !conversation || !session?.user?.id || sending) return;
 
-    setSending(true);
     const messageText = inputText.trim();
     setInputText('');
+    setSending(true);
+    
+    // Stop typing when sending
+    await stopTyping();
+
+    // Create optimistic message
+    const optimisticMessage: MessageWithUser = {
+      id: -Date.now(), // Temporary negative ID
+      conversation_id: conversation.id,
+      user_id: session.user.id,
+      content: messageText,
+      message_type: 'text',
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+      user: {
+        id: session.user.id,
+        full_name: session.user.user_metadata?.full_name || 'You',
+        avatar_url: session.user.user_metadata?.avatar_url,
+      } as Profile,
+    };
+
+    // Add optimistic message
+    setMessages(prev => [...prev, optimisticMessage]);
+    
+    // Scroll to bottom
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
 
     try {
-      const { error } = await supabase
+      // Insert message
+      const { data, error } = await supabase
         .from('messages')
         .insert({
-          conversation_id: parseInt(conversationId),
+          conversation_id: conversation.id,
           user_id: session.user.id,
           content: messageText,
           message_type: 'text',
-        });
+        })
+        .select(`
+          *,
+          user:profiles(*),
+          reply_to:messages!reply_to_id(
+            *,
+            user:profiles(*)
+          )
+        `)
+        .single();
 
       if (error) throw error;
 
-      // Stop typing indicator
-      stopTyping();
-    } catch (error) {
+      // Replace optimistic message with real one
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== optimisticMessage.id);
+        return [...filtered, data];
+      });
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      setInputText(messageText);
-      Alert.alert('Error', 'Failed to send message');
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
+      setInputText(messageText); // Restore message on error
+      
+      Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
   };
 
-  const startTyping = async () => {
-    if (!conversation || !session?.user?.id || isTyping) return;
-
-    setIsTyping(true);
-    try {
-      await supabase
-        .from('typing_indicators')
-        .upsert({
-          conversation_id: parseInt(conversationId),
-          user_id: session.user.id,
-          started_at: new Date().toISOString(),
-        });
-
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping();
-      }, 10000);
-    } catch (error) {
-      console.error('Error setting typing indicator:', error);
-    }
-  };
-
-  const stopTyping = async () => {
-    if (!conversation || !session?.user?.id || !isTyping) return;
-
-    setIsTyping(false);
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    try {
-      await supabase
-        .from('typing_indicators')
-        .delete()
-        .eq('conversation_id', conversationId)
-        .eq('user_id', session.user.id);
-    } catch (error) {
-      console.error('Error removing typing indicator:', error);
-    }
-  };
-
+  // Handle typing indicator
   const handleTextChange = (text: string) => {
     setInputText(text);
     
@@ -344,65 +249,139 @@ export default function DMChatScreen() {
     }
   };
 
-  const formatMessageTime = (dateString: string) => {
-    const date = new Date(dateString);
+  const startTyping = async () => {
+    if (!conversation || !session?.user?.id || isTyping) return;
+
+    setIsTyping(true);
     
-    if (isToday(date)) {
-      return format(date, 'HH:mm');
-    } else if (isYesterday(date)) {
-      return `Yesterday ${format(date, 'HH:mm')}`;
-    } else {
-      return format(date, 'MMM d, HH:mm');
+    try {
+      await supabase
+        .from('typing_indicators')
+        .upsert({
+          conversation_id: conversation.id,
+          user_id: session.user.id,
+          started_at: new Date().toISOString(),
+        });
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Auto-stop after 3 seconds
+      typingTimeoutRef.current = setTimeout(() => {
+        stopTyping();
+      }, 3000);
+    } catch (error) {
+      console.error('Error setting typing indicator:', error);
     }
   };
 
-  const getLastSeenText = () => {
-    if (isOnline) return 'Online';
-    if (!lastSeen) return 'Offline';
+  const stopTyping = async () => {
+    if (!conversation || !session?.user?.id) return;
+
+    setIsTyping(false);
     
-    const date = new Date(lastSeen);
-    if (isToday(date)) {
-      return `Last seen today at ${format(date, 'HH:mm')}`;
-    } else if (isYesterday(date)) {
-      return `Last seen yesterday at ${format(date, 'HH:mm')}`;
-    } else {
-      return `Last seen ${format(date, 'MMM d')}`;
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = undefined;
+    }
+
+    try {
+      await supabase
+        .from('typing_indicators')
+        .delete()
+        .eq('conversation_id', conversation.id)
+        .eq('user_id', session.user.id);
+    } catch (error) {
+      console.error('Error removing typing indicator:', error);
     }
   };
 
-  const renderMessage = ({ item, index }: { item: MessageWithDetails; index: number }) => {
+  // Initial load
+  useEffect(() => {
+    if (session?.user?.id && conversationId) {
+      fetchConversationDetails();
+      fetchMessages();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      stopTyping();
+      cleanupSubscriptions();
+    };
+  }, [session?.user?.id, conversationId]);
+
+  // Handle refresh
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchMessages();
+  };
+
+  // Render message item
+  const renderMessage = ({ item }: { item: MessageWithUser }) => {
     const isOwnMessage = item.user_id === session?.user?.id;
-    const showReadReceipt = isOwnMessage && item.read_receipts?.length > 0;
+    const messageTime = format(new Date(item.created_at), 'HH:mm');
 
     return (
-      <View style={[styles.messageContainer, isOwnMessage && styles.ownMessageContainer]}>
-        <View style={[styles.messageBubble, isOwnMessage && styles.ownMessageBubble]}>
-          {item.reply_to && (
+      <View style={[
+        styles.messageContainer,
+        isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
+      ]}>
+        {!isOwnMessage && (
+          <Pressable onPress={() => router.push(`/profile/${item.user_id}`)}>
+            <Image
+              source={{ uri: item.user?.avatar_url || 'https://via.placeholder.com/30' }}
+              style={styles.messageAvatar}
+            />
+          </Pressable>
+        )}
+        <View style={[
+          styles.messageBubble,
+          isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble
+        ]}>
+          {item.reply_to?.content && (
             <View style={styles.replyContainer}>
-              <Text style={styles.replyName}>
-                {item.reply_to.user?.full_name}
-              </Text>
+              <Text style={styles.replyName}>{item.reply_to.user?.full_name}</Text>
               <Text style={styles.replyText} numberOfLines={1}>
                 {item.reply_to.content}
               </Text>
             </View>
           )}
-          <Text style={[styles.messageText, isOwnMessage && styles.ownMessageText]}>
+          <Text style={[
+            styles.messageText,
+            isOwnMessage ? styles.ownMessageText : styles.otherMessageText
+          ]}>
             {item.content}
           </Text>
-          <View style={styles.messageFooter}>
-            <Text style={[styles.messageTime, isOwnMessage && styles.ownMessageTime]}>
-              {formatMessageTime(item.created_at)}
-            </Text>
-            {showReadReceipt && (
-              <Ionicons 
-                name="checkmark-done" 
-                size={14} 
-                color={isOwnMessage ? 'rgba(255,255,255,0.7)' : '#007AFF'} 
-              />
-            )}
-          </View>
+          <Text style={[
+            styles.messageTime,
+            isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
+          ]}>
+            {messageTime}
+          </Text>
         </View>
+      </View>
+    );
+  };
+
+  // Render typing indicator
+  const renderTypingIndicator = () => {
+    if (typingUsers.length === 0) return null;
+
+    return (
+      <View style={styles.typingContainer}>
+        <View style={styles.typingDots}>
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </View>
+        <Text style={styles.typingText}>
+          {otherUser?.full_name || 'User'} is typing...
+        </Text>
       </View>
     );
   };
@@ -411,51 +390,39 @@ export default function DMChatScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#4A90E2" />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </Pressable>
-        
         <Pressable 
-          style={styles.headerInfo}
+          style={styles.headerCenter}
           onPress={() => otherUser && router.push(`/profile/${otherUser.id}`)}
         >
-          <View style={styles.avatarContainer}>
-            <Image
-              source={{ uri: otherUser?.avatar_url || 'https://via.placeholder.com/40' }}
-              style={styles.headerAvatar}
-            />
-            {isOnline && <View style={styles.onlineIndicator} />}
-          </View>
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {otherUser?.full_name || otherUser?.username || 'Unknown'}
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              {otherUserTyping ? 'Typing...' : getLastSeenText()}
-            </Text>
-          </View>
+          <Image
+            source={{ uri: otherUser?.avatar_url || 'https://via.placeholder.com/40' }}
+            style={styles.headerAvatar}
+          />
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {otherUser?.full_name || 'Direct Message'}
+          </Text>
         </Pressable>
-
-        <Pressable style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+        <Pressable style={styles.headerButton}>
+          <Ionicons name="information-circle-outline" size={24} color="#000" />
         </Pressable>
       </View>
 
-      {/* Messages */}
       <KeyboardAvoidingView
-        style={styles.messagesContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
+        style={styles.chatContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -463,49 +430,32 @@ export default function DMChatScreen() {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-          ListEmptyComponent={
-            <View style={styles.emptyChat}>
-              <Text style={styles.emptyChatText}>
-                Start a conversation with {otherUser?.full_name}
-              </Text>
-            </View>
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
+          ListFooterComponent={renderTypingIndicator}
         />
 
-        {/* Typing indicator */}
-        {otherUserTyping && (
-          <View style={styles.typingContainer}>
-            <View style={styles.typingBubble}>
-              <View style={styles.typingDots}>
-                <View style={[styles.dot, styles.dot1]} />
-                <View style={[styles.dot, styles.dot2]} />
-                <View style={[styles.dot, styles.dot3]} />
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Input */}
         <View style={styles.inputContainer}>
           <TextInput
-            style={styles.textInput}
-            placeholder="Type a message..."
+            style={styles.input}
             value={inputText}
             onChangeText={handleTextChange}
+            placeholder="Type a message..."
             multiline
-            maxLength={1000}
+            maxHeight={100}
+            editable={!sending}
           />
-          <Pressable 
+          <Pressable
             style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
             onPress={sendMessage}
             disabled={!inputText.trim() || sending}
           >
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={inputText.trim() && !sending ? '#007AFF' : '#ccc'} 
-            />
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="send" size={20} color="#fff" />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -526,159 +476,124 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    marginRight: 12,
+  headerButton: {
+    padding: 4,
   },
-  headerInfo: {
+  headerCenter: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
+    marginHorizontal: 12,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  headerText: {
-    flex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    flex: 1,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  moreButton: {
-    marginLeft: 12,
-  },
-  messagesContainer: {
+  chatContainer: {
     flex: 1,
   },
   messagesList: {
     paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   messageContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   ownMessageContainer: {
     justifyContent: 'flex-end',
   },
+  otherMessageContainer: {
+    justifyContent: 'flex-start',
+  },
+  messageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
   messageBubble: {
-    maxWidth: '75%',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
+    maxWidth: '70%',
     padding: 12,
+    borderRadius: 16,
   },
   ownMessageBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4A90E2',
+    borderBottomRightRadius: 4,
+  },
+  otherMessageBubble: {
+    backgroundColor: '#f0f0f0',
+    borderBottomLeftRadius: 4,
   },
   replyContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#007AFF',
+    backgroundColor: 'rgba(0,0,0,0.1)',
     padding: 8,
+    borderRadius: 8,
     marginBottom: 8,
-    borderRadius: 4,
   },
   replyName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    marginBottom: 2,
   },
   replyText: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    opacity: 0.8,
   },
   messageText: {
-    fontSize: 15,
-    color: '#000',
-    lineHeight: 20,
+    fontSize: 16,
   },
   ownMessageText: {
     color: '#fff',
   },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+  otherMessageText: {
+    color: '#000',
   },
   messageTime: {
     fontSize: 11,
-    color: '#666',
+    marginTop: 4,
   },
   ownMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255,255,255,0.7)',
   },
-  emptyChat: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
-  },
-  emptyChatText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+  otherMessageTime: {
+    color: 'rgba(0,0,0,0.5)',
   },
   typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  typingBubble: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    padding: 12,
-    alignSelf: 'flex-start',
-    maxWidth: 80,
+    paddingVertical: 8,
   },
   typingDots: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginRight: 8,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#666',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#999',
     marginHorizontal: 2,
+    opacity: 0.6,
   },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.7,
-  },
-  dot3: {
-    opacity: 1,
+  typingText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#666',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -686,27 +601,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#e0e0e0',
   },
-  textInput: {
+  input: {
     flex: 1,
     minHeight: 40,
     maxHeight: 100,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 15,
-    marginRight: 8,
+    marginRight: 12,
+    fontSize: 16,
   },
   sendButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: '#ccc',
   },
 });
