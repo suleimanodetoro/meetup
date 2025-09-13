@@ -1,8 +1,6 @@
 // app/(tabs)/profile.tsx
-// ============================================
-// SIMPLE PROFILE SCREEN (no globe / no modal-style transitions)
-// ============================================
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +12,7 @@ import {
   FlatList,
   ScrollView,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,36 +22,52 @@ import { Visit, Profile } from '~/types/db';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
 
-// Modular components
 import VisitCard from '~/components/VisitCard';
 import PlanCardHome from '~/components/PlanCardHome';
 import PersonCard from '~/components/PersonCard';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const C = {
+  bg: '#FFFFFF',         // everything white
+  text: '#0B1220',
+  sub: '#6B7280',
+  border: '#EAEAEA',     // subtle borders
+  blue: '#007AFF',       // iOS blue for actions/links
+  soft: '#F5F5F5',       // icon chips
+  badge: '#FF3B30',
+};
+
 export default function ProfileScreen() {
   const { session } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [allVisits, setAllVisits] = useState<Visit[]>([]);
   const [upcomingVisits, setUpcomingVisits] = useState<any[]>([]);
-  const [pastVisits, setPastVisits] = useState<Visit[]>([]);
   const [joinedPlans, setJoinedPlans] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [stats, setStats] = useState({
     totalTrips: 0,
-    upcomingTrips: 0,
     countriesVisited: 0,
     plansCount: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchProfileData();
-    fetchFriends();
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  }, []);
+
+  const fetchAll = async () => {
+    await Promise.all([fetchProfileData(), fetchFriends()]);
+  };
 
   const fetchProfileData = async () => {
     if (!session?.user?.id) return;
@@ -69,71 +84,36 @@ export default function ProfileScreen() {
       if (profileData) setProfile(profileData);
 
       // Visits
-      const { data: userVisits, error: visitsError } = await supabase
+      const { data: userVisits } = await supabase
         .from('visits')
         .select('*')
         .eq('user_id', session.user.id)
         .order('start_date', { ascending: false });
 
-      if (visitsError) console.error('Error fetching visits:', visitsError);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const upcoming: any[] = [];
+      const countries = new Set<string>();
 
-      if (userVisits && userVisits.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+      (userVisits || []).forEach((v) => {
+        if (v.country_code) countries.add(v.country_code);
+        const end = new Date(v.end_date); end.setHours(23, 59, 59, 999);
+        const t = {
+          ...v,
+          user_count: 1,
+          image_url: getCityImageUrl(v.city),
+          recent_users: [
+            { id: session.user.id, full_name: profileData?.full_name, avatar_url: profileData?.avatar_url },
+          ],
+        };
+        if (end >= today) upcoming.push(t);
+      });
 
-        const upcoming: any[] = [];
-        const past: Visit[] = [];
-
-        for (const visit of userVisits) {
-          const endDate = new Date(visit.end_date);
-          endDate.setHours(23, 59, 59, 999);
-
-          // Transform to match VisitCard expectations
-          const transformed = {
-            ...visit,
-            user_count: 1,
-            image_url: getCityImageUrl(visit.city),
-            recent_users: [
-              {
-                id: session.user.id,
-                full_name: profileData?.full_name,
-                avatar_url: profileData?.avatar_url,
-              },
-            ],
-          };
-
-          if (endDate >= today) {
-            upcoming.push(transformed);
-          } else {
-            past.push(visit);
-          }
-        }
-
-        setAllVisits(userVisits);
-        setUpcomingVisits(upcoming);
-        setPastVisits(past);
-
-        const uniqueCountries = new Set(
-          userVisits.map((v) => v.country_code).filter(Boolean)
-        );
-
-        setStats((prev) => ({
-          ...prev,
-          totalTrips: userVisits.length,
-          upcomingTrips: upcoming.length,
-          countriesVisited: uniqueCountries.size,
-        }));
-      } else {
-        setAllVisits([]);
-        setUpcomingVisits([]);
-        setPastVisits([]);
-        setStats((prev) => ({
-          ...prev,
-          totalTrips: 0,
-          upcomingTrips: 0,
-          countriesVisited: 0,
-        }));
-      }
+      setUpcomingVisits(upcoming);
+      setStats({
+        totalTrips: (userVisits || []).length,
+        countriesVisited: countries.size,
+        plansCount: 0, // will be set after plans fetch below
+      });
 
       // Joined plans
       const { data: attendance } = await supabase
@@ -141,21 +121,16 @@ export default function ProfileScreen() {
         .select('event_id')
         .eq('user_id', session.user.id);
 
-      if (attendance && attendance.length > 0) {
+      if (attendance?.length) {
         const eventIds = attendance.map((a) => a.event_id);
-
-        // Prefer RPC for richer data if available
         const { data: plansWithAttendees, error: rpcError } = await supabase
           .rpc('get_popular_plans_with_attendees');
 
         if (!rpcError && plansWithAttendees) {
-          const myPlans = plansWithAttendees.filter((plan: any) =>
-            eventIds.includes(plan.id)
-          );
-          setJoinedPlans(myPlans);
-          setStats((p) => ({ ...p, plansCount: myPlans.length }));
+          const mine = plansWithAttendees.filter((p: any) => eventIds.includes(p.id));
+          setJoinedPlans(mine);
+          setStats((s) => ({ ...s, plansCount: mine.length }));
         } else {
-          // Fallback
           const { data: events } = await supabase
             .from('events')
             .select('*')
@@ -163,16 +138,13 @@ export default function ProfileScreen() {
             .gte('date', new Date().toISOString())
             .order('date', { ascending: true });
 
-          if (events) {
-            const transformedPlans = events.map((event: any) => ({
-              ...event,
-              attendee_count: 0,
-              recent_attendees: [],
-            }));
-            setJoinedPlans(transformedPlans);
-            setStats((p) => ({ ...p, plansCount: transformedPlans.length }));
-          }
+          const fallback = (events || []).map((e: any) => ({ ...e, attendee_count: 0, recent_attendees: [] }));
+          setJoinedPlans(fallback);
+          setStats((s) => ({ ...s, plansCount: fallback.length }));
         }
+      } else {
+        setJoinedPlans([]);
+        setStats((s) => ({ ...s, plansCount: 0 }));
       }
 
       // Pending friend requests
@@ -183,8 +155,8 @@ export default function ProfileScreen() {
         .eq('status', 'pending');
 
       setPendingRequestsCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -192,7 +164,6 @@ export default function ProfileScreen() {
 
   const fetchFriends = async () => {
     if (!session?.user?.id) return;
-
     try {
       const { data: friendships } = await supabase
         .from('friendships')
@@ -214,279 +185,261 @@ export default function ProfileScreen() {
           `requester_id.eq.${session.user.id},addressee_id.eq.${session.user.id}`
         );
 
-      if (friendships) {
-        const friendProfiles = friendships
-          .map((f: any) =>
-            f.requester_id === session.user.id ? f.addressee : f.requester
-          )
-          .filter(Boolean);
-        setFriends(friendProfiles);
-      }
-    } catch (error) {
-      console.error('Error fetching friends:', error);
+      const friendProfiles =
+        (friendships || [])
+          .map((f: any) => (f.requester_id === session.user.id ? f.addressee : f.requester))
+          .filter(Boolean) || [];
+      setFriends(friendProfiles);
+    } catch (e) {
+      console.error(e);
     }
   };
 
+  const StatBox = ({ value, label }: { value: number; label: string }) => (
+    <View
+      style={{
+        flex: 1,
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        backgroundColor: C.bg,
+      }}
+    >
+      <Text style={{ fontSize: 20, fontWeight: '800', color: C.text }}>{value}</Text>
+      <Text style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{label}</Text>
+    </View>
+  );
+
+  const SectionHeader = ({
+    title,
+    showSeeAll,
+    onPress,
+  }: { title: string; showSeeAll?: boolean; onPress?: () => void }) => (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginBottom: 12,
+      }}
+    >
+      <Text style={{ fontSize: 18, fontWeight: '700', color: C.text }}>{title}</Text>
+      {showSeeAll ? (
+        <Pressable onPress={onPress} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ color: C.blue, fontSize: 14, fontWeight: '600' }}>See all</Text>
+          <Ionicons name="chevron-forward" size={16} color={C.blue} />
+        </Pressable>
+      ) : (
+        <View />
+      )}
+    </View>
+  );
+
+  const EmptyUpcoming = () => (
+    <View
+      style={{
+        marginHorizontal: 20,
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 14,
+        paddingVertical: 24,
+        alignItems: 'center',
+        backgroundColor: C.bg,
+      }}
+    >
+      <Text style={{ fontSize: 48, marginBottom: 10 }}>🌍</Text>
+      <Text style={{ color: C.sub, fontSize: 14, marginBottom: 12 }}>
+        You don't have any upcoming trips yet
+      </Text>
+      <Pressable
+        onPress={() => router.push('/add-trip')}
+        style={{
+          backgroundColor: C.blue,
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 22,
+        }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700' }}>+ Add New Trip</Text>
+      </Pressable>
+    </View>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         <StatusBar barStyle="dark-content" />
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <ActivityIndicator size="large" color="#4A90E2" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={C.blue} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar barStyle="dark-content" />
-
-      {/* Header */}
-      <View
-        style={{
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 12,
-          backgroundColor: 'white',
-          borderBottomWidth: 1,
-          borderBottomColor: '#eee',
-        }}
-      >
-        <View
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: '#4A90E2',
-                justifyContent: 'center',
-                alignItems: 'center',
-                overflow: 'hidden',
-              }}
-            >
-              {profile?.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={{ width: 56, height: 56, borderRadius: 28 }}
-                />
-              ) : (
-                <Text style={{ fontSize: 22, color: 'white' }}>
-                  {profile?.full_name?.[0] || 'T'}
-                </Text>
-              )}
-            </View>
-
-            <View>
-              <Text style={{ fontSize: 20, fontWeight: '700' }}>
-                {profile?.full_name || 'Traveler'}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Text style={{ fontSize: 18 }}>
-                  {getCountryFlag(profile?.nationality_code || 'US')}
-                </Text>
-                <Text style={{ fontSize: 13, color: '#666' }}>
-                  {profile?.nationality || 'United States'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              onPress={() => router.push('/friend-requests')}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: '#F5F5F5',
-                justifyContent: 'center',
-                alignItems: 'center',
-                position: 'relative',
-              }}
-            >
-              <Ionicons name="notifications-outline" size={20} color="#333" />
-              {pendingRequestsCount > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    backgroundColor: '#FF3B30',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: 'white', fontSize: 8, fontWeight: 'bold' }}>
-                    {pendingRequestsCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push('/settings')}
-              hitSlop={12}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: '#F5F5F5',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons name="settings-outline" size={20} color="#333" />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
-      {/* Content */}
       <ScrollView
-        contentContainerStyle={{
-          paddingBottom: 24,
-          backgroundColor: '#F5F5F5',
-          minHeight: SCREEN_HEIGHT - 100,
-        }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} />
+        }
+        contentContainerStyle={{ paddingBottom: 28, minHeight: SCREEN_HEIGHT - 80, backgroundColor: C.bg }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Bio + Edit */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 20, marginBottom: 16 }}>
-          {profile?.bio ? (
-            <Text style={{ fontSize: 14, color: '#555' }}>{profile.bio}</Text>
-          ) : (
-            <Text style={{ fontSize: 14, color: '#999', fontStyle: 'italic' }}>
-              No bio yet
-            </Text>
-          )}
+        {/* Header (scrolls with content) */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  overflow: 'hidden',
+                  backgroundColor: C.soft,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={{ width: 56, height: 56 }} />
+                ) : (
+                  <Text style={{ fontSize: 22, color: C.sub }}>
+                    {(profile?.full_name?.[0] || 'T').toUpperCase()}
+                  </Text>
+                )}
+              </View>
 
-          <Pressable
-            onPress={() => router.push('/edit-profile')}
-            style={{ marginTop: 10 }}
-          >
-            <Text style={{ fontSize: 15, color: '#4A90E2', fontWeight: '600' }}>
-              Edit Profile ›
+              <View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>
+                  {profile?.full_name || 'Traveler'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <Text style={{ fontSize: 18 }}>
+                    {getCountryFlag(profile?.nationality_code || 'US')}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: C.sub }}>
+                    {profile?.nationality || 'United States'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => router.push('/friend-requests')}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  backgroundColor: C.bg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}
+              >
+                <Ionicons name="notifications-outline" size={20} color={C.text} />
+                {pendingRequestsCount > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      backgroundColor: C.badge,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
+                      {pendingRequestsCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/settings')}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  backgroundColor: C.bg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                hitSlop={12}
+              >
+                <Ionicons name="settings-outline" size={20} color={C.text} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Bio + Edit */}
+          <View style={{ marginTop: 8 }}>
+            <Text
+              numberOfLines={2}
+              style={{
+                fontSize: 14,
+                color: profile?.bio ? C.sub : '#9CA3AF',
+                fontStyle: profile?.bio ? 'normal' : 'italic',
+              }}
+            >
+              {profile?.bio || 'Add a short bio so travelers know you'}
             </Text>
-          </Pressable>
+            <Pressable onPress={() => router.push('/edit-profile')} style={{ marginTop: 6 }}>
+              <Text style={{ fontSize: 15, color: C.blue, fontWeight: '700' }}>Edit Profile</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Stats */}
-        <View
-          style={{
-            flexDirection: 'row',
-            paddingHorizontal: 20,
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {[
-            { label: 'Plans', value: stats.plansCount },
-            { label: 'Trips', value: stats.totalTrips },
-            { label: 'Countries', value: stats.countriesVisited },
-          ].map((stat, idx) => (
-            <View
-              key={idx}
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: '#E0E0E0',
-                borderRadius: 12,
-                paddingVertical: 16,
-                alignItems: 'center',
-                backgroundColor: 'white',
-              }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>
-                {stat.value}
-              </Text>
-              <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                {stat.label}
-              </Text>
-            </View>
-          ))}
+        <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 18 }}>
+          <StatBox value={stats.plansCount} label="Plans" />
+          <StatBox value={stats.totalTrips} label="Trips" />
+          <StatBox value={stats.countriesVisited} label="Visited" />
         </View>
 
         {/* Upcoming Trips */}
-        <View style={{ marginBottom: 28 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              marginBottom: 14,
-            }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '700' }}>Upcoming Trips</Text>
-            {upcomingVisits.length > 0 && (
-              <Pressable onPress={() => router.push('/my-trips')}>
-                <Text style={{ fontSize: 14, color: '#4A90E2' }}>See all ›</Text>
-              </Pressable>
-            )}
-          </View>
+        <SectionHeader
+          title="Upcoming Trips"
+          showSeeAll={upcomingVisits.length > 0}
+          onPress={() => router.push('/my-trips')}
+        />
 
-          {upcomingVisits.length > 0 ? (
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={upcomingVisits}
-              keyExtractor={(item) => item.id.toString()}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
-              renderItem={({ item }) => <VisitCard visit={item} />}
-            />
-          ) : (
-            <View style={{ paddingHorizontal: 20 }}>
-              <Pressable
-                onPress={() => router.push('/add-trip')}
-                style={{
-                  backgroundColor: '#F0F0F0',
-                  borderRadius: 12,
-                  padding: 32,
-                  alignItems: 'center',
-                  borderWidth: 2,
-                  borderColor: '#E0E0E0',
-                  borderStyle: 'dashed',
-                }}
-              >
-                <Ionicons name="add-circle-outline" size={40} color="#999" />
-                <Text style={{ fontSize: 15, color: '#666', marginTop: 10 }}>
-                  Add your first trip
-                </Text>
-                <Text style={{ fontSize: 13, color: '#999', marginTop: 4 }}>
-                  Connect with travelers going to the same places
-                </Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
+        {upcomingVisits.length > 0 ? (
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={upcomingVisits}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+            renderItem={({ item }) => <VisitCard visit={item} />}
+          />
+        ) : (
+          <EmptyUpcoming />
+        )}
 
-        {/* Joined Plans */}
-        <View style={{ marginBottom: 28 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              marginBottom: 14,
-            }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '700' }}>My Plans</Text>
-            {joinedPlans.length > 0 && (
-              <Pressable onPress={() => router.push('/my-plans')}>
-                <Text style={{ fontSize: 14, color: '#4A90E2' }}>See all ›</Text>
-              </Pressable>
-            )}
-          </View>
+        {/* Plans you Joined */}
+        <View style={{ marginTop: 24 }}>
+          <SectionHeader
+            title="Plans you Joined"
+            showSeeAll={joinedPlans.length > 0}
+            onPress={() => router.push('/my-plans')}
+          />
 
           {joinedPlans.length > 0 ? (
             <FlatList
@@ -495,25 +448,25 @@ export default function ProfileScreen() {
               data={joinedPlans}
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ paddingHorizontal: 20 }}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
               renderItem={({ item }) => <PlanCardHome plan={item} />}
             />
           ) : (
             <View
               style={{
                 marginHorizontal: 20,
-                backgroundColor: 'white',
-                borderRadius: 12,
-                padding: 24,
-                alignItems: 'center',
                 borderWidth: 1,
-                borderColor: '#eee',
+                borderColor: C.border,
+                borderRadius: 14,
+                padding: 22,
+                alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 44, marginBottom: 6 }}>🎯</Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+              <Text style={{ fontSize: 40, marginBottom: 4 }}>🎯</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 4 }}>
                 No Plans Yet
               </Text>
-              <Text style={{ fontSize: 13, color: '#666', textAlign: 'center' }}>
+              <Text style={{ fontSize: 13, color: C.sub, textAlign: 'center' }}>
                 Join plans to meet other travelers
               </Text>
             </View>
@@ -521,25 +474,12 @@ export default function ProfileScreen() {
         </View>
 
         {/* Friends */}
-        <View style={{ marginBottom: 40 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              marginBottom: 14,
-            }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '700' }}>
-              My Friends ({friends.length})
-            </Text>
-            {friends.length > 0 && (
-              <Pressable onPress={() => router.push('/friends')}>
-                <Text style={{ fontSize: 14, color: '#4A90E2' }}>See all ›</Text>
-              </Pressable>
-            )}
-          </View>
+        <View style={{ marginTop: 24 }}>
+          <SectionHeader
+            title={`Friends (${friends.length})`}
+            showSeeAll={friends.length > 0}
+            onPress={() => router.push('/friends')}
+          />
 
           {friends.length > 0 ? (
             <FlatList
@@ -548,43 +488,40 @@ export default function ProfileScreen() {
               data={friends.slice(0, 6)}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingHorizontal: 20 }}
+              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
               renderItem={({ item }) => <PersonCard person={item} />}
             />
           ) : (
             <View
               style={{
                 marginHorizontal: 20,
-                backgroundColor: 'white',
-                borderRadius: 12,
-                padding: 24,
-                alignItems: 'center',
                 borderWidth: 1,
-                borderColor: '#eee',
+                borderColor: C.border,
+                borderRadius: 14,
+                padding: 22,
+                alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 44, marginBottom: 6 }}>👥</Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 6 }}>
+              <Text style={{ fontSize: 40, marginBottom: 6 }}>👥</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 6 }}>
                 No Friends Yet
-              </Text>
-              <Text
-                style={{ fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 12 }}
-              >
-                Find friends from your visits and plans
               </Text>
               <Pressable
                 onPress={() => router.push('/search-users')}
                 style={{
-                  backgroundColor: '#4A90E2',
-                  paddingHorizontal: 18,
+                  backgroundColor: C.blue,
+                  paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 20,
                 }}
               >
-                <Text style={{ color: 'white', fontWeight: '600' }}>Find Friends</Text>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Find Friends</Text>
               </Pressable>
             </View>
           )}
         </View>
+
+        <View style={{ height: 28 }} />
       </ScrollView>
     </SafeAreaView>
   );
