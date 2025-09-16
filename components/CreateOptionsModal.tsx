@@ -112,7 +112,7 @@ export default function CreateOptionsModal({ visible, onClose }: CreateOptionsMo
         {/* Header with globe and branding */}
         <View style={styles.header}>
           <Text style={styles.globe}>🌍</Text>
-          <Text style={styles.brandName}>ThirdSpace</Text>
+          <Text style={styles.brandName}>Waypoint</Text>
         </View>
 
         {/* Options */}

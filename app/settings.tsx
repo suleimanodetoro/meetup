@@ -103,7 +103,7 @@ export default function SettingsScreen() {
 
   const handleReportIssue = () => {
     // Open email client with pre-filled subject
-    Linking.openURL('mailto:support@thirdspace.app?subject=Issue Report');
+    Linking.openURL('mailto:support@usewaypoint.app?subject=Issue Report');
   };
 
   const handleLeaveReview = () => {

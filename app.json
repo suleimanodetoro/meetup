@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Nomaad",
-    "slug": "nomaad",
+    "name": "Waypoint",
+    "slug": "waypoint",
     "version": "1.0.0",
-    "scheme": "nomaad",
+    "scheme": "waypoint",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -51,7 +51,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.suleimanao.nomaad",
+      "bundleIdentifier": "app.usewaypoint",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -62,7 +62,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.suleimanao.nomaad",
+      "package": "app.usewaypoint",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -72,7 +72,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9ef7618e-2264-482d-bde3-e862595d0407"
+        "projectId": "59572940-70a6-4674-9ba0-52b56edd8f29"
       }
     }
   }

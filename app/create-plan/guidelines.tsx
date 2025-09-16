@@ -1,228 +1,115 @@
 // app/create-plan/guidelines.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
+  ScrollView,
   Pressable,
   SafeAreaView,
-  StyleSheet,
-  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
-const GUIDELINES = [
-  'No illegal activity',
-  'No hate speech or harassment',
-  "Don't mislead on price or details",
-  'Respect venue rules and staff',
-  'Share accurate time and place',
-  "You'll coordinate any changes",
-];
-
 export default function GuidelinesScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
-  const [checkedItems, setCheckedItems] = useState<boolean[]>(new Array(GUIDELINES.length).fill(false));
-  const [acceptedGuidelines, setAcceptedGuidelines] = useState(false);
-
-  useEffect(() => {
-    updateField('guidelinesAccepted', acceptedGuidelines);
-  }, [acceptedGuidelines]);
-
-  const toggleCheck = (index: number) => {
-    const newChecked = [...checkedItems];
-    newChecked[index] = !newChecked[index];
-    setCheckedItems(newChecked);
-  };
+  const { formData, updateField, nextStep, prevStep } = useCreatePlan();
+  const [accepted, setAccepted] = useState(formData.guidelinesAccepted || false);
 
   const handleContinue = () => {
-    if (canContinue()) {
-      nextStep();
-      router.push('/create-plan/review');
-    }
+    updateField('guidelinesAccepted', true);
+    nextStep();
+    router.push('/create-plan/review');
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-white">
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+      <View className="flex-row items-center px-5 py-4">
+        <Pressable onPress={prevStep} className="p-1">
           <Ionicons name="chevron-back" size={28} color="#333" />
         </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
+        <Text className="flex-1 text-center text-lg font-semibold">Create Plan</Text>
+        <View className="w-8" />
       </View>
 
       {/* Progress */}
       <StepperProgress currentStep={8} totalSteps={9} />
 
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Before you create</Text>
-          <Text style={styles.subtitle}>Keep this safe for everyone</Text>
+      <ScrollView className="flex-1">
+        <View className="px-6 pt-8 pb-6">
+          <Text className="text-3xl font-bold">Before you create</Text>
+          <Text className="mt-1 text-base text-gray-600">Keep this safe for everyone</Text>
 
-          {/* Guidelines List */}
-          <View style={styles.guidelinesContainer}>
-            {GUIDELINES.map((guideline, index) => (
-              <Pressable
-                key={index}
-                onPress={() => toggleCheck(index)}
-                style={styles.guidelineRow}
-              >
-                <View style={[
-                  styles.checkbox,
-                  checkedItems[index] && styles.checkboxChecked,
-                ]}>
-                  {checkedItems[index] && (
-                    <Ionicons name="checkmark" size={16} color="white" />
-                  )}
-                </View>
-                <Text style={styles.guidelineText}>{guideline}</Text>
-              </Pressable>
-            ))}
+          {/* Simple Guidelines List */}
+          <View className="mt-8 rounded-2xl bg-gray-50 p-5">
+            <View className="space-y-4">
+              <View className="flex-row">
+                <Text className="mr-3 text-gray-400">•</Text>
+                <Text className="flex-1 text-base text-gray-700">No illegal activity</Text>
+              </View>
+              
+              <View className="flex-row">
+                <Text className="mr-3 text-gray-400">•</Text>
+                <Text className="flex-1 text-base text-gray-700">Be respectful to everyone</Text>
+              </View>
+              
+              <View className="flex-row">
+                <Text className="mr-3 text-gray-400">•</Text>
+                <Text className="flex-1 text-base text-gray-700">Keep details accurate</Text>
+              </View>
+              
+              <View className="flex-row">
+                <Text className="mr-3 text-gray-400">•</Text>
+                <Text className="flex-1 text-base text-gray-700">Show up or notify of changes</Text>
+              </View>
+            </View>
           </View>
 
-          {/* Main Acceptance */}
+          {/* Single Checkbox */}
           <Pressable
-            onPress={() => setAcceptedGuidelines(!acceptedGuidelines)}
-            style={styles.acceptanceContainer}
+            onPress={() => setAccepted(!accepted)}
+            className="mt-8 flex-row items-center rounded-xl bg-white p-4 shadow-sm"
           >
-            <View style={[
-              styles.checkbox,
-              acceptedGuidelines && styles.checkboxChecked,
-            ]}>
-              {acceptedGuidelines && (
-                <Ionicons name="checkmark" size={16} color="white" />
-              )}
+            <View
+              className={`mr-4 h-6 w-6 items-center justify-center rounded-md border-2 ${
+                accepted ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 bg-white'
+              }`}
+            >
+              {accepted && <Ionicons name="checkmark" size={16} color="white" />}
             </View>
-            <Text style={styles.acceptanceText}>
+            <Text className="flex-1 text-base text-gray-700">
               I understand and will follow these guidelines
+            </Text>
+          </Pressable>
+
+          {/* Terms Link */}
+          <Pressable 
+            onPress={() => {
+              // Open website terms page
+              // Linking.openURL('https://yourapp.com/terms');
+            }}
+            className="mt-6 items-center"
+          >
+            <Text className="text-sm text-gray-500">
+              View full terms and conditions on our website
             </Text>
           </Pressable>
         </View>
       </ScrollView>
 
       {/* Continue Button */}
-      <View style={styles.footer}>
+      <View className="border-t border-gray-200 bg-white px-5 pb-8 pt-4">
         <Pressable
           onPress={handleContinue}
-          disabled={!acceptedGuidelines}
-          style={[
-            styles.continueButton,
-            !acceptedGuidelines && styles.continueButtonDisabled,
-          ]}
+          disabled={!accepted}
+          className={`items-center justify-center rounded-2xl py-4 ${
+            accepted ? 'bg-indigo-600' : 'bg-gray-300'
+          }`}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text className="text-center text-lg font-semibold text-white">Continue</Text>
         </Pressable>
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 32,
-  },
-  guidelinesContainer: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    gap: 16,
-  },
-  guidelineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
-  },
-  guidelineText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
-  },
-  acceptanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-  },
-  acceptanceText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 34,
-  },
-  continueButton: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 28,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  continueButtonDisabled: {
-    backgroundColor: '#C8D7E8',
-  },
-  continueButtonText: {
-    color: 'white',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-});

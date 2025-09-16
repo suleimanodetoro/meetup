@@ -28,7 +28,7 @@ export default function OnboardingNotificationsScreen() {
     await saveProfileAndComplete(false);
   };
 
-  const saveProfileAndComplete = async (notificationsEnabled: boolean) => {
+  const saveProfileAndComplete = async (_notificationsEnabled: boolean) => {
     if (!session?.user?.id) {
       Alert.alert('Error', 'User session not found');
       return;
@@ -36,36 +36,61 @@ export default function OnboardingNotificationsScreen() {
 
     setLoading(true);
     try {
-      // Parse all the data from params
-      const interests = params.interests ? JSON.parse(params.interests as string) : [];
-      const languages = params.languages ? JSON.parse(params.languages as string) : ['en'];
-      
-      // Format birth date properly
-      const birthDate = new Date(params.birthDate as string);
-      const formattedBirthDate = birthDate.toISOString().split('T')[0];
+      // Parse optional arrays from params (they might not exist if you switched to DB-first flow)
+      const interests = typeof params.interests === 'string'
+        ? JSON.parse(params.interests as string)
+        : undefined;
 
-      // Update the user's profile with ALL collected data
-      const profileData = {
-        full_name: params.name as string,
-        birth_date: formattedBirthDate,
-        gender: params.gender as string,
-        nationality: params.nationalityName as string,
-        nationality_code: params.nationality as string,
-        interests: interests,
-        languages: languages,
-        bio: params.bio as string || null,
-        avatar_url: params.avatar_url as string || null,
-        meeting_preference: params.meet_preference as string || null,
-        gender_preference: params.gender_preference as string || null,
+      const languages = typeof params.languages === 'string'
+        ? JSON.parse(params.languages as string)
+        : undefined;
+
+      // Build the payload *conditionally* so we don't clobber existing DB values with null/empty
+      const profileData: Record<string, any> = {
         onboarding_completed: true,
-        onboarding_step: 13, // Final step
+        onboarding_step: 13,
         updated_at: new Date().toISOString(),
-        // Note: Consider adding a username selection screen
-        // For now, we'll skip username to avoid conflicts
-        // username: (params.name as string).toLowerCase().replace(/\s+/g, ''),
       };
 
-      console.log('Saving complete profile:', profileData);
+      // Strings: add only when provided and non-empty
+      const addIfString = (key: string, value: unknown) => {
+        if (typeof value === 'string' && value.trim().length) {
+          profileData[key] = value.trim();
+        }
+      };
+
+      // Arrays (jsonb): add only if parsed and actually arrays
+      const addIfArray = (key: string, value: unknown) => {
+        if (Array.isArray(value)) profileData[key] = value;
+      };
+
+      // name -> full_name
+      addIfString('full_name', params.name);
+      // gender
+      addIfString('gender', params.gender);
+      // nationality code + name
+      addIfString('nationality_code', params.nationality);
+      addIfString('nationality', params.nationalityName);
+      // bio
+      addIfString('bio', params.bio);
+      // avatar_url: IMPORTANT — only set if present so we don't wipe DB value
+      addIfString('avatar_url', params.avatar_url);
+      // meeting & gender preferences
+      addIfString('meeting_preference', params.meet_preference);
+      addIfString('gender_preference', params.gender_preference);
+      // languages / interests (jsonb)
+      addIfArray('languages', languages);
+      addIfArray('interests', interests);
+
+      // birth date (expects YYYY-MM-DD)
+      if (typeof params.birthDate === 'string' && params.birthDate.length) {
+        const birthDate = new Date(params.birthDate as string);
+        if (!isNaN(birthDate.getTime())) {
+          profileData.birth_date = birthDate.toISOString().split('T')[0];
+        }
+      }
+
+      console.log('Saving complete profile (conditional):', profileData);
 
       const { error } = await supabase
         .from('profiles')
@@ -77,17 +102,8 @@ export default function OnboardingNotificationsScreen() {
         throw error;
       }
 
-      // If user added a trip, it should already be saved in onboarding-trips
-      // No need to save it again here
-
-      console.log('Profile saved successfully');
-      
-      // Refresh the onboarding status in AuthProvider
+      // Refresh onboarding status (your controller will navigate)
       await refreshOnboardingStatus();
-      
-      // The NavigationController will automatically redirect to tabs
-      // once it detects the onboarding is complete
-      
     } catch (error: any) {
       console.error('Complete profile error:', error);
       Alert.alert('Error', error.message || 'Failed to save profile');
@@ -101,8 +117,8 @@ export default function OnboardingNotificationsScreen() {
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ 
-          flexDirection: 'row', 
+        <View style={{
+          flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 20,
           paddingTop: 10,
@@ -127,7 +143,7 @@ export default function OnboardingNotificationsScreen() {
           }}>
             enable notifications
           </Text>
-          
+
           <Text style={{
             fontSize: 16,
             color: '#666',
@@ -246,7 +262,7 @@ export default function OnboardingNotificationsScreen() {
               </Text>
             )}
           </Pressable>
-          
+
           <Pressable
             onPress={handleSkip}
             disabled={loading}

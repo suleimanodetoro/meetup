@@ -11,37 +11,29 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
 import { decode } from 'base64-arraybuffer';
+import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 
 export default function OnboardingPictureScreen() {
   const params = useLocalSearchParams();
   const { session } = useAuth();
+
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   async function pickImage() {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: false,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-        base64: true, // Important: get base64 immediately
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const image = result.assets[0];
-        setImageUri(image.uri);
-        setImageBase64(image.base64 || null); // Store base64 data
-      }
-    } catch (error) {
+      // Same UX: 1:1 crop, similar compression; util guarantees base64
+      const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
+      if (!picked) return;
+      setImageUri(picked.uri);
+      setImageBase64(picked.base64);
+    } catch (error: any) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert('Error', error?.message || 'Failed to pick image');
     }
   }
 
@@ -53,11 +45,11 @@ export default function OnboardingPictureScreen() {
 
     try {
       setUploading(true);
-      
+
       const fileName = `${session?.user.id}-${Date.now()}.jpg`;
-      
-      // Direct upload to avatars bucket - no subfolder path!
-      const { data, error } = await supabase.storage
+
+      // Upload to avatars bucket, same as before
+      const { error } = await supabase.storage
         .from('avatars')
         .upload(fileName, decode(imageBase64), {
           contentType: 'image/jpeg',
@@ -66,17 +58,16 @@ export default function OnboardingPictureScreen() {
 
       if (error) throw error;
 
-      // Get the public URL
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
       console.log('Upload successful, URL:', publicUrl);
       return publicUrl;
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Upload Error', error.message || 'Failed to upload avatar');
+      Alert.alert('Upload Error', error?.message || 'Failed to upload avatar');
       return null;
     } finally {
       setUploading(false);
@@ -84,18 +75,14 @@ export default function OnboardingPictureScreen() {
   }
 
   const handleContinue = async () => {
-    let avatarUrl = null;
-    
+    let avatarUrl: string | null = null;
+
     if (imageUri && imageBase64) {
       avatarUrl = await uploadAvatar();
-      // Only proceed if upload was successful or user had no image
-      if (!avatarUrl && imageUri) {
-        // Upload failed but user had selected an image
-        return; // Don't navigate
-      }
+      if (!avatarUrl && imageUri) return; // don’t navigate if upload failed after selection
     }
 
-    // Navigate to languages screen
+    // Keep passing avatar_url via params (unchanged flow)
     router.push({
       pathname: '/onboarding-languages',
       params: {
@@ -121,9 +108,9 @@ export default function OnboardingPictureScreen() {
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ 
-          flexDirection: 'row', 
-          alignItems: 'center', 
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: 20,
           paddingTop: 10,
@@ -138,19 +125,11 @@ export default function OnboardingPictureScreen() {
 
         <View style={{ flex: 1, paddingHorizontal: 30, paddingTop: 40 }}>
           {/* Title */}
-          <Text style={{
-            fontSize: 36,
-            fontWeight: 'bold',
-            marginBottom: 8,
-          }}>
+          <Text style={{ fontSize: 36, fontWeight: 'bold', marginBottom: 8 }}>
             add a picture
           </Text>
-          
-          <Text style={{
-            fontSize: 16,
-            color: '#666',
-            marginBottom: 40,
-          }}>
+
+          <Text style={{ fontSize: 16, color: '#666', marginBottom: 40 }}>
             let others know what you look like 📸
           </Text>
 
@@ -191,13 +170,7 @@ export default function OnboardingPictureScreen() {
                 opacity: uploading ? 0.6 : 1,
               }}>
               {imageUri ? (
-                <Image
-                  source={{ uri: imageUri }}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                  }}
-                />
+                <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} />
               ) : (
                 <View style={{
                   width: 60,
@@ -247,20 +220,12 @@ export default function OnboardingPictureScreen() {
             {uploading ? (
               <>
                 <ActivityIndicator size="small" color="white" />
-                <Text style={{
-                  color: 'white',
-                  fontSize: 18,
-                  fontWeight: '600',
-                }}>
+                <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
                   Uploading...
                 </Text>
               </>
             ) : (
-              <Text style={{
-                color: 'white',
-                fontSize: 18,
-                fontWeight: '600',
-              }}>
+              <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
                 Continue
               </Text>
             )}

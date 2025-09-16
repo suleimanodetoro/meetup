@@ -14,13 +14,12 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import { COUNTRIES } from '~/utils/countryFlags';
 import { useAuth } from './contexts/AuthProvider';
+import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 
 const INTERESTS = [
   'Music & Concerts',
@@ -30,42 +29,18 @@ const INTERESTS = [
   'Yoga & Mindfulness',
   'Foodie Adventures',
   'Coffee & Chill',
-  'Arts & Crafts',
+  'Arts & Culture',
+  'Film & Cinema',
   'Photography',
-  'Board Games',
-  'Karaoke',
-  'Outdoor Activities',
+  'Hiking & Outdoors',
+  'Travel',
   'Volunteering',
-  'Movie Nights',
-  'Fashion',
-  'Tech Meetups',
-  'Sports',
+  'Tech & Startups',
+  'Board Games',
+  'Language Exchange',
   'Book Club',
   'Creative Writing',
   'Adventure',
-];
-
-const LANGUAGES = [
-  { name: 'English', code: 'en' },
-  { name: 'German', code: 'de' },
-  { name: 'Hausa', code: 'ha' },
-  { name: 'Spanish', code: 'es' },
-  { name: 'French', code: 'fr' },
-  { name: 'Italian', code: 'it' },
-  { name: 'Portuguese', code: 'pt' },
-  { name: 'Russian', code: 'ru' },
-  { name: 'Chinese', code: 'zh' },
-  { name: 'Japanese', code: 'ja' },
-  { name: 'Korean', code: 'ko' },
-  { name: 'Arabic', code: 'ar' },
-  { name: 'Hindi', code: 'hi' },
-  { name: 'Bengali', code: 'bn' },
-  { name: 'Punjabi', code: 'pa' },
-  { name: 'Turkish', code: 'tr' },
-  { name: 'Vietnamese', code: 'vi' },
-  { name: 'Thai', code: 'th' },
-  { name: 'Dutch', code: 'nl' },
-  { name: 'Polish', code: 'pl' },
 ];
 
 type Country = {
@@ -85,153 +60,176 @@ export default function EditProfile() {
   const [secondImage, setSecondImage] = useState<string | null>(null);
   const [thirdImage, setThirdImage] = useState<string | null>(null);
 
-  // Profile Fields
-  const [firstName, setFirstName] = useState('');
-  const [introduction, setIntroduction] = useState('');
-  const [birthDate, setBirthDate] = useState(new Date(1998, 0, 1));
+  // Basic Info
+  const [fullName, setFullName] = useState('');
+  const [bio, setBio] = useState('');
+  const [dob, setDob] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [genderPreference, setGenderPreference] = useState<'everyone' | 'guys' | 'girls'>('everyone');
-  const [travelLifestyle, setTravelLifestyle] = useState('Digital nomad');
-  const [instagramUsername, setInstagramUsername] = useState('');
-  const [tiktokUsername, setTiktokUsername] = useState('');
-  const [nationality, setNationality] = useState<Country>(COUNTRIES[0] as Country);
-  const [languages, setLanguages] = useState<string[]>(['English']);
-  const [interests, setInterests] = useState<string[]>([]);
 
-  // Modal States
-  const [showNationalityModal, setShowNationalityModal] = useState(false);
+  // Location (stored as nationality in DB)
+  const [country, setCountry] = useState<Country | null>(null);
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+
+  // Gender & Preferences
+  const [gender, setGender] =
+    useState<'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null>(null);
+  const [genderPreference, setGenderPreference] =
+    useState<'everyone' | 'guys' | 'girls'>('everyone');
+
+  // Languages
+  const [languages, setLanguages] = useState<string[]>([]);
   const [showLanguagesModal, setShowLanguagesModal] = useState(false);
-  const [showInterestsModal, setShowInterestsModal] = useState(false);
-  const [showGenderPreferenceModal, setShowGenderPreferenceModal] = useState(false);
-  const [showTravelLifestyleModal, setShowTravelLifestyleModal] = useState(false);
 
+  // Interests
+  const [interests, setInterests] = useState<string[]>([]);
+  const [showInterestsModal, setShowInterestsModal] = useState(false);
+
+  // ────────────────────────────────────────────────────────────────────────────────
+  // Load profile (schema-correct)
+  // ────────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      if (!session?.user?.id) return;
+      setLoading(true);
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            full_name,
+            bio,
+            avatar_url,
+            birth_date,
+            languages,
+            gender,
+            nationality,
+            nationality_code,
+            interests,
+            gender_preference
+          `)
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (profile) {
+          setFullName(profile.full_name ?? '');
+          setBio(profile.bio ?? '');
+          setMainImage(profile.avatar_url ?? null);
+
+          // birth_date -> dob
+          if (profile.birth_date) setDob(new Date(profile.birth_date));
+
+          // nationality_code/name -> Country object
+          const byCode = profile.nationality_code
+            ? COUNTRIES.find((c) => c.code === profile.nationality_code)
+            : null;
+          const byName =
+            !byCode && profile.nationality
+              ? COUNTRIES.find((c) => c.name === profile.nationality)
+              : null;
+          setCountry(byCode ?? byName ?? null);
+
+          // gender / gender_preference
+          if (profile.gender) setGender(profile.gender);
+          if (profile.gender_preference) {
+            const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
+            setGenderPreference(gp);
+          }
+
+          // languages / interests (jsonb arrays)
+          if (Array.isArray(profile.languages)) setLanguages(profile.languages as string[]);
+          if (Array.isArray(profile.interests)) setInterests(profile.interests as string[]);
+        }
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Error', 'Failed to load your profile.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [session?.user?.id]);
 
-  const loadProfile = async () => {
-    if (!session?.user?.id) return;
-
-    setLoading(true);
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error) throw error;
-
-      if (profile) {
-        setFirstName(profile.full_name || '');
-        setIntroduction(profile.bio || '');
-        if (profile.birth_date) setBirthDate(new Date(profile.birth_date));
-
-        setMainImage(profile.avatar_url || null);
-        setInstagramUsername(profile.username || '');
-
-        // nationality
-        const country =
-          (COUNTRIES as Country[]).find(c => c.code === profile.nationality_code) ||
-          (COUNTRIES[0] as Country);
-        setNationality(country);
-
-        // languages
-        if (Array.isArray(profile.languages)) {
-          const names = (profile.languages as string[]).map(code => {
-            const lang = LANGUAGES.find(l => l.code === code);
-            return lang?.name || code;
-          });
-          setLanguages(names);
-        }
-
-        // interests
-        if (Array.isArray(profile.interests)) {
-          setInterests(profile.interests as string[]);
-        }
-
-        setGenderPreference((profile.gender_preference as 'everyone' | 'guys' | 'girls') || 'everyone');
-      }
-    } catch (err) {
-      console.error('Error loading profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ────────────────────────────────────────────────────────────────────────────────
+  // Image picking (storage upload only; DB save happens in saveProfile)
+  // ────────────────────────────────────────────────────────────────────────────────
   const pickImage = async (position: 'main' | 'second' | 'third') => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-        base64: true,
-      });
+      const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
+      if (!picked) return;
 
-      if (!result.canceled && result.assets?.length) {
-        const image = result.assets[0];
+      const fileName = `${session?.user.id}-${position}-${Date.now()}.jpg`;
 
-        if (image.base64) {
-          const fileName = `${session?.user.id}-${position}-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, decode(picked.base64), {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
 
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, decode(image.base64), {
-              contentType: 'image/jpeg',
-              upsert: true,
-            });
+      if (uploadError) throw uploadError;
 
-          if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+      const publicUrl = publicData.publicUrl;
 
-          const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-          const publicUrl = publicData.publicUrl;
-
-          if (position === 'main') setMainImage(publicUrl);
-          if (position === 'second') setSecondImage(publicUrl);
-          if (position === 'third') setThirdImage(publicUrl);
-        }
-      }
+      if (position === 'main') setMainImage(publicUrl);
+      if (position === 'second') setSecondImage(publicUrl); // preview only
+      if (position === 'third') setThirdImage(publicUrl);   // preview only
     } catch (err) {
       console.error('Error picking image:', err);
       Alert.alert('Error', 'Failed to pick image');
     }
   };
 
-  const handleSave = async () => {
+  // ────────────────────────────────────────────────────────────────────────────────
+  // Save (schema-correct payload)
+  // ────────────────────────────────────────────────────────────────────────────────
+  const saveProfile = async () => {
     if (!session?.user?.id) return;
-
-    setSaving(true);
     try {
-      // Convert language names back to codes
-      const languageCodes = languages.map(name => LANGUAGES.find(l => l.name === name)?.code || name);
+      setSaving(true);
 
-      const updates = {
-        id: session.user.id,
-        full_name: firstName,
-        bio: introduction,
-        birth_date: birthDate.toISOString().split('T')[0],
-        avatar_url: mainImage,
-        username: instagramUsername,
-        tiktok: tiktokUsername,
-        nationality: nationality.name,
-        nationality_code: nationality.code,
-        languages: languageCodes,
-        interests,
-        gender_preference: genderPreference,
+      const payload: {
+        updated_at: string;
+        full_name: string | null;
+        bio: string | null;
+        avatar_url: string | null;
+        birth_date: string | null; // YYYY-MM-DD
+        languages: string[];
+        gender: string | null;
+        nationality: string | null;
+        nationality_code: string | null;
+        interests: string[];
+        gender_preference: string | null;
+      } = {
         updated_at: new Date().toISOString(),
+        full_name: fullName || null,
+        bio: bio || null,
+        avatar_url: mainImage || null,
+        birth_date: dob ? new Date(dob).toISOString().slice(0, 10) : null,
+        languages,
+        gender: gender ?? null,
+        nationality: country?.name ?? null,
+        nationality_code: country?.code ?? null,
+        interests,
+        gender_preference: genderPreference ?? null,
       };
 
-      const { error } = await supabase.from('profiles').upsert(updates);
+      const { error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', session.user.id);
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Profile updated successfully');
+      Alert.alert('Saved', 'Your profile has been updated.');
       router.back();
-    } catch (err: any) {
-      console.error('Error saving profile:', err);
-      Alert.alert('Error', err.message || 'Failed to save profile');
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to save profile.');
     } finally {
       setSaving(false);
     }
@@ -239,620 +237,380 @@ export default function EditProfile() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" />
-        </View>
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
       </SafeAreaView>
     );
   }
 
+  const filteredCountries = COUNTRIES.filter((c) => {
+    if (!countrySearch) return true;
+    return (
+      c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      c.code.toLowerCase().includes(countrySearch.toLowerCase())
+    );
+  });
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: '#F0F0F0',
-        }}
-      >
-        <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </Pressable>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 16 }}>Edit profile</Text>
 
-        <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Edit Profile</Text>
-
-        <Pressable
-          onPress={handleSave}
-          disabled={saving}
-          style={{
-            backgroundColor: '#4A90E2',
-            paddingHorizontal: 20,
-            paddingVertical: 10,
-            borderRadius: 20,
-            opacity: saving ? 0.7 : 1,
-          }}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Update</Text>
-          )}
-        </Pressable>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-        {/* Profile Pictures */}
-        <View style={{ padding: 20 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 16 }}>Profile Pictures</Text>
-
-          {/* Main Picture */}
-          <Pressable
-            onPress={() => pickImage('main')}
-            style={{
-              width: '100%',
-              height: 200,
-              borderRadius: 16,
-              backgroundColor: mainImage ? '#4A90E2' : '#E0E0E0',
-              marginBottom: 16,
-              overflow: 'hidden',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
+        {/* Photos */}
+        <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Photos</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {/* Main */}
+          <View style={{ width: 120, height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#F0F0F0' }}>
             {mainImage ? (
               <Image source={{ uri: mainImage }} style={{ width: '100%', height: '100%' }} />
             ) : (
-              <View style={{ alignItems: 'center' }}>
-                <Ionicons name="camera-outline" size={40} color="white" />
-                <Text style={{ color: 'white', marginTop: 8 }}>Main Picture</Text>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 30, color: '#999' }}>+</Text>
+                <Text style={{ color: '#999', marginTop: 4 }}>Main Pic</Text>
               </View>
             )}
-
             <Pressable
               onPress={() => pickImage('main')}
               style={{
                 position: 'absolute',
-                bottom: 12,
-                right: 12,
+                bottom: 8,
+                right: 8,
                 backgroundColor: 'rgba(255,255,255,0.9)',
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: 30,
+                height: 30,
+                borderRadius: 15,
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
             >
-              <Ionicons name="camera" size={20} color="#333" />
+              <Text style={{ fontSize: 18 }}>✎</Text>
             </Pressable>
-          </Pressable>
+          </View>
 
-          {/* Secondary Pictures */}
-          <View style={{ flexDirection: 'row' }}>
-            {/* second */}
+          {/* Second (preview only) */}
+          <View style={{ width: 120, height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#F0F0F0' }}>
+            {secondImage ? (
+              <Image source={{ uri: secondImage }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 30, color: '#999' }}>+</Text>
+                <Text style={{ color: '#999', marginTop: 4 }}>2nd Pic</Text>
+              </View>
+            )}
             <Pressable
               onPress={() => pickImage('second')}
               style={{
-                flex: 1,
-                height: 140,
-                borderRadius: 16,
-                backgroundColor: '#E0E0E0',
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                width: 30,
+                height: 30,
+                borderRadius: 15,
                 justifyContent: 'center',
                 alignItems: 'center',
-                overflow: 'hidden',
-                marginRight: 16,
               }}
             >
-              {secondImage ? (
-                <Image source={{ uri: secondImage }} style={{ width: '100%', height: '100%' }} />
-              ) : (
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 30, color: '#999' }}>+</Text>
-                  <Text style={{ color: '#999', marginTop: 4 }}>2nd Pic</Text>
-                </View>
-              )}
-              <Pressable
-                onPress={() => pickImage('second')}
-                style={{
-                  position: 'absolute',
-                  bottom: 8,
-                  right: 8,
-                  backgroundColor: 'rgba(255,255,255,0.9)',
-                  width: 30,
-                  height: 30,
-                  borderRadius: 15,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Ionicons name="camera" size={16} color="#333" />
-              </Pressable>
+              <Text style={{ fontSize: 18 }}>✎</Text>
             </Pressable>
+          </View>
 
-            {/* third */}
+          {/* Third (preview only) */}
+          <View style={{ width: 120, height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#F0F0F0' }}>
+            {thirdImage ? (
+              <Image source={{ uri: thirdImage }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 30, color: '#999' }}>+</Text>
+                <Text style={{ color: '#999', marginTop: 4 }}>3rd Pic</Text>
+              </View>
+            )}
             <Pressable
               onPress={() => pickImage('third')}
               style={{
-                flex: 1,
-                height: 140,
-                borderRadius: 16,
-                backgroundColor: '#E0E0E0',
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                width: 30,
+                height: 30,
+                borderRadius: 15,
                 justifyContent: 'center',
                 alignItems: 'center',
-                overflow: 'hidden',
               }}
             >
-              {thirdImage ? (
-                <Image source={{ uri: thirdImage }} style={{ width: '100%', height: '100%' }} />
-              ) : (
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 30, color: '#999' }}>+</Text>
-                  <Text style={{ color: '#999', marginTop: 4 }}>3rd Pic</Text>
-                </View>
-              )}
-              <Pressable
-                onPress={() => pickImage('third')}
-                style={{
-                  position: 'absolute',
-                  bottom: 8,
-                  right: 8,
-                  backgroundColor: 'rgba(255,255,255,0.9)',
-                  width: 30,
-                  height: 30,
-                  borderRadius: 15,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Ionicons name="camera" size={16} color="#333" />
-              </Pressable>
+              <Text style={{ fontSize: 18 }}>✎</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* First Name */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>First Name</Text>
-          <TextInput
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="Enter your first name"
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              fontSize: 16,
-            }}
-          />
+        {/* Basic Info */}
+        <Text style={{ fontSize: 16, fontWeight: '600', marginVertical: 16 }}>Basic Info</Text>
+        <View style={{ gap: 12 }}>
+          <View>
+            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Full name</Text>
+            <TextInput
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Your name"
+              style={{
+                borderWidth: 1,
+                borderColor: '#E0E0E0',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 12,
+              }}
+            />
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Bio</Text>
+            <TextInput
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell us about yourself"
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: '#E0E0E0',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 12,
+                minHeight: 100,
+                textAlignVertical: 'top',
+              }}
+            />
+          </View>
+
+          <View>
+            <Text style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Date of birth</Text>
+            <Pressable
+              onPress={() => setShowDatePicker(true)}
+              style={{
+                borderWidth: 1,
+                borderColor: '#E0E0E0',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 12,
+              }}
+            >
+              <Text>{dob ? dob.toDateString() : 'Select date'}</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* Introduction */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Introduction</Text>
-          <TextInput
-            value={introduction}
-            onChangeText={setIntroduction}
-            placeholder="Write something..."
-            multiline
-            numberOfLines={4}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              fontSize: 16,
-              minHeight: 100,
-              textAlignVertical: 'top',
-            }}
-          />
-        </View>
+        {/* Location (stored as nationality) */}
+        <Text style={{ fontSize: 16, fontWeight: '600', marginVertical: 16 }}>Location</Text>
+        <Pressable
+          onPress={() => setShowCountryModal(true)}
+          style={{
+            borderWidth: 1,
+            borderColor: '#E0E0E0',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+          }}
+        >
+          <Text>{country ? `${country.flag}  ${country.name}` : 'Choose country'}</Text>
+        </Pressable>
 
-        {/* Date of Birth */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Date of Birth</Text>
-          <Pressable
-            onPress={() => setShowDatePicker(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>
-              {birthDate.toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </Pressable>
-        </View>
+        {/* Gender & Preferences */}
+        <Text style={{ fontSize: 16, fontWeight: '600', marginVertical: 16 }}>Preferences</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {['male', 'female', 'non-binary', 'prefer-not-to-say'].map((g) => (
+            <Pressable
+              key={g}
+              onPress={() => setGender(g as any)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: gender === g ? '#4A90E2' : '#E0E0E0',
+                backgroundColor: gender === g ? '#EAF3FF' : 'white',
+              }}
+            >
+              <Text>{g}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
-        {/* Gender Preference */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>Gender Preference</Text>
-          <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>Who do you want to meet?</Text>
-          <Pressable
-            onPress={() => setShowGenderPreferenceModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, marginRight: 8 }}>👫</Text>
-              <Text style={{ fontSize: 16, textTransform: 'capitalize' }}>{genderPreference}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={20} color="#666" />
-          </Pressable>
-        </View>
-
-        {/* Travel Lifestyle */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Travel Lifestyle</Text>
-          <Pressable
-            onPress={() => setShowTravelLifestyleModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, marginRight: 8 }}>💻</Text>
-              <Text style={{ fontSize: 16 }}>{travelLifestyle}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={20} color="#666" />
-          </Pressable>
-        </View>
-
-        {/* Instagram Username */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Instagram Username</Text>
-          <TextInput
-            value={instagramUsername}
-            onChangeText={setInstagramUsername}
-            placeholder="Instagram username"
-            autoCapitalize="none"
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              fontSize: 16,
-            }}
-          />
-        </View>
-
-        {/* TikTok Username */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>TikTok Username</Text>
-          <TextInput
-            value={tiktokUsername}
-            onChangeText={setTiktokUsername}
-            placeholder="TikTok username"
-            autoCapitalize="none"
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              fontSize: 16,
-            }}
-          />
-        </View>
-
-        {/* Nationality */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Nationality</Text>
-          <Pressable
-            onPress={() => setShowNationalityModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 20, marginRight: 8 }}>{nationality.flag}</Text>
-              <Text style={{ fontSize: 16 }}>{nationality.name}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={20} color="#666" />
-          </Pressable>
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 10 }}>
+          {['everyone', 'guys', 'girls'].map((gp) => (
+            <Pressable
+              key={gp}
+              onPress={() => setGenderPreference(gp as any)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: genderPreference === gp ? '#4A90E2' : '#E0E0E0',
+                backgroundColor: genderPreference === gp ? '#EAF3FF' : 'white',
+              }}
+            >
+              <Text>{gp}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
         {/* Languages */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Languages</Text>
-          <Pressable
-            onPress={() => setShowLanguagesModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            {languages.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {languages.map((lang, index) => (
-                  <View
-                    key={`${lang}-${index}`}
-                    style={{
-                      backgroundColor: '#E3F2FD',
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 16,
-                      marginRight: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Text style={{ fontSize: 14, color: '#4A90E2' }}>{lang}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={{ fontSize: 16, color: '#999' }}>Select languages</Text>
-            )}
-          </Pressable>
-        </View>
+        <Text style={{ fontSize: 16, fontWeight: '600', marginVertical: 16 }}>Languages</Text>
+        <Pressable
+          onPress={() => setShowLanguagesModal(true)}
+          style={{
+            borderWidth: 1,
+            borderColor: '#E0E0E0',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+          }}
+        >
+          <Text>{languages.length ? languages.join(', ') : 'Add languages'}</Text>
+        </Pressable>
 
         {/* Interests */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 40 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Interests</Text>
-          <Pressable
-            onPress={() => setShowInterestsModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: '#E0E0E0',
-              borderRadius: 12,
-              padding: 16,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 20, marginRight: 8 }}>+</Text>
-            <Text style={{ fontSize: 16, color: '#999' }}>
-              {interests.length > 0 ? `${interests.length} interests selected` : 'Tap here to add interests'}
-            </Text>
-          </Pressable>
+        <Text style={{ fontSize: 16, fontWeight: '600', marginVertical: 16 }}>Interests</Text>
+        <Pressable
+          onPress={() => setShowInterestsModal(true)}
+          style={{
+            borderWidth: 1,
+            borderColor: '#E0E0E0',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+          }}
+        >
+          <Text>{interests.length ? `${interests.length} selected` : 'Choose interests'}</Text>
+        </Pressable>
 
-          {interests.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 }}>
-              {interests.map((interest, index) => (
-                <View
-                  key={`${interest}-${index}`}
-                  style={{
-                    backgroundColor: '#E3F2FD',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    marginRight: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: '#4A90E2' }}>{interest}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        <Pressable
+          onPress={saveProfile}
+          disabled={saving}
+          style={{
+            marginTop: 24,
+            backgroundColor: 'black',
+            paddingVertical: 14,
+            borderRadius: 12,
+            alignItems: 'center',
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: '700' }}>
+            {saving ? 'Saving...' : 'Save changes'}
+          </Text>
+        </Pressable>
       </ScrollView>
 
       {/* Date Picker */}
-      <DatePicker
-        modal
-        open={showDatePicker}
-        date={birthDate}
-        mode="date"
-        maximumDate={new Date()}
-        minimumDate={new Date(1920, 0, 1)}
-        onConfirm={(date) => {
-          setShowDatePicker(false);
-          setBirthDate(date);
-        }}
-        onCancel={() => setShowDatePicker(false)}
-      />
-
-      {/* Gender Preference Modal */}
-      <Modal visible={showGenderPreferenceModal} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 20 }}>Gender Preference</Text>
-            {['everyone', 'guys', 'girls'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => {
-                  setGenderPreference(option as 'everyone' | 'guys' | 'girls');
-                  setShowGenderPreferenceModal(false);
-                }}
-                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}
-              >
-                <Text style={{ fontSize: 16, textTransform: 'capitalize' }}>{option}</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setShowGenderPreferenceModal(false)} style={{ marginTop: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#666' }}>Cancel</Text>
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <SafeAreaView
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.35)',
+          }}
+        >
+          <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20 }}>
+            <DatePicker
+              mode="date"
+              date={dob || new Date(2000, 0, 1)}
+              onDateChange={setDob as any}
+              maximumDate={new Date()}
+            />
+            <Pressable
+              onPress={() => setShowDatePicker(false)}
+              style={{
+                marginTop: 12,
+                backgroundColor: '#111',
+                borderRadius: 10,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '600' }}>Done</Text>
             </Pressable>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
-      {/* Travel Lifestyle Modal */}
-      <Modal visible={showTravelLifestyleModal} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 20 }}>Travel Lifestyle</Text>
-            {['Digital nomad', 'Backpacker', 'Luxury traveler', 'Weekend explorer', 'Adventure seeker'].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => {
-                  setTravelLifestyle(option);
-                  setShowTravelLifestyleModal(false);
-                }}
-                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}
-              >
-                <Text style={{ fontSize: 16 }}>{option}</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setShowTravelLifestyleModal(false)} style={{ marginTop: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#666' }}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Nationality Modal */}
-      <Modal visible={showNationalityModal} animationType="slide">
+      {/* Country Modal */}
+      <Modal
+        visible={showCountryModal}
+        animationType="slide"
+        onRequestClose={() => setShowCountryModal(false)}
+      >
         <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E0E0E0',
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: '600' }}>Select Nationality</Text>
-            <Pressable onPress={() => setShowNationalityModal(false)}>
-              <Text style={{ fontSize: 16, color: '#4A90E2' }}>Done</Text>
-            </Pressable>
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+            <TextInput
+              value={countrySearch}
+              onChangeText={setCountrySearch}
+              placeholder="Search country"
+              style={{
+                borderWidth: 1,
+                borderColor: '#E0E0E0',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+              }}
+            />
           </View>
           <FlatList
-            data={COUNTRIES as Country[]}
+            data={filteredCountries}
             keyExtractor={(item) => item.code}
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => {
-                  setNationality(item);
-                  setShowNationalityModal(false);
+                  setCountry(item);
+                  setShowCountryModal(false);
                 }}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingVertical: 16,
+                  paddingVertical: 14,
                   paddingHorizontal: 20,
                   borderBottomWidth: 1,
                   borderBottomColor: '#F0F0F0',
                 }}
               >
-                <Text style={{ fontSize: 20, marginRight: 12 }}>{item.flag}</Text>
+                <Text style={{ fontSize: 18, marginRight: 12 }}>{item.flag}</Text>
                 <Text style={{ fontSize: 16 }}>{item.name}</Text>
-                {nationality.code === item.code && (
-                  <Ionicons name="checkmark" size={20} color="#4A90E2" style={{ marginLeft: 'auto' }} />
-                )}
+                <Text style={{ marginLeft: 'auto', color: '#999' }}>{item.code}</Text>
               </Pressable>
             )}
           />
         </SafeAreaView>
       </Modal>
 
-      {/* Languages Modal */}
-      <Modal visible={showLanguagesModal} animationType="slide">
+      {/* Languages Modal (example) */}
+      <Modal
+        visible={showLanguagesModal}
+        animationType="slide"
+        onRequestClose={() => setShowLanguagesModal(false)}
+      >
         <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E0E0E0',
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: '600' }}>Select Languages</Text>
-            <Pressable onPress={() => setShowLanguagesModal(false)}>
-              <Text style={{ fontSize: 16, color: '#4A90E2' }}>Done</Text>
-            </Pressable>
+          <View style={{ padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700' }}>Languages</Text>
+            <Text style={{ color: '#666', marginTop: 4 }}>Tap to toggle</Text>
           </View>
           <FlatList
-            data={LANGUAGES}
-            keyExtractor={(item) => item.code}
+            data={['en', 'es', 'fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko']}
+            keyExtractor={(x) => x}
             renderItem={({ item }) => (
               <Pressable
-                onPress={() => {
-                  setLanguages(prev =>
-                    prev.includes(item.name) ? prev.filter(l => l !== item.name) : [...prev, item.name],
-                  );
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#F0F0F0',
-                }}
-              >
-                <Text style={{ fontSize: 16, flex: 1 }}>{item.name}</Text>
-                {languages.includes(item.name) && <Ionicons name="checkmark" size={20} color="#4A90E2" />}
-              </Pressable>
-            )}
-          />
-        </SafeAreaView>
-      </Modal>
-
-      {/* Interests Modal */}
-      <Modal visible={showInterestsModal} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E0E0E0',
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: '600' }}>Select Interests</Text>
-            <Pressable onPress={() => setShowInterestsModal(false)}>
-              <Text style={{ fontSize: 16, color: '#4A90E2' }}>Done</Text>
-            </Pressable>
-          </View>
-          <FlatList
-            data={INTERESTS}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => {
-                  if (interests.includes(item)) {
-                    setInterests(prev => prev.filter(i => i !== item));
-                  } else if (interests.length < 5) {
-                    setInterests(prev => [...prev, item]);
-                  } else {
-                    Alert.alert('Maximum Interests', 'You can select up to 5 interests');
-                  }
-                }}
+                onPress={() =>
+                  setLanguages((prev) =>
+                    prev.includes(item)
+                      ? prev.filter((x) => x !== item)
+                      : [...prev, item]
+                  )
+                }
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -863,7 +621,49 @@ export default function EditProfile() {
                 }}
               >
                 <Text style={{ fontSize: 16, flex: 1 }}>{item}</Text>
-                {interests.includes(item) && <Ionicons name="checkmark" size={20} color="#4A90E2" />}
+                {languages.includes(item) && <Text>✓</Text>}
+              </Pressable>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
+
+      {/* Interests Modal */}
+      <Modal
+        visible={showInterestsModal}
+        animationType="slide"
+        onRequestClose={() => setShowInterestsModal(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+          <View style={{ padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700' }}>Interests</Text>
+            <Text style={{ color: '#666', marginTop: 4 }}>Pick up to 5</Text>
+          </View>
+          <FlatList
+            data={INTERESTS}
+            keyExtractor={(x) => x}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() =>
+                  setInterests((prev) =>
+                    prev.includes(item)
+                      ? prev.filter((x) => x !== item)
+                      : prev.length < 5
+                      ? [...prev, item]
+                      : prev
+                  )
+                }
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#F0F0F0',
+                }}
+              >
+                <Text style={{ fontSize: 16, flex: 1 }}>{item}</Text>
+                {interests.includes(item) && <Text>✓</Text>}
               </Pressable>
             )}
           />

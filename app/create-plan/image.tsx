@@ -167,12 +167,6 @@ export default function PlanImageScreen() {
           This image will be the main visual for your activity plan
         </Text>
         
-        {/* Debug info in dev mode */}
-        {__DEV__ && formData.imageBase64 && (
-          <Text style={styles.debugText}>
-            ✔ Base64 data captured ({Math.round(formData.imageBase64.length / 1024)}KB)
-          </Text>
-        )}
       </View>
 
       {/* Continue Button - Always enabled (image is optional) */}

@@ -1,5 +1,5 @@
 {
-  "name": "MeetupClone",
+  "name": "Waypoint",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
@@ -51,7 +51,9 @@
     "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0",
     "three": "^0.179.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "react-native-maps": "1.20.1",
+    "expo-clipboard": "~7.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

@@ -37,6 +37,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'search-users',
       'friend-requests',
       'modal',
+      'explore',        // ADDED EXPLORE HERE!
     ];
 
     const isAllowedRoute =
@@ -57,7 +58,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     }
 
     // ----- Authenticated + onboarded -----
-    // If we’re still on any (auth) screen (e.g., /signin), leave immediately.
+    // If we're still on any (auth) screen (e.g., /signin), leave immediately.
     if (inAuthGroup) {
       router.replace('/(tabs)');
       return;
@@ -111,6 +112,7 @@ export default function RootLayout() {
               <Stack.Screen name="settings/privacy" />
               <Stack.Screen name="search-users" />
               <Stack.Screen name="friend-requests" />
+              <Stack.Screen name="explore" /> 
               <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
 
               {/* 404 */}

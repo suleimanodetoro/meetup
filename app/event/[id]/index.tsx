@@ -1,4 +1,4 @@
-// app/event/[id]/index.tsx 
+// app/event/[id]/index.tsx - FIXED VERSION
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -12,14 +12,19 @@ import {
   Alert,
   SafeAreaView,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
+import { Platform, ToastAndroid } from 'react-native';
 
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/app/contexts/AuthProvider';
+import { getCountryFlag } from '~/utils/geographic';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface EventDetails {
   id: number;
@@ -66,29 +71,60 @@ interface EventDetails {
   }>;
 }
 
+// Interest mapping from your constants
+const INTERESTS = [
+  { id: 'music', label: 'Music', emoji: '🎶' },
+  { id: 'gaming', label: 'Esports', emoji: '🎮' },
+  { id: 'dance', label: 'Dance Nights', emoji: '💃' },
+  { id: 'fitness', label: 'Group Fitness', emoji: '🏋️‍♂️' },
+  { id: 'yoga', label: 'Yoga & Mindfulness', emoji: '🧘‍♀️' },
+  { id: 'foodie', label: 'Food', emoji: '🍣' },
+  { id: 'coffee', label: 'Coffee & Chill', emoji: '☕' },
+  { id: 'arts', label: 'Arts & Crafts', emoji: '🎨' },
+  { id: 'photography', label: 'Photography Walks', emoji: '📸' },
+  { id: 'boardgames', label: 'Game Nights', emoji: '🎲' },
+  { id: 'karaoke', label: 'Karaoke', emoji: '🎤' },
+  { id: 'outdoor', label: 'Outdoor', emoji: '🌳' },
+  { id: 'volunteer', label: 'Volunteering', emoji: '🤝' },
+  { id: 'film', label: 'Movie Nights', emoji: '🎬' },
+  { id: 'fashion', label: 'Fashion', emoji: '🛍️' },
+  { id: 'tech', label: 'Tech Meetups', emoji: '💻' },
+  { id: 'skate', label: 'Skateboarding', emoji: '🛹' },
+  { id: 'sports', label: 'Sports', emoji: '⚽' },
+  { id: 'bookclub', label: 'Book Club', emoji: '📚' },
+  { id: 'creative', label: 'Writing', emoji: '✍️' },
+  { id: 'thrill', label: 'Adventure', emoji: '🏎️' },
+];
+
 export default function PlanDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, fromCreation } = useLocalSearchParams<{ id: string; fromCreation?: string }>();
   const { session } = useAuth();
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [isAttending, setIsAttending] = useState(false);
+  
+  // Check if we came from plan creation
+  const isFromCreation = fromCreation === 'true';
+  
   const [expandedSections, setExpandedSections] = useState({
     about: true,
     interests: true,
     destinations: true,
+    cost: true,
     managedBy: true,
   });
 
   useEffect(() => {
+    StatusBar.setBarStyle('light-content');
     if (id) {
       fetchEventDetails();
     }
+    return () => StatusBar.setBarStyle('dark-content');
   }, [id]);
 
   const fetchEventDetails = async () => {
     try {
-      // Fetch event with all related data
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select(`
@@ -124,7 +160,6 @@ export default function PlanDetailsScreen() {
       if (eventError) throw eventError;
       setEvent(eventData);
 
-      // Check if current user is attending
       if (session?.user?.id) {
         const isUserAttending = eventData.attendees?.some(
           a => a.user.id === session.user.id
@@ -147,7 +182,6 @@ export default function PlanDetailsScreen() {
 
     setJoining(true);
     try {
-      // Add user to attendance
       const { error } = await supabase
         .from('attendance')
         .insert({
@@ -156,12 +190,9 @@ export default function PlanDetailsScreen() {
         });
 
       if (error) throw error;
-
-      // Navigate to group chat
       router.push(`/chat/${id}`);
     } catch (error: any) {
       if (error?.code === '23505') {
-        // Already attending - just go to chat
         router.push(`/chat/${id}`);
       } else {
         console.error('Error joining plan:', error);
@@ -169,6 +200,19 @@ export default function PlanDetailsScreen() {
       }
     } finally {
       setJoining(false);
+    }
+  };
+
+  const copyAddressToClipboard = async (address?: string, fallback?: string) => {
+    const text = (address || fallback || '').trim();
+    if (!text) return;
+
+    await Clipboard.setStringAsync(text);
+
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('Address copied', ToastAndroid.SHORT);
+    } else {
+      Alert.alert('Copied to clipboard', text);
     }
   };
 
@@ -188,20 +232,54 @@ export default function PlanDetailsScreen() {
     return date.toLocaleDateString('en-US', options);
   };
 
-  const getFlagEmoji = (countryCode: string) => {
-    if (!countryCode) return '';
-    const codePoints = countryCode
-      .toUpperCase()
-      .split('')
-      .map(char => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
-  };
-
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section],
     }));
+  };
+
+  const getInterestEmoji = (interestLabel: string): string => {
+    const interest = INTERESTS.find(i => 
+      i.label.toLowerCase() === interestLabel.toLowerCase() || 
+      i.id === interestLabel.toLowerCase()
+    );
+    return interest?.emoji || '✨';
+  };
+
+  // FIXED: Handle back navigation properly
+  const handleBack = () => {
+    if (isFromCreation) {
+      // If from creation, go home (dismiss the flow)
+      router.replace('/(tabs)');
+    } else {
+      // Normal back navigation
+      router.back();
+    }
+  };
+
+  const calculateTotalCost = () => {
+    if (event?.cost !== undefined && event?.cost !== null) {
+      return event.cost;
+    }
+    
+    if (event?.costs && event.costs.length > 0) {
+      const total = event.costs
+        .filter(c => !c.is_optional && c.amount)
+        .reduce((sum, c) => sum + (c.amount || 0), 0);
+      return total;
+    }
+    
+    return null;
+  };
+
+  const formatCost = (amount: number | null) => {
+    if (amount === null || amount === undefined) return null;
+    if (amount === 0) return 'Free';
+    
+    const currency = event?.cost_currency || 'USD';
+    const symbol = currency === 'USD' ? '$' : currency;
+    return `${symbol}${amount.toFixed(0)}`;
   };
 
   if (loading) {
@@ -219,7 +297,7 @@ export default function PlanDetailsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Plan not found</Text>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={handleBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </Pressable>
         </View>
@@ -232,109 +310,114 @@ export default function PlanDetailsScreen() {
   const spotsLeft = event.max_attendees 
     ? Math.max(0, event.max_attendees - attendeeCount)
     : null;
+  const totalCost = calculateTotalCost();
+  const costDisplay = formatCost(totalCost);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView bounces={false}>
+    <View style={styles.container}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
         {/* Header with Image */}
         <View style={styles.headerContainer}>
           <Image
             source={{ 
-              uri: event.image_uri || 'https://via.placeholder.com/400x300' 
+              uri: event.image_uri || 'https://source.unsplash.com/800x600/?bangkok,travel' 
             }}
             style={styles.headerImage}
           />
           
-          {/* Back Button */}
+          {/* FIXED: Back/Close Button - changes icon based on fromCreation */}
           <Pressable 
             style={styles.headerBackButton}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons 
+              name={isFromCreation ? "close" : "arrow-back"} 
+              size={24} 
+              color="#000" 
+            />
           </Pressable>
 
           {/* Share Button */}
           <Pressable style={styles.shareButton}>
-            <Ionicons name="share-outline" size={24} color="#fff" />
+            <Ionicons name="share-outline" size={24} color="#000" />
           </Pressable>
 
-          {/* Overlay with title */}
-          <View style={styles.imageOverlay}>
-            <Text style={styles.overlayTitle}>{event.title}</Text>
-            {event.country_code && (
-              <View style={styles.countryBadge}>
-                <Text style={styles.countryFlag}>
-                  {getFlagEmoji(event.country_code)}
-                </Text>
-                <Text style={styles.countryName}>{event.country}</Text>
-              </View>
-            )}
-          </View>
+          {/* Price Badge */}
+          {costDisplay && (
+            <View style={styles.priceBadge}>
+              <Text style={styles.priceText}>{costDisplay}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Main Content */}
+        {/* Main Content - ALL THE REST STAYS THE SAME */}
         <View style={styles.content}>
-          {/* Date and Attendees */}
-          <View style={styles.infoRow}>
-            <View style={styles.dateContainer}>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-              <Text style={styles.dateText}>
-                {formatDate(event.date, event.end_date)}
+          {/* Title and Location */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>{event.title}</Text>
+            <View style={styles.locationRow}>
+              <Text style={styles.locationFlag}>
+                {getCountryFlag(event.country_code)}
+              </Text>
+              <Text style={styles.locationText}>
+                {event.location_name || event.city}
+                {event.country && `, ${event.country}`}
               </Text>
             </View>
           </View>
 
+          {/* Date */}
+          <View style={styles.dateRow}>
+            <Ionicons name="calendar-outline" size={18} color="#6B7280" />
+            <Text style={styles.dateText}>
+              {formatDate(event.date, event.end_date)}
+            </Text>
+          </View>
+
           {/* Attendees */}
           <View style={styles.attendeesSection}>
-            <View style={styles.attendeesRow}>
-              <View style={styles.avatarStack}>
-                {event.attendees?.slice(0, 5).map((attendee, index) => (
-                  <Image
-                    key={attendee.user.id}
-                    source={{ 
-                      uri: attendee.user.avatar_url || 'https://via.placeholder.com/40' 
-                    }}
-                    style={[
-                      styles.attendeeAvatar,
-                      { marginLeft: index > 0 ? -12 : 0, zIndex: 5 - index }
-                    ]}
-                  />
-                ))}
-                {attendeeCount > 5 && (
-                  <View style={[styles.moreAttendees, { marginLeft: -12 }]}>
-                    <Text style={styles.moreAttendeesText}>
-                      +{attendeeCount - 5}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              {spotsLeft !== null && spotsLeft > 0 && (
-                <Text style={styles.spotsLeft}>
-                  {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
-                </Text>
+            <View style={styles.avatarStack}>
+              {event.attendees?.slice(0, 5).map((attendee, index) => (
+                <Image
+                  key={attendee.user.id}
+                  source={{ 
+                    uri: attendee.user.avatar_url || `https://i.pravatar.cc/100?u=${attendee.user.id}` 
+                  }}
+                  style={[
+                    styles.attendeeAvatar,
+                    { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index }
+                  ]}
+                />
+              ))}
+              {attendeeCount > 5 && (
+                <View style={[styles.moreAttendees, { marginLeft: -15, zIndex: 0 }]}>
+                  <Text style={styles.moreAttendeesText}>
+                    +{attendeeCount - 5}
+                  </Text>
+                </View>
               )}
             </View>
           </View>
 
-          {/* Join/Chat Button */}
+          {/* Join Button */}
           <Pressable
-            style={[
-              styles.mainButton,
-              (joining || (isAttending && !isCreator)) && styles.chatButton
-            ]}
             onPress={isAttending ? () => router.push(`/chat/${id}`) : handleJoinPlan}
             disabled={joining}
           >
-            {joining ? (
-              <ActivityIndicator color="#fff" />
-            ) : isAttending ? (
-              <>
-                <Ionicons name="chatbubbles" size={20} color="#fff" />
-                <Text style={styles.mainButtonText}>Open Chat</Text>
-              </>
-            ) : (
-              <Text style={styles.mainButtonText}>Join Chat</Text>
-            )}
+            <LinearGradient
+              colors={['#007AFF', '#0051D5']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.joinButton}
+            >
+              {joining ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.joinButtonText}>
+                  {isAttending ? 'Open Chat' : 'Join Chat'}
+                </Text>
+              )}
+            </LinearGradient>
           </Pressable>
 
           {/* About Section */}
@@ -347,13 +430,56 @@ export default function PlanDetailsScreen() {
               <Ionicons 
                 name={expandedSections.about ? 'chevron-down' : 'chevron-forward'} 
                 size={20} 
-                color="#666" 
+                color="#000" 
               />
             </View>
             {expandedSections.about && (
               <Text style={styles.description}>{event.description}</Text>
             )}
           </Pressable>
+
+          {/* Cost Section */}
+          {(costDisplay || (event.costs && event.costs.length > 0)) && (
+            <Pressable 
+              style={styles.section}
+              onPress={() => toggleSection('cost')}
+            >
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Cost Details</Text>
+                <Ionicons 
+                  name={expandedSections.cost ? 'chevron-down' : 'chevron-forward'} 
+                  size={20} 
+                  color="#000" 
+                />
+              </View>
+              {expandedSections.cost && (
+                <View>
+                  {event.costs && event.costs.length > 0 && !event.costs.some(c => c.item_name === 'No expected cost') && (
+                    <View style={styles.costBreakdown}>
+                      {event.costs.map((cost, index) => (
+                        <View key={index} style={styles.costItem}>
+                          <Text style={styles.costItemName}>
+                            {cost.item_name}
+                            {cost.is_optional && ' (optional)'}
+                          </Text>
+                          {cost.amount !== undefined && cost.amount !== null && (
+                            <Text style={styles.costItemAmount}>
+                              {formatCost(cost.amount)}
+                            </Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  <View style={styles.costTotalContainer}>
+                    <Text style={styles.costTotalLabel}>Estimated Total</Text>
+                    <Text style={styles.costTotalAmount}>{costDisplay || 'Free'}</Text>
+                  </View>
+                </View>
+              )}
+            </Pressable>
+          )}
 
           {/* Interests Section */}
           {event.interests && event.interests.length > 0 && (
@@ -366,19 +492,17 @@ export default function PlanDetailsScreen() {
                 <Ionicons 
                   name={expandedSections.interests ? 'chevron-down' : 'chevron-forward'} 
                   size={20} 
-                  color="#666" 
+                  color="#000" 
                 />
               </View>
               {expandedSections.interests && (
                 <View style={styles.interestsGrid}>
                   {event.interests.map((interest, index) => (
                     <View key={index} style={styles.interestItem}>
-                      <View style={styles.interestIcon}>
-                        <Ionicons 
-                          name={getInterestIcon(interest)} 
-                          size={24} 
-                          color="#666" 
-                        />
+                      <View style={styles.interestIconContainer}>
+                        <Text style={styles.interestEmoji}>
+                          {getInterestEmoji(interest)}
+                        </Text>
                       </View>
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
@@ -388,36 +512,56 @@ export default function PlanDetailsScreen() {
             </Pressable>
           )}
 
-          {/* Destinations Section */}
+          {/* Venues/Destinations Section */}
           {event.venues && event.venues.length > 0 && (
-            <Pressable 
-              style={styles.section}
-              onPress={() => toggleSection('destinations')}
-            >
-              <View style={styles.sectionHeader}>
+            <View style={styles.section}>
+              <Pressable
+                style={styles.sectionHeader}
+                onPress={() => toggleSection('destinations')}
+              >
                 <Text style={styles.sectionTitle}>Destinations</Text>
-                <Ionicons 
-                  name={expandedSections.destinations ? 'chevron-down' : 'chevron-forward'} 
-                  size={20} 
-                  color="#666" 
+                <Ionicons
+                  name={expandedSections.destinations ? 'chevron-down' : 'chevron-forward'}
+                  size={20}
+                  color="#000"
                 />
-              </View>
+              </Pressable>
+
               {expandedSections.destinations && (
-                <View style={styles.destinationsGrid}>
+                <View style={styles.destinationsContainer}>
                   {event.venues.map((venue, index) => (
-                    <View key={index} style={styles.destinationCard}>
+                    <Pressable
+                      key={index}
+                      style={styles.destinationCard}
+                      onPress={() =>
+                        copyAddressToClipboard(
+                          venue.venue_address,
+                          `${venue.venue_name}${venue.venue_city ? `, ${venue.venue_city}` : ''}`
+                        )
+                      }
+                      android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
+                    >
                       <Image
-                        source={{ 
-                          uri: `https://source.unsplash.com/400x300/?${venue.venue_city || 'city'}` 
-                        }}
+                        source={{ uri: `https://picsum.photos/400/300?random=${index}` }}
                         style={styles.destinationImage}
+                        defaultSource={{
+                          uri: 'https://via.placeholder.com/400x300/007AFF/FFFFFF?text=Loading',
+                        }}
                       />
-                      <Text style={styles.destinationName}>{venue.venue_name}</Text>
-                    </View>
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        style={styles.destinationGradient}
+                      >
+                        <Text style={styles.destinationName}>{venue.venue_name}</Text>
+                        {venue.venue_address && (
+                          <Text style={styles.destinationAddress}>{venue.venue_address}</Text>
+                        )}
+                      </LinearGradient>
+                    </Pressable>
                   ))}
                 </View>
               )}
-            </Pressable>
+            </View>
           )}
 
           {/* Managed By Section */}
@@ -430,7 +574,7 @@ export default function PlanDetailsScreen() {
               <Ionicons 
                 name={expandedSections.managedBy ? 'chevron-down' : 'chevron-forward'} 
                 size={20} 
-                color="#666" 
+                color="#000" 
               />
             </View>
             {expandedSections.managedBy && event.creator && (
@@ -440,7 +584,7 @@ export default function PlanDetailsScreen() {
               >
                 <Image
                   source={{ 
-                    uri: event.creator.avatar_url || 'https://via.placeholder.com/50' 
+                    uri: event.creator.avatar_url || `https://i.pravatar.cc/100?u=${event.creator.id}` 
                   }}
                   style={styles.organizerAvatar}
                 />
@@ -450,7 +594,7 @@ export default function PlanDetailsScreen() {
                   </Text>
                   <Text style={styles.organizerRole}>Group Organizer</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#666" />
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </Pressable>
             )}
           </Pressable>
@@ -461,27 +605,11 @@ export default function PlanDetailsScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-// Helper function for interest icons
-function getInterestIcon(interest: string): any {
-  const iconMap: { [key: string]: string } = {
-    'Adventure': 'compass',
-    'Beach': 'umbrella',
-    'Night Life': 'moon',
-    'Solo Travel': 'person',
-    'Nature': 'leaf',
-    'Food': 'restaurant',
-    'Culture': 'school',
-    'Sports': 'basketball',
-    'Music': 'musical-notes',
-    'Art': 'color-palette',
-  };
-  return (iconMap[interest] || 'star') as any;
-}
-
+// Styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -500,16 +628,22 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    color: '#666',
+    color: '#6B7280',
     marginBottom: 20,
+    fontWeight: '500',
+  },
+  backButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   backButtonText: {
     color: '#007AFF',
     fontSize: 16,
+    fontWeight: '600',
   },
   headerContainer: {
     position: 'relative',
-    height: 300,
+    height: height * 0.45,
   },
   headerImage: {
     width: '100%',
@@ -522,9 +656,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   shareButton: {
     position: 'absolute',
@@ -533,202 +672,282 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  imageOverlay: {
+  priceBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    bottom: 50,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  overlayTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  countryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  countryFlag: {
+  priceText: {
+    color: '#059669',
     fontSize: 20,
-  },
-  countryName: {
-    fontSize: 16,
-    color: '#fff',
+    fontWeight: '700',
   },
   content: {
-    padding: 16,
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: -30,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
-  infoRow: {
+  titleSection: {
     marginBottom: 16,
   },
-  dateContainer: {
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  dateText: {
+  locationFlag: {
+    fontSize: 24,
+  },
+  locationText: {
     fontSize: 16,
-    color: '#333',
+    color: '#4B5563',
+    fontWeight: '500',
   },
-  attendeesSection: {
-    marginBottom: 20,
-  },
-  attendeesRow: {
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 20,
+  },
+  dateText: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  attendeesSection: {
+    marginBottom: 24,
   },
   avatarStack: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   attendeeAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
     borderColor: '#fff',
   },
   moreAttendees: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
   },
   moreAttendeesText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-  },
-  spotsLeft: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
+    color: '#4B5563',
   },
-  mainButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 25,
+  joinButton: {
+    borderRadius: 30,
     paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 24,
+    marginBottom: 32,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  chatButton: {
-    backgroundColor: '#34C759',
-  },
-  mainButtonText: {
+  joinButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+    letterSpacing: -0.3,
   },
   section: {
+    paddingVertical: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingVertical: 16,
+    borderTopColor: '#F3F4F6',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#000',
+    letterSpacing: -0.3,
   },
   description: {
+    fontSize: 16,
+    color: '#4B5563',
+    lineHeight: 24,
+    letterSpacing: -0.2,
+  },
+  costBreakdown: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  costItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  costItemName: {
     fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
+    color: '#6B7280',
+  },
+  costItemAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  costTotalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  costTotalLabel: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  costTotalAmount: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#059669',
   },
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    marginHorizontal: -8,
   },
   interestItem: {
-    width: (width - 48) / 3,
+    width: (width - 56) / 3,
     alignItems: 'center',
-    paddingVertical: 12,
+    marginBottom: 24,
+    paddingHorizontal: 8,
   },
-  interestIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F3F4F6',
+  interestIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
-  interestText: {
-    fontSize: 13,
-    color: '#333',
-    textAlign: 'center',
+  interestEmoji: {
+    fontSize: 28,
   },
-  destinationsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  interestText: {
+    fontSize: 14,
+    color: '#374151',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  destinationsContainer: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
   },
   destinationCard: {
-    width: (width - 44) / 2,
+    width: width - 40,
+    height: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
   },
   destinationImage: {
     width: '100%',
-    height: 120,
-    borderRadius: 12,
-    marginBottom: 8,
+    height: '100%',
+  },
+  destinationGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    justifyContent: 'flex-end',
+    padding: 16,
   },
   destinationName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  destinationAddress: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
     fontWeight: '500',
-    color: '#333',
   },
   organizerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
   },
   organizerAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 16,
   },
   organizerInfo: {
     flex: 1,
   },
   organizerName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#000',
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
   organizerRole: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   reportButton: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 20,
     marginTop: 8,
   },
   reportText: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 15,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });

@@ -224,93 +224,10 @@ export default function ChatsScreen() {
   // Get filtered data
   const filteredChats = getFilteredChats();
 
-  // Empty state component
+  // Simplified empty state component - REMOVED PROBLEMATIC BUTTONS
   const renderEmptyState = () => {
-    let emptyMessage = '';
-    let emptySubtext = '';
-    let emptyIcon = 'chatbubbles-outline';
-
-    if (searchQuery.trim()) {
-      emptyMessage = 'No results found';
-      emptySubtext = `No conversations match "${searchQuery}"`;
-      emptyIcon = 'search-outline';
-    } else {
-      switch (activeTab) {
-        case 'dms':
-          emptyMessage = 'No direct messages yet';
-          emptySubtext = 'Start a conversation with someone!';
-          emptyIcon = 'chatbubble-outline';
-          break;
-        case 'plans':
-          emptyMessage = 'No plan chats yet';
-          emptySubtext = 'Join or create a plan to start chatting';
-          emptyIcon = 'people-outline';
-          break;
-        default:
-          emptyMessage = 'No conversations yet';
-          emptySubtext = 'Start chatting with other travelers!';
-          emptyIcon = 'chatbubbles-outline';
-      }
-    }
-
-    return (
-      <View style={styles.emptyContainer}>
-        {/* Friend Requests Card - only show when not searching */}
-        {pendingRequestsCount > 0 && activeTab === 'all' && !searchQuery.trim() && (
-          <Pressable 
-            style={styles.friendRequestCard}
-            onPress={() => router.push('/friend-requests')}>
-            <View style={styles.friendRequestIcon}>
-              <Ionicons name="person-add" size={24} color="#007AFF" />
-              {pendingRequestsCount > 0 && (
-                <View style={styles.requestBadge}>
-                  <Text style={styles.requestBadgeText}>{pendingRequestsCount}</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.friendRequestContent}>
-              <Text style={styles.friendRequestTitle}>Friend Requests</Text>
-              <Text style={styles.friendRequestSubtitle}>
-                {pendingRequestsCount} pending request{pendingRequestsCount !== 1 ? 's' : ''}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </Pressable>
-        )}
-
-        <View style={styles.emptyState}>
-          <Ionicons 
-            name={emptyIcon} 
-            size={60} 
-            color="#ccc" 
-          />
-          <Text style={styles.emptyTitle}>{emptyMessage}</Text>
-          <Text style={styles.emptySubtitle}>{emptySubtext}</Text>
-          
-          {/* Quick action buttons when empty */}
-          {!searchQuery.trim() && (
-            <View style={styles.emptyActions}>
-              {activeTab !== 'plans' && (
-                <Pressable 
-                  style={styles.emptyActionButton}
-                  onPress={() => router.push('/search-users')}>
-                  <Ionicons name="person-add-outline" size={20} color="#007AFF" />
-                  <Text style={styles.emptyActionText}>Find Friends</Text>
-                </Pressable>
-              )}
-              {activeTab !== 'dms' && (
-                <Pressable 
-                  style={styles.emptyActionButton}
-                  onPress={() => router.push('/explore')}>
-                  <Ionicons name="compass-outline" size={20} color="#007AFF" />
-                  <Text style={styles.emptyActionText}>Explore Plans</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-        </View>
-      </View>
-    );
+    // Return nothing - just empty space
+    return null;
   };
 
   // Header component with friend request badge
@@ -319,7 +236,7 @@ export default function ChatsScreen() {
       {/* Friend Requests Card - show at top when there are chats */}
       {pendingRequestsCount > 0 && filteredChats.length > 0 && !searchQuery.trim() && (
         <Pressable 
-          style={[styles.friendRequestCard, styles.friendRequestCardInList]}
+          style={styles.friendRequestCard}
           onPress={() => router.push('/friend-requests')}>
           <View style={styles.friendRequestIcon}>
             <Ionicons name="person-add" size={24} color="#007AFF" />
@@ -357,19 +274,24 @@ export default function ChatsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
         <View style={styles.headerActions}>
+          {/* Friend requests indicator */}
+          <Pressable 
+            style={styles.requestsButton}
+            onPress={() => router.push('/friend-requests')}>
+            <Text style={styles.requestsButtonText}>
+              {pendingRequestsCount} Requests
+            </Text>
+          </Pressable>
+          
+          {/* Search button */}
           <Pressable 
             style={styles.headerButton}
             onPress={() => setShowSearch(!showSearch)}>
             <Ionicons 
               name={showSearch ? "close" : "search"} 
               size={24} 
-              color="#000" 
+              color="#333" 
             />
-          </Pressable>
-          <Pressable 
-            style={styles.headerButton}
-            onPress={() => router.push('/search-users')}>
-            <Ionicons name="person-add-outline" size={24} color="#000" />
           </Pressable>
         </View>
       </View>
@@ -396,46 +318,29 @@ export default function ChatsScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        <Pressable 
-          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
-          onPress={() => setActiveTab('all')}>
-          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-            All
-          </Text>
-          {activeTab !== 'all' && chats.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{chats.length}</Text>
-            </View>
-          )}
-        </Pressable>
-        <Pressable 
-          style={[styles.tab, activeTab === 'dms' && styles.activeTab]}
-          onPress={() => setActiveTab('dms')}>
-          <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>
-            DMs
-          </Text>
-          {activeTab !== 'dms' && chats.filter(c => c.conversation_type === 'dm').length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {chats.filter(c => c.conversation_type === 'dm').length}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-        <Pressable 
-          style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
-          onPress={() => setActiveTab('plans')}>
-          <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
-            Plans
-          </Text>
-          {activeTab !== 'plans' && chats.filter(c => c.conversation_type === 'group').length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {chats.filter(c => c.conversation_type === 'group').length}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+        <View style={styles.tabsContainer}>
+          <Pressable 
+            style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+            onPress={() => setActiveTab('all')}>
+            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+              All
+            </Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tab, activeTab === 'dms' && styles.activeTab]}
+            onPress={() => setActiveTab('dms')}>
+            <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>
+              DMs
+            </Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
+            onPress={() => setActiveTab('plans')}>
+            <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
+              Plans
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Chat List */}
@@ -472,105 +377,122 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingVertical: 12,
+    borderBottomWidth: 0,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -0.5,
   },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  requestsButton: {
+    backgroundColor: '#EBF4FF',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  requestsButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerButton: {
-    marginLeft: 20,
-    padding: 4,
+    padding: 8,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#F8F8F8',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E5E5',
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
+    color: '#333',
   },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E5E5EA',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 25,
+    padding: 2,
   },
   tab: {
-    marginRight: 25,
-    paddingBottom: 5,
-    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 23,
+    minWidth: 70,
     alignItems: 'center',
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tabText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#8E8E93',
+    fontWeight: '500',
   },
   activeTabText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  tabBadge: {
-    marginLeft: 6,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabBadgeText: {
-    fontSize: 11,
-    color: '#666',
+    color: '#000000',
     fontWeight: '600',
   },
   chatItem: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingVertical: 12,
+    backgroundColor: '#fff',
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     marginRight: 12,
   },
   chatContent: {
     flex: 1,
+    justifyContent: 'center',
   },
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   chatName: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#000',
     flex: 1,
-    marginRight: 8,
   },
   timestamp: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 8,
   },
   messagePreview: {
     flexDirection: 'row',
@@ -581,11 +503,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     flex: 1,
-    marginRight: 8,
   },
   unreadMessage: {
-    fontWeight: '600',
     color: '#000',
+    fontWeight: '500',
   },
   unreadBadge: {
     backgroundColor: '#007AFF',
@@ -604,22 +525,16 @@ const styles = StyleSheet.create({
   emptyListContent: {
     flex: 1,
   },
-  emptyContainer: {
-    flex: 1,
-  },
   friendRequestCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#F8F9FA',
     marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 10,
-  },
-  friendRequestCardInList: {
     marginTop: 10,
     marginBottom: 10,
+    borderRadius: 12,
   },
   friendRequestIcon: {
     position: 'relative',
@@ -652,42 +567,5 @@ const styles = StyleSheet.create({
   friendRequestSubtitle: {
     fontSize: 14,
     color: '#666',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  emptyActions: {
-    flexDirection: 'row',
-    marginTop: 30,
-    gap: 15,
-  },
-  emptyActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    gap: 8,
-  },
-  emptyActionText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

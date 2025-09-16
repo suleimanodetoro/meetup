@@ -188,19 +188,25 @@ export default function ReviewScreen() {
 
       // Step 7: Navigate WITHOUT resetting form immediately
       const eventId = event.id;
-      console.log('Navigating to event:', eventId);
-      
-      // Use replace to avoid navigation stack issues
-      router.replace(`/event/${eventId}`);
-      
-      // Don't reset the form - let the navigation complete first
+    console.log('Navigating to event:', eventId);
+    
+    // Pass fromCreation=true to show X button
+    router.replace({
+      pathname: `/event/${eventId}`,
+      params: { fromCreation: 'true' }
+    });
+    
+    // Optional: Reset form after a delay to ensure navigation completes
+    setTimeout(() => {
+      resetForm();
+    }, 500);
 
-    } catch (error: any) {
-      Alert.alert('Creation Failed', error?.message || 'An unexpected error occurred. Please try again.');
-    } finally {
-      setCreating(false);
-    }
-  };
+  } catch (error: any) {
+    Alert.alert('Creation Failed', error?.message || 'An unexpected error occurred. Please try again.');
+  } finally {
+    setCreating(false);
+  }
+};
 
   const calculateTotalCost = () => {
     const costs = formData.costs || [];

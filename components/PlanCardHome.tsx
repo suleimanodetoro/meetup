@@ -1,173 +1,134 @@
-// ============================================
-// components/PlanCardHome.tsx
-// ============================================
-import React, { useMemo, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Image,
-  Dimensions,
-  type ColorValue,
-} from 'react-native';
+// components/PlanCardHome.tsx - FIXED VERSION WITH PRICE DISPLAY
+
+import React, { memo } from 'react';
+import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { getCountryFlag } from '~/utils/countryFlags';
+import { LinearGradient } from 'expo-linear-gradient';
+import type { Event } from '~/types/db';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+interface ExtendedEvent extends Event {
+  attendee_count?: number;
+  recent_attendees?: Array<{
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+  }>;
+}
 
-interface PlanCardProps {
-  plan: {
-    id: number | string;
-    title?: string;
-    city?: string;
-    country?: string;
-    country_code?: string;
-    image_uri?: string;
-    attendee_count?: number;
-    recent_attendees?: Array<{
-      id: string;
-      full_name?: string;
-      avatar_url?: string;
-    }>;
+interface PlanCardHomeProps {
+  plan: ExtendedEvent;
+}
+
+const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Check if today
+    if (date.toDateString() === today.toDateString()) {
+      return `Today, ${date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })}`;
+    }
+
+    // Check if tomorrow
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return `Tomorrow, ${date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })}`;
+    }
+
+    // Otherwise show date
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
-}
 
-// 2-color gradient tuple type
-type GradientTuple = readonly [ColorValue, ColorValue];
-
-// Stable palette
-const GRADIENTS: readonly GradientTuple[] = [
-  ['#667eea', '#764ba2'],
-  ['#f093fb', '#f5576c'],
-  ['#4facfe', '#00f2fe'],
-  ['#43e97b', '#38f9d7'],
-] as const;
-
-// Hash any id (number or string) to an index in [0, len)
-function hashToIndex(key: number | string, len: number) {
-  if (typeof key === 'number') return Math.abs(key) % len;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
-  return Math.abs(h) % len;
-}
-
-export const PlanCardHome = React.memo<PlanCardProps>(({ plan }) => {
-  const [imageError, setImageError] = useState(false);
-
-  // If the image URI changes, allow it to try again
-  useEffect(() => {
-    setImageError(false);
-  }, [plan.image_uri]);
-
-  const gradientColors = useMemo<GradientTuple>(() => {
-    const idx = hashToIndex(plan.id, GRADIENTS.length);
-    return GRADIENTS[idx];
-  }, [plan.id]);
-
-  const attendeeCount = plan.attendee_count ?? 0;
-  const attendees = (plan.recent_attendees || []).slice(0, 3);
+  const attendeeCount = plan.attendee_count || 0;
+  const displayAttendees = plan.recent_attendees?.slice(0, 3) || [];
 
   return (
     <Pressable
       onPress={() => router.push(`/event/${plan.id}`)}
-      accessibilityRole="button"
-      accessibilityLabel={`Open plan ${plan.title ?? 'Untitled Plan'}`}
-      hitSlop={8}
-      style={{
-        width: SCREEN_WIDTH * 0.6,
-        marginRight: 16,
-      }}
+      style={styles.container}
     >
-      <View
-        style={{
-          height: 160,
-          borderRadius: 16,
-          overflow: 'hidden',
-          marginBottom: 12,
-        }}
-      >
-        {plan.image_uri && !imageError ? (
-          <Image
-            source={{ uri: plan.image_uri }}
-            style={{ width: '100%', height: '100%' }}
-            onError={() => setImageError(true)}
-          />
+      {/* Image Section */}
+      <View style={styles.imageContainer}>
+        {plan.image_uri ? (
+          <Image source={{ uri: plan.image_uri }} style={styles.image} />
         ) : (
           <LinearGradient
-            colors={gradientColors}
-            style={{
-              width: '100%',
-              height: '100%',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
+            colors={['#667eea', '#764ba2']}
+            style={styles.imagePlaceholder}
           >
-            <Ionicons name="calendar" size={40} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="calendar" size={32} color="white" />
           </LinearGradient>
         )}
       </View>
 
-      <Text
-        style={{
-          fontSize: 17,
-          fontWeight: '600',
-          marginBottom: 6,
-        }}
-        numberOfLines={2}
-      >
-        {plan.title || 'Untitled Plan'}
-      </Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ fontSize: 18, marginRight: 8 }}>
-          {plan.country_code ? getCountryFlag(plan.country_code) : '🌍'}
+      {/* Content Section */}
+      <View style={styles.content}>
+        {/* Title */}
+        <Text style={styles.title} numberOfLines={2}>
+          {plan.title}
         </Text>
 
-        <Text
-          style={{ color: '#666', fontSize: 14, maxWidth: SCREEN_WIDTH * 0.32 }}
-          numberOfLines={1}
-        >
-          {plan.country || plan.city || 'Location TBD'}
-        </Text>
+        {/* Date & Location Row */}
+        <View style={styles.infoRow}>
+          <View style={styles.dateContainer}>
+            <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+            <Text style={styles.dateText} numberOfLines={1}>
+              {formatDate(plan.date)}
+            </Text>
+          </View>
+        </View>
 
+        {/* Location Row */}
+        {(plan.location_name || plan.city) && (
+          <View style={styles.locationContainer}>
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {plan.location_name || plan.city}
+            </Text>
+          </View>
+        )}
+
+        {/* Price Display - ADDED */}
+        {plan.cost !== null && plan.cost !== undefined && (
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceText}>
+              {plan.cost === 0 ? 'Free' : `${plan.cost}`}
+            </Text>
+          </View>
+        )}
+
+        {/* Attendees Section */}
         {attendeeCount > 0 && (
-          <View
-            style={{
-              flexDirection: 'row',
-              marginLeft: 'auto',
-              alignItems: 'center',
-            }}
-          >
-            <View style={{ flexDirection: 'row' }}>
-              {attendees.map((user, i) => (
+          <View style={styles.attendeesContainer}>
+            <View style={styles.avatarStack}>
+              {displayAttendees.map((user, index) => (
                 <View
-                  key={`${plan.id}-attendee-${user?.id || i}`}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    backgroundColor: '#E0E0E0',
-                    borderWidth: 2,
-                    borderColor: 'white',
-                    marginLeft: i === 0 ? 0 : -8,
-                    overflow: 'hidden',
-                  }}
+                  key={user.id}
+                  style={[
+                    styles.avatar,
+                    index > 0 && { marginLeft: -8 }
+                  ]}
                 >
                   {user?.avatar_url ? (
                     <Image
                       source={{ uri: user.avatar_url }}
-                      style={{ width: '100%', height: '100%' }}
+                      style={styles.avatarImage}
                     />
                   ) : (
-                    <View
-                      style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
+                    <View style={styles.avatarPlaceholder}>
                       <Ionicons name="person" size={12} color="#999" />
                     </View>
                   )}
@@ -175,14 +136,128 @@ export const PlanCardHome = React.memo<PlanCardProps>(({ plan }) => {
               ))}
             </View>
 
-            <Text style={{ fontSize: 12, color: '#666', marginLeft: 4 }}>
-              {attendeeCount}+
+            <Text style={styles.attendeeCount}>
+              {attendeeCount}+ going
             </Text>
           </View>
         )}
       </View>
     </Pressable>
   );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    width: 280,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginRight: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  imageContainer: {
+    height: 160,
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    padding: 16,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+    letterSpacing: -0.3,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 6,
+    flex: 1,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 6,
+    flex: 1,
+  },
+  priceContainer: {
+    marginBottom: 8,
+  },
+  priceText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  attendeesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  attendeeCount: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
 });
 
 export default PlanCardHome;

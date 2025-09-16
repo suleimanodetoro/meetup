@@ -45,7 +45,7 @@ export default function WelcomeScreen() {
                   fontWeight: 'bold',
                   color: 'white',
                 }}>
-                  ThirdSpace
+                  Waypoint
                 </Text>
               </View>
             </View>
@@ -59,7 +59,7 @@ export default function WelcomeScreen() {
                 marginBottom: 16,
                 lineHeight: 52,
               }}>
-                welcome to thirdspace
+                welcome to waypoint
               </Text>
               
               <Text style={{

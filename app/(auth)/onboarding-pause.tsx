@@ -43,7 +43,7 @@ export default function OnboardingPauseScreen() {
             you're almost{'\n'}there!
           </Text>
           <Text style={{ fontSize: 16, color: '#555', lineHeight: 22 }}>
-We’re finding more groups, activities, and fun in your Thirdspace.</Text>
+We’re finding more groups, activities, and fun in your thirdspace.</Text>
 
           {/* Full-width graphic */}
           <Animated.View style={{ opacity: fade, transform: [{ scale: pop }] }}>

@@ -1,6 +1,4 @@
-// ============================================
-// app/(tabs)/index.tsx - FIXED VERSION
-// ============================================
+// app/(tabs)/index.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -20,17 +18,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/countryFlags';
-import { getCityImageUrl } from '~/utils/cityImages'; // ← ADDED
+import { getCityImageUrl } from '~/utils/cityImages';
 import type { Event, Profile } from '~/types/db';
 
-// Import your components (note the filenames)
+// Import components
 import VisitCard from '~/components/VisitCard';
 import PlanCardHome from '~/components/PlanCardHome';
 import PersonCard from '~/components/PersonCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Small inline component: Category Pill(kept inline since it's trivial and screen-specific)
+// Category Pill component (kept but commented out in render)
 const CategoryPill = React.memo(
   ({
     label,
@@ -74,12 +72,17 @@ const CategoryPill = React.memo(
   )
 );
 
-// ============================================
-// MAIN HOME SCREEN
-// ============================================
+const categories = [
+  { id: 'for you', label: 'For you', icon: null },
+  { id: 'tropical', label: 'Tropical', icon: '🏝️' },
+  { id: 'hiking', label: 'Hiking', icon: '⛰️' },
+  { id: 'backpacking', label: 'Backpacking', icon: '🎒' },
+  { id: 'adventure', label: 'Adventure', icon: '🚀' },
+  { id: 'culture', label: 'Culture', icon: '🏛️' },
+];
+
 export default function HomeScreen() {
   const { session } = useAuth();
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('for you');
@@ -88,21 +91,12 @@ export default function HomeScreen() {
   const [trendingVisits, setTrendingVisits] = useState<any[]>([]);
   const [popularPlans, setPopularPlans] = useState<any[]>([]);
   const [newPlans, setNewPlans] = useState<any[]>([]);
-  const [suggestedPeople, setSuggestedPeople] = useState<Profile[]>([]);
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-
-  const categories = [
-    { id: 'for you', label: 'for you', icon: null },
-    { id: 'tropical', label: 'tropical', icon: '🏝' },
-    { id: 'hiking', label: 'hiking', icon: '🥾' },
-    { id: 'backpacking', label: 'backpacking', icon: '🎒' },
-    { id: 'adventure', label: 'adventure', icon: '🏔' },
-    { id: 'culture', label: 'culture', icon: '🏛' },
-  ];
+  const [suggestedPeople, setSuggestedPeople] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   const fetchHomeData = useCallback(async () => {
     try {
-      // Fetch user profile
+      // Fetch user profile FIRST
       if (session?.user?.id) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -112,23 +106,18 @@ export default function HomeScreen() {
         if (profile) setUserProfile(profile);
       }
 
-      // Note: the following RPCs must exist in your Supabase project.
-      // If they're not deployed yet, replace these with basic table queries temporarily.
-
-      // Trending visits - FIXED: Add images based on city name
+      // Trending visits
       const { data: visits, error: visitsError } = await supabase.rpc('get_trending_visits');
       if (visitsError) throw visitsError;
       
-      // Transform visits to ensure they have images
       const visitsWithImages = (visits || []).map(visit => ({
         ...visit,
-        // Always generate image from city name (visits table has no images)
         image_url: getCityImageUrl(visit.city)
       }));
       
       setTrendingVisits(visitsWithImages.slice(0, 6));
 
-      // Popular plans (with attendee counts)
+      // Popular plans
       const { data: popular, error: popularError } = await supabase.rpc('get_popular_plans_with_attendees');
       if (popularError) throw popularError;
       setPopularPlans((popular || []).slice(0, 6));
@@ -138,23 +127,16 @@ export default function HomeScreen() {
       if (recentError) throw recentError;
       setNewPlans((recent || []).slice(0, 6));
 
-      // Suggested users
+      // Suggested users - Function now ALWAYS returns up to 7 users
       if (session?.user?.id) {
         const { data: people, error: peopleError } = await supabase.rpc('get_suggested_users', {
           current_user_id: session.user.id,
         });
-        if (peopleError) throw peopleError;
-        setSuggestedPeople((people || []).slice(0, 6));
-      }
-
-      // Category filter (optional RPC)
-      if (activeCategory !== 'for you') {
-        const { data: filteredPlans, error: filterError } = await supabase.rpc('get_plans_by_category', {
-          category: activeCategory,
-        });
-        if (filterError) throw filterError;
-        if (filteredPlans?.length) {
-          setPopularPlans(filteredPlans.slice(0, 6));
+        if (peopleError) {
+          console.error('Error fetching suggested users:', peopleError);
+        } else if (people) {
+          setSuggestedPeople(people); // Function already returns 7 max, no need to slice
+          console.log('Suggested people returned:', people.length);
         }
       }
     } catch (err) {
@@ -164,7 +146,7 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [session?.user?.id, activeCategory]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     fetchHomeData();
@@ -179,12 +161,11 @@ export default function HomeScreen() {
     setActiveCategory(categoryId);
   }, []);
 
-  // Composite key for visits (in case your RPC groups rows)
   const getVisitKey = useCallback((visit: any) => {
     const c = visit.city ?? 'city';
     const s = visit.start_date ?? 'start';
     const e = visit.end_date ?? 'end';
-    return `visit-${c}-${s}-${e}`;
+    return `visit-${c}-${s}-${e}-${visit.id ?? 'id'}`;
   }, []);
 
   if (loading) {
@@ -198,72 +179,58 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[2]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
+        showsVerticalScrollIndicator={false}>
+        
         {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingVertical: 16,
-            backgroundColor: 'white',
-          }}
-        >
-          {/* Logo */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View
+        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+          {/* Top Row with Logo and Profile */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: '#87CEEB',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 10
+              }}>
+                <Text style={{ fontSize: 20 }}>🌍</Text>
+              </View>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827' }}>Waypoint</Text>
+            </View>
+            <Pressable 
+              onPress={() => router.push('/profile/' + session?.user?.id)}
+              hitSlop={8}
               style={{
                 width: 36,
                 height: 36,
                 borderRadius: 18,
-                backgroundColor: '#7DD3FC',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 8,
-              }}
-            >
-              <Text style={{ fontSize: 20 }}>😊</Text>
-            </View>
-            <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Thirdspace</Text>
+                overflow: 'hidden',
+                backgroundColor: '#E0E0E0',
+              }}>
+              {userProfile?.avatar_url ? (
+                <Image
+                  source={{ uri: userProfile.avatar_url }}
+                  style={{ width: '100%', height: '100%' }}
+                  onError={() => console.log('Avatar failed to load')}
+                />
+              ) : (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="person" size={20} color="#999" />
+                </View>
+              )}
+            </Pressable>
           </View>
-
-          {/* User Avatar */}
+          
+          <Text style={{ fontSize: 34, fontWeight: 'bold', color: '#111827', marginBottom: 4 }}>
+            For You
+          </Text>
           <Pressable
-            onPress={() => router.push('/(tabs)/profile')}
-            accessibilityRole="button"
-            hitSlop={8}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              overflow: 'hidden',
-              backgroundColor: '#E0E0E0',
-            }}
-          >
-            {userProfile?.avatar_url ? (
-              <Image
-                source={{ uri: userProfile.avatar_url }}
-                style={{ width: '100%', height: '100%' }}
-                onError={() => console.log('Avatar failed to load')}
-              />
-            ) : (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="person" size={20} color="#999" />
-              </View>
-            )}
-          </Pressable>
-        </View>
-
-        {/* Search Bar (placeholder button for now) */}
-        <View style={{ paddingHorizontal: 20, paddingBottom: 16, backgroundColor: 'white' }}>
-          <Pressable
-            onPress={() => Alert.alert('Search', 'Search functionality coming soon!')}
+            onPress={() => router.push('/explore')}
             accessibilityRole="button"
             hitSlop={8}
             style={{
@@ -280,8 +247,8 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Categories Carousel - Sticky */}
-        <View style={{ backgroundColor: 'white', paddingVertical: 12 }}>
+        {/* Categories Carousel - COMMENTED OUT */}
+        {/* <View style={{ backgroundColor: 'white', paddingVertical: 12 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
             {categories.map((category) => (
               <CategoryPill
@@ -293,7 +260,7 @@ export default function HomeScreen() {
               />
             ))}
           </ScrollView>
-        </View>
+        </View> */}
 
         {/* Trending Visits */}
         {trendingVisits.length > 0 && (
@@ -316,20 +283,21 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Popular Plans */}
+        {/* Popular Plans with See More */}
         {popularPlans.length > 0 && (
           <View style={{ marginTop: 32 }}>
             <View
               style={{
                 flexDirection: 'row',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 paddingHorizontal: 20,
                 marginBottom: 16,
               }}
             >
               <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>Popular Plans</Text>
               <Pressable
-                onPress={() => Alert.alert('See More', 'Navigate to all popular plans')}
+                onPress={() => router.push('/explore?filter=popular')}
                 accessibilityRole="button"
                 hitSlop={8}
               >
@@ -347,7 +315,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* New Plans */}
+        {/* New Plans with See More */}
         {newPlans.length > 0 && (
           <View style={{ marginTop: 32 }}>
             <View
@@ -366,7 +334,7 @@ export default function HomeScreen() {
                 </View>
               </View>
               <Pressable
-                onPress={() => Alert.alert('See More', 'Navigate to all new plans')}
+                onPress={() => router.push('/explore?filter=new')}
                 accessibilityRole="button"
                 hitSlop={8}
                 style={{ justifyContent: 'center' }}
@@ -385,7 +353,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* People You May Like */}
+        {/* People You May Like - Showing multiple users */}
         {suggestedPeople.length > 0 && (
           <View style={{ marginTop: 32, marginBottom: 40 }}>
             <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
@@ -403,15 +371,7 @@ export default function HomeScreen() {
         {trendingVisits.length === 0 && popularPlans.length === 0 && newPlans.length === 0 && (
           <View style={{ padding: 20, alignItems: 'center', marginTop: 50 }}>
             <Ionicons name="compass-outline" size={64} color="#CCC" />
-            <Text
-              style={{
-                fontSize: 18,
-                color: '#666',
-                textAlign: 'center',
-                marginTop: 16,
-                marginBottom: 8,
-              }}
-            >
+            <Text style={{ fontSize: 18, color: '#666', textAlign: 'center', marginTop: 16, marginBottom: 8 }}>
               No trips or plans available yet
             </Text>
             <Text style={{ fontSize: 14, color: '#999', textAlign: 'center' }}>
