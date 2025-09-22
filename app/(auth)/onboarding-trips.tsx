@@ -152,7 +152,7 @@ export default function OnboardingTripsScreen() {
               borderRadius: 16,
               marginBottom: 30,
               borderWidth: 2,
-              borderColor: selectedDestination ? '#4A90E2' : '#E0E0E0',
+              borderColor: selectedDestination ? '#007AFF' : '#E0E0E0',
             }}>
             <Text style={{
               fontSize: 16,
@@ -185,7 +185,7 @@ export default function OnboardingTripsScreen() {
               alignItems: 'center',
               gap: 12,
               borderWidth: 2,
-              borderColor: arrivalDate ? '#4A90E2' : '#E0E0E0',
+              borderColor: arrivalDate ? '#007AFF' : '#E0E0E0',
             }}>
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text style={{
@@ -210,7 +210,7 @@ export default function OnboardingTripsScreen() {
               alignItems: 'center',
               gap: 12,
               borderWidth: 2,
-              borderColor: departureDate ? '#4A90E2' : '#E0E0E0',
+              borderColor: departureDate ? '#007AFF' : '#E0E0E0',
             }}>
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text style={{
@@ -230,7 +230,7 @@ export default function OnboardingTripsScreen() {
             onPress={handleContinue}
             disabled={loading}
             style={{
-              backgroundColor: loading ? '#ccc' : '#4A90E2',
+              backgroundColor: loading ? '#ccc' : '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',
@@ -269,7 +269,7 @@ export default function OnboardingTripsScreen() {
                 <Pressable
                   onPress={() => setShowDestinationModal(false)}
                   style={{ padding: 5 }}>
-                  <Text style={{ fontSize: 17, color: '#4A90E2', fontWeight: '600' }}>
+                  <Text style={{ fontSize: 17, color: '#007AFF', fontWeight: '600' }}>
                     Done
                   </Text>
                 </Pressable>

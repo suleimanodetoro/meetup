@@ -86,7 +86,7 @@ export default function CostsScreen() {
             <Switch
               value={noCost}
               onValueChange={setNoCost}
-              trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
               thumbColor="white"
             />
           </View>
@@ -127,7 +127,7 @@ export default function CostsScreen() {
                       <Switch
                         value={cost.isOptional}
                         onValueChange={(value) => updateCostItem(index, 'isOptional', value)}
-                        trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+                        trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
                         thumbColor="white"
                       />
                     </View>
@@ -146,7 +146,7 @@ export default function CostsScreen() {
 
               {/* Add Item Button */}
               <Pressable onPress={addCostItem} style={styles.addButton}>
-                <Ionicons name="add-circle-outline" size={24} color="#4A90E2" />
+                <Ionicons name="add-circle-outline" size={24} color="#007AFF" />
                 <Text style={styles.addButtonText}>Add item</Text>
               </Pressable>
             </>
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 16,
-    color: '#4A90E2',
+    color: '#007AFF',
     fontWeight: '500',
   },
   footerText: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',

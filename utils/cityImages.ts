@@ -124,7 +124,7 @@ export function getCityInitialsImage(city: string): string {
   const params = new URLSearchParams({
     name: initials,
     size: '800',
-    background: '4A90E2',
+    background: '007AFF',
     color: 'ffffff',
     bold: 'true',
     format: 'png'

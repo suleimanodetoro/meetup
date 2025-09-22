@@ -161,7 +161,7 @@ export default function OnboardingPictureScreen() {
                 height: 280,
                 borderRadius: 20,
                 borderWidth: 3,
-                borderColor: '#4A90E2',
+                borderColor: '#007AFF',
                 borderStyle: 'dashed',
                 backgroundColor: 'white',
                 justifyContent: 'center',
@@ -180,7 +180,7 @@ export default function OnboardingPictureScreen() {
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}>
-                  <Text style={{ fontSize: 30, color: '#4A90E2' }}>+</Text>
+                  <Text style={{ fontSize: 30, color: '#007AFF' }}>+</Text>
                 </View>
               )}
             </Pressable>
@@ -195,7 +195,7 @@ export default function OnboardingPictureScreen() {
                   backgroundColor: 'white',
                   borderRadius: 20,
                 }}>
-                <Text style={{ color: '#4A90E2', fontWeight: '600' }}>
+                <Text style={{ color: '#007AFF', fontWeight: '600' }}>
                   Change Photo
                 </Text>
               </Pressable>
@@ -209,7 +209,7 @@ export default function OnboardingPictureScreen() {
             onPress={handleContinue}
             disabled={uploading}
             style={{
-              backgroundColor: uploading ? '#ccc' : '#4A90E2',
+              backgroundColor: uploading ? '#ccc' : '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',

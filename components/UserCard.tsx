@@ -47,7 +47,7 @@ export default function UserCard({ user }: UserCardProps) {
           )}
           {user.is_verified && (
             <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color="#4A90E2" />
+              <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
             </View>
           )}
         </View>

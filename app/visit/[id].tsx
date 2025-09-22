@@ -47,7 +47,7 @@ export default function VisitDetailsScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90E2" />
+        <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading visit details...</Text>
       </View>
     );
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

@@ -37,6 +37,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   stepActive: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
   },
 });

@@ -141,7 +141,7 @@ export default function OnboardingBasicScreen() {
                   fontSize: 18,
                   marginBottom: 30,
                   borderWidth: 2,
-                  borderColor: '#4A90E2',
+                  borderColor: '#007AFF',
                 }}
               />
 
@@ -161,7 +161,7 @@ export default function OnboardingBasicScreen() {
                   borderRadius: 16,
                   marginBottom: 8,
                   borderWidth: 2,
-                  borderColor: showDatePicker ? '#4A90E2' : 'transparent',
+                  borderColor: showDatePicker ? '#007AFF' : 'transparent',
                 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, color: '#333' }}>
@@ -197,7 +197,7 @@ export default function OnboardingBasicScreen() {
                   <Pressable
                     onPress={() => setShowDatePicker(false)}
                     style={{
-                      backgroundColor: '#4A90E2',
+                      backgroundColor: '#007AFF',
                       padding: 12,
                       borderRadius: 8,
                       alignItems: 'center',
@@ -216,7 +216,7 @@ export default function OnboardingBasicScreen() {
               onPress={handleContinue}
               disabled={!name.trim()}
               style={{
-                backgroundColor: name.trim() ? '#4A90E2' : '#ccc',
+                backgroundColor: name.trim() ? '#007AFF' : '#ccc',
                 paddingVertical: 18,
                 borderRadius: 30,
                 alignItems: 'center',

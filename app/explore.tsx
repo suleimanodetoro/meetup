@@ -301,7 +301,7 @@ export default function ExploreScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       </SafeAreaView>
     );

@@ -141,7 +141,7 @@ export default function OnboardingLanguagesScreen() {
           {item.name}
         </Text>
         {isSelected && (
-          <Text style={{ fontSize: 20, color: '#4A90E2' }}>✓</Text>
+          <Text style={{ fontSize: 20, color: '#007AFF' }}>✓</Text>
         )}
       </Pressable>
     );
@@ -239,7 +239,7 @@ export default function OnboardingLanguagesScreen() {
           <Pressable
             onPress={handleContinue}
             style={{
-              backgroundColor: '#4A90E2',
+              backgroundColor: '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',

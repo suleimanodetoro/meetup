@@ -93,7 +93,7 @@ export default function OnboardingInterestsScreen() {
                     className={[
                       'mb-3 mr-3 w-auto shrink-0 grow-0 self-start',
                       'flex-row items-center rounded-full border px-3 py-3',
-                      selected ? 'border-[#4A90E2] bg-[#4A90E2]' : 'border-[#E0E0E0] bg-white',
+                      selected ? 'border-[#007AFF] bg-[#007AFF]' : 'border-[#E0E0E0] bg-white',
                     ].join(' ')}>
                     <Text className="mr-2 text-[17px]">{i.emoji}</Text>
                     <Text
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chipSelected: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   emoji: { fontSize: 18, marginRight: 8 },
   chipLabel: { fontSize: 15, fontWeight: '600', color: '#333' },
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cta: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     paddingVertical: 18,
     borderRadius: 30,
     alignItems: 'center',

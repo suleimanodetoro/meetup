@@ -57,7 +57,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => (
               <View
                 style={{
-                  backgroundColor: showCreateModal ? '#3A7BC8' : '#4A90E2',
+                  backgroundColor: showCreateModal ? '#3A7BC8' : '#007AFF',
                   width: 50,
                   height: 50,
                   borderRadius: 25,

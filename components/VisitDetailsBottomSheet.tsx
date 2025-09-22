@@ -161,7 +161,7 @@ export default function VisitDetailsBottomSheet({
           <Ionicons 
             name="people" 
             size={20} 
-            color={activeTab === 'users' ? '#4A90E2' : '#999'} 
+            color={activeTab === 'users' ? '#007AFF' : '#999'} 
           />
           <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
             Users {users.length > 0 && `(${users.length})`}
@@ -174,7 +174,7 @@ export default function VisitDetailsBottomSheet({
           <Ionicons 
             name="calendar" 
             size={20} 
-            color={activeTab === 'plans' ? '#4A90E2' : '#999'} 
+            color={activeTab === 'plans' ? '#007AFF' : '#999'} 
           />
           <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
             Plans {plans.length > 0 && `(${plans.length})`}
@@ -193,7 +193,7 @@ export default function VisitDetailsBottomSheet({
       >
         {loading ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#4A90E2" />
+            <ActivityIndicator size="large" color="#007AFF" />
           </View>
         ) : activeTab === 'users' ? (
           <>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   activeTabText: {
-    color: '#4A90E2',
+    color: '#007AFF',
     fontWeight: '600',
   },
   divider: {

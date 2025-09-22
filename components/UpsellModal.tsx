@@ -26,7 +26,7 @@ export default function UpsellModal({ visible, onDismiss, onSubscribe }: UpsellM
       statusBarTranslucent
     >
       <LinearGradient
-        colors={['#4A90E2', '#667eea']}
+        colors={['#007AFF', '#667eea']}
         style={styles.container}
       >
         <SafeAreaView style={styles.content}>
@@ -49,7 +49,7 @@ export default function UpsellModal({ visible, onDismiss, onSubscribe }: UpsellM
             {/* Benefits */}
             <View style={styles.benefits}>
               {[
-                'See all travelers in any city',
+                'See all poeple in any city',
                 'Send unlimited messages',
                 'Get priority visibility',
                 'Access exclusive events',
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#4A90E2',
+    color: '#007AFF',
   },
   secondaryButton: {
     paddingVertical: 12,

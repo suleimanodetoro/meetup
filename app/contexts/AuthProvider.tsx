@@ -140,7 +140,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-        <ActivityIndicator size="large" color="#4A90E2" />
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }

@@ -90,7 +90,7 @@ export default function OnboardingPreferencesScreen() {
                     alignItems: 'center',
                     gap: 16,
                     borderWidth: 2,
-                    borderColor: meetPreference === option.id ? '#4A90E2' : 'white',
+                    borderColor: meetPreference === option.id ? '#007AFF' : 'white',
                   }}>
                   <View style={{
                     width: 50,
@@ -115,7 +115,7 @@ export default function OnboardingPreferencesScreen() {
                       width: 24,
                       height: 24,
                       borderRadius: 12,
-                      backgroundColor: '#4A90E2',
+                      backgroundColor: '#007AFF',
                       justifyContent: 'center',
                       alignItems: 'center',
                     }}>
@@ -146,7 +146,7 @@ export default function OnboardingPreferencesScreen() {
           <Pressable
             onPress={handleContinue}
             style={{
-              backgroundColor: '#4A90E2',
+              backgroundColor: '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',

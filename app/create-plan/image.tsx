@@ -148,7 +148,7 @@ export default function PlanImageScreen() {
             <View style={styles.placeholderContent}>
               {busy ? (
                 <>
-                  <ActivityIndicator size="large" color="#4A90E2" />
+                  <ActivityIndicator size="large" color="#007AFF" />
                   <Text style={styles.dropzoneText}>Processing...</Text>
                 </>
               ) : (
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',

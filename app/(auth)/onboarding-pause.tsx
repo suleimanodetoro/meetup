@@ -123,5 +123,5 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   badgeImg: { width: 40, height: 40, borderRadius: 20 },
-  cta: { backgroundColor: '#4A90E2', paddingVertical: 18, borderRadius: 30, alignItems: 'center' },
+  cta: { backgroundColor: '#007AFF', paddingVertical: 18, borderRadius: 30, alignItems: 'center' },
 });

@@ -78,7 +78,7 @@ export default function OnboardingGenderPreferenceScreen() {
                   alignItems: 'center',
                   gap: 16,
                   borderWidth: 2,
-                  borderColor: genderPreference === option.id ? '#4A90E2' : 'white',
+                  borderColor: genderPreference === option.id ? '#007AFF' : 'white',
                 }}>
                 <View style={{
                   width: 50,
@@ -103,8 +103,8 @@ export default function OnboardingGenderPreferenceScreen() {
                   height: 24,
                   borderRadius: 12,
                   borderWidth: 2,
-                  borderColor: genderPreference === option.id ? '#4A90E2' : '#E0E0E0',
-                  backgroundColor: genderPreference === option.id ? '#4A90E2' : 'white',
+                  borderColor: genderPreference === option.id ? '#007AFF' : '#E0E0E0',
+                  backgroundColor: genderPreference === option.id ? '#007AFF' : 'white',
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}>
@@ -127,7 +127,7 @@ export default function OnboardingGenderPreferenceScreen() {
           <Pressable
             onPress={handleContinue}
             style={{
-              backgroundColor: '#4A90E2',
+              backgroundColor: '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',

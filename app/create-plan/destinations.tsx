@@ -231,7 +231,7 @@ export default function DestinationsScreen() {
           {/* Results */}
           {searching && searchResults.length === 0 ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4A90E2" />
+              <ActivityIndicator size="large" color="#007AFF" />
               <Text style={styles.loadingText}>Loading venue details...</Text>
             </View>
           ) : (
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   },
   addIconText: {
     fontSize: 20,
-    color: '#4A90E2',
+    color: '#007AFF',
   },
   addButtonText: {
     fontSize: 16,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     fontSize: 16,
-    color: '#4A90E2',
+    color: '#007AFF',
   },
   searchBar: {
     flexDirection: 'row',

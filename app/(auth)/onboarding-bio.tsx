@@ -93,7 +93,7 @@ export default function OnboardingBioScreen() {
               minHeight: 200,
               maxHeight: 300,
               borderWidth: 2,
-              borderColor: bio.length > 0 ? '#4A90E2' : '#E0E0E0',
+              borderColor: bio.length > 0 ? '#007AFF' : '#E0E0E0',
             }}>
               <TextInput
                 value={bio}
@@ -145,7 +145,7 @@ export default function OnboardingBioScreen() {
             <Pressable
               onPress={handleContinue}
               style={{
-                backgroundColor: '#4A90E2',
+                backgroundColor: '#007AFF',
                 paddingVertical: 18,
                 borderRadius: 30,
                 alignItems: 'center',

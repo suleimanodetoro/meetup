@@ -163,7 +163,7 @@ export default function AddTripScreen() {
             onPress={handleAddTrip}
             disabled={!canAddTrip || saving}
             style={{
-              backgroundColor: canAddTrip && !saving ? '#4A90E2' : '#E0E0E0',
+              backgroundColor: canAddTrip && !saving ? '#007AFF' : '#E0E0E0',
               paddingVertical: 16,
               paddingHorizontal: 40,
               borderRadius: 30,
@@ -287,7 +287,7 @@ export default function AddTripScreen() {
                     <Text style={{ fontSize: 14, color: '#666', marginTop: 2 }}>{item.country}</Text>
                   </View>
                   {selectedDestination?.city === item.city && (
-                    <Ionicons name="checkmark" size={20} color="#4A90E2" />
+                    <Ionicons name="checkmark" size={20} color="#007AFF" />
                   )}
                 </Pressable>
               )}

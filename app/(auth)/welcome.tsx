@@ -74,7 +74,7 @@ export default function WelcomeScreen() {
               <Pressable
                 onPress={() => router.push('/signin')}
                 style={{
-                  backgroundColor: '#4A90E2',
+                  backgroundColor: '#007AFF',
                   paddingVertical: 18,
                   borderRadius: 30,
                   alignItems: 'center',

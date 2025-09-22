@@ -269,7 +269,7 @@ export default function MapScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading map...</Text>
         </View>
       </SafeAreaView>
@@ -346,7 +346,7 @@ export default function MapScreen() {
         {/* Current City Pill */}
         {userCity && (
           <View style={styles.currentCityPill}>
-            <Ionicons name="location" size={14} color="#4A90E2" />
+            <Ionicons name="location" size={14} color="#007AFF" />
             <Text style={styles.currentCityText}>
               {userCity}, {userCountry}
             </Text>
@@ -358,7 +358,7 @@ export default function MapScreen() {
       <View style={[styles.bottomSheet, { paddingBottom: insets.bottom }]}>
         <View style={styles.bottomSheetHandle} />
         <Text style={styles.bottomSheetTitle}>
-          {usersInCity.length} Travelers in {userCity || 'this city'}
+          {usersInCity.length} People in {userCity || 'this city'}
         </Text>
         
         <ScrollView 
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   currentCityText: {
     fontSize: 12,
-    color: '#4A90E2',
+    color: '#007AFF',
     marginLeft: 4,
     fontWeight: '600',
   },
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   seeAllButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     marginHorizontal: 20,
     marginTop: 15,
     marginBottom: 20,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   viewProfileButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 180,
     alignSelf: 'center',
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,

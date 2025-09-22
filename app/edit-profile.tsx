@@ -426,7 +426,7 @@ export default function EditProfile() {
                 paddingVertical: 10,
                 borderRadius: 999,
                 borderWidth: 1,
-                borderColor: gender === g ? '#4A90E2' : '#E0E0E0',
+                borderColor: gender === g ? '#007AFF' : '#E0E0E0',
                 backgroundColor: gender === g ? '#EAF3FF' : 'white',
               }}
             >
@@ -445,7 +445,7 @@ export default function EditProfile() {
                 paddingVertical: 10,
                 borderRadius: 999,
                 borderWidth: 1,
-                borderColor: genderPreference === gp ? '#4A90E2' : '#E0E0E0',
+                borderColor: genderPreference === gp ? '#007AFF' : '#E0E0E0',
                 backgroundColor: genderPreference === gp ? '#EAF3FF' : 'white',
               }}
             >

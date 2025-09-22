@@ -390,7 +390,7 @@ export default function DMChatScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       </SafeAreaView>
     );
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   ownMessageBubble: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderBottomRightRadius: 4,
   },
   otherMessageBubble: {
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -50,9 +50,9 @@ const CategoryPill = React.memo(
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 25,
-        backgroundColor: isActive ? '#4A90E2' : 'white',
+        backgroundColor: isActive ? '#007AFF' : 'white',
         borderWidth: 1,
-        borderColor: isActive ? '#4A90E2' : '#E0E0E0',
+        borderColor: isActive ? '#007AFF' : '#E0E0E0',
         flexDirection: 'row',
         alignItems: 'center',
         marginRight: 12,
@@ -172,7 +172,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#4A90E2" />
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       </SafeAreaView>
     );
@@ -225,10 +225,6 @@ export default function HomeScreen() {
               )}
             </Pressable>
           </View>
-          
-          <Text style={{ fontSize: 34, fontWeight: 'bold', color: '#111827', marginBottom: 4 }}>
-            For You
-          </Text>
           <Pressable
             onPress={() => router.push('/explore')}
             accessibilityRole="button"
@@ -301,7 +297,7 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 hitSlop={8}
               >
-                <Text style={{ color: '#4A90E2', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
+                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
               </Pressable>
             </View>
             <FlatList
@@ -339,7 +335,7 @@ export default function HomeScreen() {
                 hitSlop={8}
                 style={{ justifyContent: 'center' }}
               >
-                <Text style={{ color: '#4A90E2', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
+                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
               </Pressable>
             </View>
             <FlatList
@@ -357,7 +353,7 @@ export default function HomeScreen() {
         {suggestedPeople.length > 0 && (
           <View style={{ marginTop: 32, marginBottom: 40 }}>
             <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>Travelers you may like</Text>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>People you may like</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
               {suggestedPeople.map((person) => (
@@ -383,7 +379,7 @@ export default function HomeScreen() {
               hitSlop={8}
               style={{
                 marginTop: 24,
-                backgroundColor: '#4A90E2',
+                backgroundColor: '#007AFF',
                 paddingHorizontal: 24,
                 paddingVertical: 12,
                 borderRadius: 25,

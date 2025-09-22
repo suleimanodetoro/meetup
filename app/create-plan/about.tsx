@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   hintTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4A90E2',
+    color: '#007AFF',
     marginBottom: 8,
   },
   hintItem: {
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',

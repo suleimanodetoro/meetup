@@ -219,7 +219,7 @@ export default function SignInScreen() {
                       disabled={loading}
                       style={{
                         flex: 1,
-                        backgroundColor: loading ? '#ccc' : '#4A90E2',
+                        backgroundColor: loading ? '#ccc' : '#007AFF',
                         paddingVertical: 16,
                         borderRadius: 30,
                         alignItems: 'center',
@@ -239,9 +239,9 @@ export default function SignInScreen() {
                         borderRadius: 30,
                         alignItems: 'center',
                         borderWidth: 2,
-                        borderColor: loading ? '#ccc' : '#4A90E2',
+                        borderColor: loading ? '#ccc' : '#007AFF',
                       }}>
-                      <Text style={{ color: loading ? '#ccc' : '#4A90E2', fontSize: 17, fontWeight: '600' }}>
+                      <Text style={{ color: loading ? '#ccc' : '#007AFF', fontSize: 17, fontWeight: '600' }}>
                         {loading ? 'Loading...' : 'Sign Up'}
                       </Text>
                     </Pressable>
@@ -259,9 +259,9 @@ export default function SignInScreen() {
               lineHeight: 18,
             }}>
               By continuing, you agree to our{' '}
-              <Text style={{ color: '#4A90E2' }}>terms of service</Text>
+              <Text style={{ color: '#007AFF' }}>terms of service</Text>
               {' '}and also certify that you've read our{' '}
-              <Text style={{ color: '#4A90E2' }}>privacy policy</Text>.
+              <Text style={{ color: '#007AFF' }}>privacy policy</Text>.
             </Text>
           </View>
         </KeyboardAvoidingView>

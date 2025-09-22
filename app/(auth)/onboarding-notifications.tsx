@@ -233,7 +233,7 @@ export default function OnboardingNotificationsScreen() {
             onPress={handleEnableNotifications}
             disabled={loading}
             style={{
-              backgroundColor: loading ? '#ccc' : '#4A90E2',
+              backgroundColor: loading ? '#ccc' : '#007AFF',
               paddingVertical: 18,
               borderRadius: 30,
               alignItems: 'center',

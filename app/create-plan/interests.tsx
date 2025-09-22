@@ -189,8 +189,8 @@ const styles = StyleSheet.create({
 
   },
   chipSelected: {
-    backgroundColor: '#4A90E2',
-    borderColor: '#4A90E2',
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   chipEmoji: {
     fontSize: 18,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',

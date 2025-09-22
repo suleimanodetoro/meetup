@@ -79,7 +79,7 @@ export default function DateScreen() {
             <Switch
               value={isOneDay}
               onValueChange={setIsOneDay}
-              trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
               thumbColor="white"
             />
           </View>
@@ -88,7 +88,7 @@ export default function DateScreen() {
             <Switch
               value={isAllDay}
               onValueChange={setIsAllDay}
-              trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
               thumbColor="white"
             />
           </View>
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
   },
   continueButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',

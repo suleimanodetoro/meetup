@@ -214,7 +214,7 @@ export default function SettingsScreen() {
               <Switch
                 value={hideNearbyDistance}
                 onValueChange={setHideNearbyDistance}
-                trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+                trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
                 thumbColor="white"
               />
             }
@@ -231,14 +231,14 @@ export default function SettingsScreen() {
                   paddingVertical: 4,
                   borderRadius: 12,
                 }}>
-                  <Text style={{ fontSize: 14, color: '#4A90E2', fontWeight: '600' }}>
+                  <Text style={{ fontSize: 14, color: '#007AFF', fontWeight: '600' }}>
                     Pro Feature
                   </Text>
                 </View>
                 <Switch
                   value={hideActiveStatus}
                   onValueChange={setHideActiveStatus}
-                  trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
+                  trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
                   thumbColor="white"
                   disabled
                 />
@@ -370,12 +370,12 @@ export default function SettingsScreen() {
                   borderRadius: 12,
                   marginBottom: 10,
                   borderWidth: 1,
-                  borderColor: unitOfMeasurement === unit ? '#4A90E2' : '#E0E0E0',
+                  borderColor: unitOfMeasurement === unit ? '#007AFF' : '#E0E0E0',
                 }}
               >
                 <Text style={{
                   fontSize: 16,
-                  color: unitOfMeasurement === unit ? '#4A90E2' : '#000',
+                  color: unitOfMeasurement === unit ? '#007AFF' : '#000',
                   fontWeight: unitOfMeasurement === unit ? '600' : '400',
                   textAlign: 'center',
                 }}>

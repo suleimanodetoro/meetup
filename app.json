@@ -2,7 +2,7 @@
   "expo": {
     "name": "Waypoint",
     "slug": "waypoint",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "waypoint",
     "web": {
       "bundler": "metro",
@@ -52,7 +52,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.usewaypoint",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
