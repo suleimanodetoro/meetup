@@ -426,98 +426,67 @@ export function formatCountryWithFlag(countryCode: string): string {
   
   return `${country.flag} ${country.name}`;
 }
-export function getCityCoordinates(city: string): { lat: number; lng: number } {
-  // This is a simplified version - you should use a proper geocoding service
-  // or expand this list based on your popular cities
-  const cityCoordinates: Record<string, { lat: number; lng: number }> = {
-    // Europe
-    'London': { lat: 51.5074, lng: -0.1278 },
-    'Paris': { lat: 48.8566, lng: 2.3522 },
-    'Barcelona': { lat: 41.3851, lng: 2.1734 },
-    'Madrid': { lat: 40.4168, lng: -3.7038 },
-    'Rome': { lat: 41.9028, lng: 12.4964 },
-    'Berlin': { lat: 52.5200, lng: 13.4050 },
-    'Amsterdam': { lat: 52.3676, lng: 4.9041 },
-    'Prague': { lat: 50.0755, lng: 14.4378 },
-    'Vienna': { lat: 48.2082, lng: 16.3738 },
-    'Lisbon': { lat: 38.7223, lng: -9.1393 },
-    'Dublin': { lat: 53.3498, lng: -6.2603 },
-    'Copenhagen': { lat: 55.6761, lng: 12.5683 },
-    'Stockholm': { lat: 59.3293, lng: 18.0686 },
-    'Athens': { lat: 37.9838, lng: 23.7275 },
-    'Budapest': { lat: 47.4979, lng: 19.0402 },
-    'Warsaw': { lat: 52.2297, lng: 21.0122 },
-    
-    // Spain specific
-    'Malaga': { lat: 36.7213, lng: -4.4214 },
-    'Valencia': { lat: 39.4699, lng: -0.3763 },
-    'Seville': { lat: 37.3891, lng: -5.9845 },
-    'Ibiza': { lat: 38.9067, lng: 1.4206 },
-    'Mallorca': { lat: 39.5696, lng: 2.6502 },
-    'Bilbao': { lat: 43.2630, lng: -2.9350 },
-    
-    // Americas
-    'New York': { lat: 40.7128, lng: -74.0060 },
-    'Los Angeles': { lat: 34.0522, lng: -118.2437 },
-    'San Francisco': { lat: 37.7749, lng: -122.4194 },
-    'Chicago': { lat: 41.8781, lng: -87.6298 },
-    'Miami': { lat: 25.7617, lng: -80.1918 },
-    'Toronto': { lat: 43.6532, lng: -79.3832 },
-    'Vancouver': { lat: 49.2827, lng: -123.1207 },
-    'Montreal': { lat: 45.5017, lng: -73.5673 },
-    'Mexico City': { lat: 19.4326, lng: -99.1332 },
-    'Buenos Aires': { lat: -34.6037, lng: -58.3816 },
-    'Rio de Janeiro': { lat: -22.9068, lng: -43.1729 },
-    'São Paulo': { lat: -23.5505, lng: -46.6333 },
-    'Lima': { lat: -12.0464, lng: -77.0428 },
-    
-    // Asia
-    'Tokyo': { lat: 35.6762, lng: 139.6503 },
-    'Seoul': { lat: 37.5665, lng: 126.9780 },
-    'Beijing': { lat: 39.9042, lng: 116.4074 },
-    'Shanghai': { lat: 31.2304, lng: 121.4737 },
-    'Hong Kong': { lat: 22.3193, lng: 114.1694 },
-    'Singapore': { lat: 1.3521, lng: 103.8198 },
-    'Bangkok': { lat: 13.7563, lng: 100.5018 },
-    'Bali': { lat: -8.3405, lng: 115.0920 },
-    'Dubai': { lat: 25.2048, lng: 55.2708 },
-    'Istanbul': { lat: 41.0082, lng: 28.9784 },
-    'Mumbai': { lat: 19.0760, lng: 72.8777 },
-    'Delhi': { lat: 28.7041, lng: 77.1025 },
-    
-    // Oceania
-    'Sydney': { lat: -33.8688, lng: 151.2093 },
-    'Melbourne': { lat: -37.8136, lng: 144.9631 },
-    'Auckland': { lat: -36.8485, lng: 174.7633 },
-    'Brisbane': { lat: -27.4698, lng: 153.0251 },
-    'Perth': { lat: -31.9505, lng: 115.8605 },
-    
-    // Africa
-    'Cape Town': { lat: -33.9249, lng: 18.4241 },
-    'Johannesburg': { lat: -26.2041, lng: 28.0473 },
-    'Cairo': { lat: 30.0444, lng: 31.2357 },
-    'Marrakech': { lat: 31.6295, lng: -7.9811 },
-    'Lagos': { lat: 6.5244, lng: 3.3792 },
-    'Nairobi': { lat: -1.2921, lng: 36.8219 },
-  };
-  
-  // Try exact match first
-  if (cityCoordinates[city]) {
-    return cityCoordinates[city];
+
+/**
+ * Get city coordinates using Mapbox Geocoding API
+ * @param city - City name
+ * @param countryCode - Optional country code for more accurate results
+ * @returns Promise with lat/lng coordinates
+ */
+export async function getCityCoordinates(
+  city: string, 
+  countryCode?: string
+): Promise<{ lat: number; lng: number }> {
+  if (!city) {
+    throw new Error('City name is required');
   }
-  
-  // Try case-insensitive match
-  const lowerCity = city.toLowerCase();
-  for (const [key, coords] of Object.entries(cityCoordinates)) {
-    if (key.toLowerCase() === lowerCity) {
-      return coords;
+
+  try {
+    // Build search query - add country if provided for better accuracy
+    const searchQuery = countryCode 
+      ? `${city}, ${countryCode}`
+      : city;
+
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${process.env.EXPO_PUBLIC_MAPBOX_TOKEN}&types=place&limit=1`;
+
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Mapbox API error: ${response.status}`);
     }
+
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const [lng, lat] = data.features[0].center;
+      return { lat, lng };
+    }
+    
+    throw new Error(`No coordinates found for city: ${city}`);
+  } catch (error) {
+    console.error('Geocoding error for city:', city, error);
+    throw error;
   }
-  
-  // Default fallback (center of Europe - reasonable for travel app)
-  console.warn(`Coordinates not found for city: ${city}, using default`);
-  return { lat: 48.8566, lng: 2.3522 }; // Paris as default
 }
+
+/**
+ * Synchronous version - ONLY for backward compatibility
+ * Returns a default and fetches real coordinates in background
+ * Use the async version above wherever possible
+ */
+export function getCityCoordinatesSync(city: string, countryCode?: string): { lat: number; lng: number } {
+  console.warn('Using sync version - coordinates may be inaccurate. Use async getCityCoordinates() instead');
+  
+  // Return a default, but trigger background fetch
+  getCityCoordinates(city, countryCode).catch(err => 
+    console.error('Background geocoding failed:', err)
+  );
+  
+  // Default to center of Europe as temporary placeholder
+  return { lat: 50.0, lng: 10.0 };
+}
+
+
 
 // ============= VALIDATION HELPERS =============
 

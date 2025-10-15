@@ -3,37 +3,14 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, SafeAreaView, ScrollView, Alert, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const INTERESTS = [
-  { id: 'music', label: 'Music', emoji: '🎶' },
-  { id: 'gaming', label: 'Esports', emoji: '🎮' },
-  { id: 'dance', label: 'Dance Nights', emoji: '💃' },
-  { id: 'fitness', label: 'Group Fitness', emoji: '🏋️‍♂️' },
-  { id: 'yoga', label: 'Yoga & Mindfulness', emoji: '🧘‍♀️' },
-  { id: 'foodie', label: 'Food', emoji: '🍣' },
-  { id: 'coffee', label: 'Coffee & Chill', emoji: '☕' },
-  { id: 'arts', label: 'Arts & Crafts', emoji: '🎨' },
-  { id: 'photography', label: 'Photography Walks', emoji: '📸' },
-  { id: 'boardgames', label: 'Game Nights', emoji: '🎲' },
-  { id: 'karaoke', label: 'Karaoke', emoji: '🎤' },
-  { id: 'outdoor', label: 'Outdoor', emoji: '🌳' },
-  { id: 'volunteer', label: 'Volunteering', emoji: '🤝' },
-  { id: 'film', label: 'Movie Nights', emoji: '🎬' },
-  { id: 'fashion', label: 'Fashion', emoji: '🛍️' },
-  { id: 'tech', label: 'Tech Meetups', emoji: '💻' },
-  { id: 'skate', label: 'Skateboarding', emoji: '🛹' },
-  { id: 'sports', label: 'Sports', emoji: '⚽' },
-  { id: 'bookclub', label: 'Book Club', emoji: '📚' },
-  { id: 'creative', label: 'Writing', emoji: '✍️' },
-  { id: 'thrill', label: 'Adventure', emoji: '🏎️' },
-].sort((a, b) => a.label.localeCompare(b.label));
+import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
 
 export default function OnboardingInterestsScreen() {
   const params = useLocalSearchParams();
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [selectedInterests, setSelectedInterests] = useState<InterestId[]>([]);
   const [matchCount, setMatchCount] = useState(102192);
 
-  const toggleInterest = (interestId: string) => {
+  const toggleInterest = (interestId: InterestId) => {
     setSelectedInterests((prev) => {
       if (prev.includes(interestId)) return prev.filter((id) => id !== interestId);
       if (prev.length < 5) {
@@ -60,7 +37,7 @@ export default function OnboardingInterestsScreen() {
   };
 
   return (
-    <LinearGradient colors={['#E8F5E9', '#DFF4E6', '#CFF0DA']} style={{ flex: 1 }}>
+    <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
@@ -77,7 +54,7 @@ export default function OnboardingInterestsScreen() {
           showsVerticalScrollIndicator={false}>
           <View style={{ paddingHorizontal: 30 }}>
             <Text style={styles.title}>select up to 5{'\n'}interests</Text>
-            <Text style={styles.subtitle}>match with travelers that have similar interests 🤝</Text>
+            <Text style={styles.subtitle}>connect with people who share your vibe 🤝</Text>
 
             <View style={{ position: 'absolute', right: 20, top: 0 }}>
               <Text style={{ fontSize: 56 }}>🏄‍♀️</Text>
@@ -100,9 +77,7 @@ export default function OnboardingInterestsScreen() {
                       className={[
                         'text-[14px] font-semibold',
                         selected ? 'text-white' : 'text-[#333]',
-                      ].join(' ')}
-                      numberOfLines={1}
-                      ellipsizeMode="tail">
+                      ].join(' ')}>
                       {i.label}
                     </Text>
                   </Pressable>
@@ -112,10 +87,16 @@ export default function OnboardingInterestsScreen() {
           </View>
         </ScrollView>
 
-        {/* Bottom CTA */}
-        <View style={styles.bottom}>
-          <Pressable onPress={handleContinue} style={styles.cta}>
-            <Text style={styles.ctaText}>Continue</Text>
+        {/* Bottom Bar */}
+        <View style={styles.bottomBar}>
+          <Pressable
+            onPress={handleContinue}
+            disabled={selectedInterests.length === 0}
+            style={[
+              styles.continueBtn,
+              selectedInterests.length === 0 && styles.continueBtnDisabled,
+            ]}>
+            <Text style={styles.continueBtnTxt}>Continue</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -130,61 +111,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 10,
-    marginBottom: 12,
   },
-  headerBtn: { padding: 10 },
-  skip: { fontSize: 16, color: '#666' },
-
-  title: { fontSize: 36, fontWeight: '800', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#666', marginBottom: 20 },
-
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    // spacing with margins (gap can be flaky in RN)
-    marginTop: 8,
+  headerBtn: {
+    padding: 10,
   },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: 'white',
-
-    // make chips auto-width and never stretch
-    flexGrow: 0,
-    flexShrink: 0,
-    alignSelf: 'flex-start',
-
-    // row/column spacing
-    marginRight: 12,
-    marginBottom: 12,
+  skip: {
+    fontSize: 16,
+    color: '#666',
   },
-  chipSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+  title: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    marginTop: 20,
   },
-  emoji: { fontSize: 18, marginRight: 8 },
-  chipLabel: { fontSize: 15, fontWeight: '600', color: '#333' },
-  chipLabelSelected: { color: 'white' },
-
-  bottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 30,
+  },
+  bottomBar: {
     paddingHorizontal: 30,
-    paddingBottom: 30,
+    paddingVertical: 20,
     backgroundColor: 'transparent',
   },
-  cta: {
+  continueBtn: {
     backgroundColor: '#007AFF',
     paddingVertical: 18,
     borderRadius: 30,
     alignItems: 'center',
   },
-  ctaText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  continueBtnDisabled: {
+    backgroundColor: '#ccc',
+  },
+  continueBtnTxt: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
 });

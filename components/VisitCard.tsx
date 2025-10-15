@@ -1,7 +1,4 @@
 // components/VisitCard.tsx
-// ============================================
-// FIXED: Image display logic corrected
-// ============================================
 import React, { useMemo } from 'react';
 import {
   View,
@@ -15,6 +12,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryFlag } from '~/utils/countryFlags';
+import { getPlaceholderImageUrl } from '~/utils/cityImages';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -39,7 +37,7 @@ interface VisitCardProps {
 // 2-color gradient tuple type
 type GradientTuple = readonly [ColorValue, ColorValue];
 
-// Stable palette
+// Stable palette for fallback
 const GRADIENTS: readonly GradientTuple[] = [
   ['#667eea', '#764ba2'],
   ['#f093fb', '#f5576c'],
@@ -61,6 +59,11 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
     return GRADIENTS[index];
   }, [visit.city]);
 
+  // Always use placeholder image service for consistent, city-specific images
+  const displayImageUrl = useMemo(() => {
+    return getPlaceholderImageUrl(visit.city);
+  }, [visit.city]);
+
   // Safe date formatting
   const dateRange = useMemo(() => {
     try {
@@ -77,14 +80,12 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
     }
   }, [visit.start_date, visit.end_date]);
 
-  // Log the image URL for debugging
-
   return (
     <Pressable
-onPress={() => {
-  console.log("Navigating with Visit:", JSON.stringify(visit, null, 2)); // 🔍 full object
-  router.push(`/visit/${visit?.id}`);
-}}
+      onPress={() => {
+        console.log("Navigating to visit:", visit.id);
+        router.push(`/visit/${visit?.id}`);
+      }}
       accessibilityRole="button"
       accessibilityLabel={`Open visit to ${visit.city}`}
       hitSlop={8}
@@ -96,42 +97,37 @@ onPress={() => {
         overflow: 'hidden',
       }}
     >
-      {/* Base gradient background */}
+      {/* Base gradient background (fallback) */}
       <LinearGradient
         colors={gradientColors}
         style={{ width: '100%', height: '100%', position: 'absolute' }}
       />
 
-      {/* Optional city image overlay - FIXED: Should show when image_url EXISTS */}
-      {visit.image_url && (
+      {/* City or event image overlay */}
+      {displayImageUrl && (
         <Image
-          source={{ uri: visit.image_url }}
+          source={{ uri: displayImageUrl }}
           style={{
             width: '100%',
             height: '100%',
             position: 'absolute',
-            opacity: 0.8,
           }}
           resizeMode="cover"
           onError={(e) => {
             console.log(`Image failed to load for ${visit.city}:`, e.nativeEvent.error);
-            console.log(`Failed URL was: ${visit.image_url}`);
-          }}
-          onLoad={() => {
-            console.log(`Image loaded successfully for ${visit.city}`);
           }}
         />
       )}
 
-      {/* Bottom gradient to ensure text contrast */}
+      {/* Subtle bottom gradient for text readability */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.7)']}
+        colors={['transparent', 'rgba(0,0,0,0.5)']}
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          height: '60%',
+          height: '50%',
         }}
       />
 
@@ -145,15 +141,35 @@ onPress={() => {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ fontSize: 24, marginRight: 8 }}>
+          <Text style={{ 
+            fontSize: 24, 
+            marginRight: 8,
+            textShadowColor: 'rgba(0, 0, 0, 0.75)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}>
             {visit.country_code ? getCountryFlag(visit.country_code) : '🌍'}
           </Text>
-          <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold' }}>
+          <Text style={{ 
+            color: 'white', 
+            fontSize: 22, 
+            fontWeight: 'bold',
+            textShadowColor: 'rgba(0, 0, 0, 0.75)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}>
             {visit.city}
           </Text>
         </View>
 
-        <Text style={{ color: 'white', fontSize: 14, opacity: 0.9 }}>
+        <Text style={{ 
+          color: 'white', 
+          fontSize: 14, 
+          opacity: 0.95,
+          textShadowColor: 'rgba(0, 0, 0, 0.75)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 3,
+        }}>
           {dateRange}
         </Text>
 
@@ -194,8 +210,15 @@ onPress={() => {
             ))}
           </View>
 
-          <Text style={{ color: 'white', fontSize: 13, marginLeft: 8, fontWeight: '600' }}>
-            {visit.user_count || 0}+
+          <Text style={{ 
+            color: 'white', 
+            fontSize: 13, 
+            marginLeft: 8, 
+            fontWeight: '600',
+            textShadowColor: 'rgba(0, 0, 0, 0.75)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}>
           </Text>
         </View>
       </View>

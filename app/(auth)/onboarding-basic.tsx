@@ -32,14 +32,21 @@ export default function OnboardingBasicScreen() {
 
   // Calculate age for display
   const calculateAge = (date: Date) => {
-    const today = new Date();
-    const age = today.getFullYear() - date.getFullYear();
-    return age;
-  };
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  const monthDiff = today.getMonth() - date.getMonth();
+  
+  // If birthday hasn't occurred yet this year, subtract 1
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+    age--;
+  }
+  
+  return age;
+};
 
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView 
@@ -119,7 +126,7 @@ export default function OnboardingBasicScreen() {
                 color: '#666',
                 marginBottom: 40,
               }}>
-                let's get started with your profile 🤓
+                let's get started with your profile 🤝
               </Text>
 
               {/* Name Input */}
@@ -128,12 +135,12 @@ export default function OnboardingBasicScreen() {
                 fontWeight: '600',
                 marginBottom: 12,
               }}>
-                Your name
+                Your first name
               </Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Traveler"
+                placeholder="Enter your name"
                 style={{
                   backgroundColor: 'white',
                   padding: 20,
@@ -159,9 +166,9 @@ export default function OnboardingBasicScreen() {
                   backgroundColor: 'white',
                   padding: 20,
                   borderRadius: 16,
-                  marginBottom: 8,
+                  marginBottom: 30,
                   borderWidth: 2,
-                  borderColor: showDatePicker ? '#007AFF' : 'transparent',
+                  borderColor: '#007AFF',
                 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, color: '#333' }}>
@@ -177,36 +184,21 @@ export default function OnboardingBasicScreen() {
                 </View>
               </Pressable>
 
-              {showDatePicker && (
-                <View style={{
-                  backgroundColor: 'white',
-                  borderRadius: 16,
-                  padding: 10,
-                  marginBottom: 20,
-                }}>
-                  <DatePicker
-                    date={birthDate}
-                    onDateChange={setBirthDate}
-                    mode="date"
-                    maximumDate={new Date()}
-                    minimumDate={new Date(1920, 0, 1)}
-                    fadeToColor="white"
-                    textColor="#333"
-                    style={{ height: 150 }}
-                  />
-                  <Pressable
-                    onPress={() => setShowDatePicker(false)}
-                    style={{
-                      backgroundColor: '#007AFF',
-                      padding: 12,
-                      borderRadius: 8,
-                      alignItems: 'center',
-                      marginTop: 10,
-                    }}>
-                    <Text style={{ color: 'white', fontWeight: '600' }}>Done</Text>
-                  </Pressable>
-                </View>
-              )}
+              {/* Modal Date Picker */}
+              <DatePicker
+                modal
+                open={showDatePicker}
+                date={birthDate}
+                mode="date"
+                maximumDate={new Date()}
+                minimumDate={new Date(1920, 0, 1)}
+                onConfirm={(date) => {
+                  setBirthDate(date);
+                  setShowDatePicker(false);
+                }}
+                onCancel={() => setShowDatePicker(false)}
+                title="Select your birthday"
+              />
             </View>
           </ScrollView>
 

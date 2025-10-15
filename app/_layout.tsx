@@ -1,11 +1,15 @@
 // app/_layout.tsx
 import '../global.css';
+import * as SplashScreen from 'expo-splash-screen';
+
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import AuthProvider, { useAuth } from './contexts/AuthProvider';
 import { CreatePlanProvider } from './contexts/CreatePlanContext';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+
 
 function NavigationController({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompletedOnboarding, isLoading } = useAuth();

@@ -4,6 +4,8 @@
 export const INTERESTS = [
   { id: 'music', label: 'Music', emoji: '🎶' },
   { id: 'gaming', label: 'Esports', emoji: '🎮' },
+  { id: 'raves', label: 'Raves', emoji: '🪩' },
+  { id: 'partying', label: 'Partying', emoji: '🥳' },
   { id: 'dance', label: 'Dance Nights', emoji: '💃' },
   { id: 'fitness', label: 'Group Fitness', emoji: '🏋️‍♂️' },
   { id: 'yoga', label: 'Yoga & Mindfulness', emoji: '🧘‍♀️' },
@@ -21,11 +23,21 @@ export const INTERESTS = [
   { id: 'skate', label: 'Skateboarding', emoji: '🛹' },
   { id: 'sports', label: 'Sports', emoji: '⚽' },
   { id: 'bookclub', label: 'Book Club', emoji: '📚' },
-  { id: 'creative', label: 'Writing', emoji: '✍️' },
-  { id: 'thrill', label: 'Adventure', emoji: '🏎️' },
+  { id: 'creative', label: 'Writing', emoji: '✏️' },
+  { id: 'thrill', label: 'Adventure', emoji: '🎢' },
 ] as const;
 
-export type InterestId = typeof INTERESTS[number]['id'];
+export const INTEREST_LABELS = INTERESTS.map((i) => i.label);
+
+// Helper to get emoji from label or id
+export const getInterestEmoji = (labelOrId: string): string => {
+  const interest = INTERESTS.find(
+    (i) => i.label.toLowerCase() === labelOrId.toLowerCase() || i.id === labelOrId.toLowerCase()
+  );
+  return interest?.emoji || '✨';
+};
+
+export type InterestId = (typeof INTERESTS)[number]['id'];
 
 // ============= LANGUAGES =============
 export const LANGUAGES = [
@@ -63,17 +75,24 @@ export const LANGUAGES = [
   { code: 'tl', name: 'Tagalog', flag: '🇵🇭' },
 ] as const;
 
-export type LanguageCode = typeof LANGUAGES[number]['code'];
+export type Interest = (typeof INTERESTS)[number]; // item type
+
+export type LanguageCode = (typeof LANGUAGES)[number]['code'];
+
+// Sorted copy with correct typing (not a tuple anymore)
+export const SORTED_INTERESTS: readonly Interest[] = [...INTERESTS].sort((a, b) =>
+  a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+);
 
 // ============= MEETING PREFERENCES =============
 export const MEETING_PREFERENCES = [
-      { id: 'travel-together', label: 'Travel together', emoji: '🚕' },
-    { id: 'meet-there', label: 'Meet while I\'m there', emoji: '📍' },
-    { id: 'message-first', label: 'Message before making plans', emoji: '💬' },
-    { id: 'no-plans', label: 'No plans to meet yet', emoji: '✨' }
-] as const;
+  { id: 'go-together', label: 'Go together', emoji: '🚕' },
+  { id: 'meet-there', label: 'Meet up there', emoji: '📍' },
+  { id: 'chat-first', label: 'Message before making plans', emoji: '💬' },
+  { id: 'no-plans', label: 'No plans to meet yet', emoji: '✨' }
+];
 
-export type MeetingPreferenceId = typeof MEETING_PREFERENCES[number]['id'];
+export type MeetingPreferenceId = (typeof MEETING_PREFERENCES)[number]['id'];
 
 // ============= GENDER OPTIONS =============
 export const GENDER_OPTIONS = [
@@ -82,7 +101,7 @@ export const GENDER_OPTIONS = [
   { id: 'other', label: 'Other', emoji: '🦄' },
 ] as const;
 
-export type GenderId = typeof GENDER_OPTIONS[number]['id'];
+export type GenderId = (typeof GENDER_OPTIONS)[number]['id'];
 
 // ============= GENDER PREFERENCES =============
 export const GENDER_PREFERENCES = [
@@ -91,7 +110,7 @@ export const GENDER_PREFERENCES = [
   { id: 'everyone', label: 'Everyone', emoji: '👫' },
 ] as const;
 
-export type GenderPreferenceId = typeof GENDER_PREFERENCES[number]['id'];
+export type GenderPreferenceId = (typeof GENDER_PREFERENCES)[number]['id'];
 
 // ============= TRAVEL LIFESTYLES =============
 export const TRAVEL_LIFESTYLES = [
@@ -102,7 +121,7 @@ export const TRAVEL_LIFESTYLES = [
   { id: 'adventure', label: 'Adventure seeker', emoji: '🏔️' },
 ] as const;
 
-export type TravelLifestyleId = typeof TRAVEL_LIFESTYLES[number]['id'];
+export type TravelLifestyleId = (typeof TRAVEL_LIFESTYLES)[number]['id'];
 
 // ============= COMMUNITY GUIDELINES =============
 export const COMMUNITY_GUIDELINES = [

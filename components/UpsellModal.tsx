@@ -41,9 +41,9 @@ export default function UpsellModal({ visible, onDismiss, onSubscribe }: UpsellM
               <Ionicons name="lock-open" size={64} color="white" />
             </View>
             
-            <Text style={styles.title}>Unlock All Travelers</Text>
+            <Text style={styles.title}>Unlock All Profiles</Text>
             <Text style={styles.subtitle}>
-              Connect with unlimited travelers and see who's visiting your destinations
+              Connect with unlimited users and see who's visiting your destinations
             </Text>
 
             {/* Benefits */}

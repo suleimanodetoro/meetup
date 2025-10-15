@@ -1,5 +1,5 @@
 // app/(auth)/onboarding-location.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,13 @@ export default function OnboardingLocationScreen() {
     country?: string;
     countryCode?: string;
   } | null>(null);
+  
+  // Prevent double navigation
+  const hasNavigated = useRef(false);
 
   const handleEnableLocation = async () => {
+    if (hasNavigated.current) return; // Prevent multiple calls
+    
     setLoading(true);
     try {
       // Request location permission
@@ -37,6 +42,7 @@ export default function OnboardingLocationScreen() {
           'You can always enable location later in settings.',
           [{ text: 'OK', onPress: () => navigateNext(false) }]
         );
+        setLoading(false);
         return;
       }
 
@@ -70,6 +76,7 @@ export default function OnboardingLocationScreen() {
           if (error) {
             console.error('Error saving location:', error);
             Alert.alert('Error', 'Failed to save location. You can update it later in settings.');
+            setLoading(false);
           } else {
             // Show success feedback
             setDetectedLocation({
@@ -77,6 +84,13 @@ export default function OnboardingLocationScreen() {
               country: place.country,
               countryCode: place.isoCountryCode,
             });
+            
+            // Navigate after showing success (only once!)
+            setTimeout(() => {
+              if (!hasNavigated.current) {
+                navigateNext(true);
+              }
+            }, 1500);
           }
         } else {
           Alert.alert(
@@ -84,12 +98,9 @@ export default function OnboardingLocationScreen() {
             'Could not determine your city. You can set it manually in settings.',
             [{ text: 'OK', onPress: () => navigateNext(true) }]
           );
+          setLoading(false);
         }
       }
-
-      // Navigate to next screen after a brief delay to show location
-      setTimeout(() => navigateNext(true), 1500);
-
     } catch (error) {
       console.error('Location error:', error);
       Alert.alert(
@@ -97,12 +108,14 @@ export default function OnboardingLocationScreen() {
         'Unable to detect your location. You can set it manually later.',
         [{ text: 'OK', onPress: () => navigateNext(false) }]
       );
-    } finally {
       setLoading(false);
     }
   };
 
   const navigateNext = (locationEnabled: boolean) => {
+    if (hasNavigated.current) return; // Prevent double navigation
+    hasNavigated.current = true;
+    
     router.push({
       pathname: '/onboarding-notifications',
       params: {
@@ -116,9 +129,13 @@ export default function OnboardingLocationScreen() {
     navigateNext(false);
   };
 
+  const handleContinue = () => {
+    navigateNext(true);
+  };
+
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -129,11 +146,11 @@ export default function OnboardingLocationScreen() {
           paddingTop: 10,
         }}>
           <Pressable onPress={() => router.back()} style={{ padding: 10 }}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Text style={{ fontSize: 30 }}>←</Text>
           </Pressable>
           <View style={{ flex: 1 }} />
           <Pressable onPress={handleSkip} style={{ padding: 10 }}>
-            <Text style={{ fontSize: 16, color: '#666' }}>Skip</Text>
+            <Text style={{ fontSize: 16, color: '#666', fontWeight: '600' }}>Skip</Text>
           </Pressable>
         </View>
 
@@ -142,96 +159,72 @@ export default function OnboardingLocationScreen() {
           flex: 1, 
           justifyContent: 'center', 
           alignItems: 'center',
-          paddingHorizontal: 30,
+          paddingHorizontal: 40,
         }}>
           {/* Icon */}
           <View style={{
             width: 120,
             height: 120,
             borderRadius: 60,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backgroundColor: 'white',
             justifyContent: 'center',
             alignItems: 'center',
-            marginBottom: 30,
+            marginBottom: 32,
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
+            shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.1,
-            shadowRadius: 10,
-            elevation: 5,
+            shadowRadius: 12,
+            elevation: 4,
           }}>
-            <Ionicons name="location" size={60} color="#4CAF50" />
+            <Ionicons 
+              name={detectedLocation ? "checkmark-circle" : "location"} 
+              size={60} 
+              color={detectedLocation ? "#4CAF50" : "#007AFF"} 
+            />
           </View>
 
           {/* Title */}
           <Text style={{
-            fontSize: 28,
+            fontSize: 32,
             fontWeight: 'bold',
-            color: '#2E7D32',
-            marginBottom: 15,
             textAlign: 'center',
+            marginBottom: 16,
+            color: '#1A1A1A',
           }}>
-            Share Your City
+            {detectedLocation 
+              ? `You're in ${detectedLocation.city}!` 
+              : 'Find people nearby'}
           </Text>
 
-          {/* Description */}
+          {/* Subtitle */}
           <Text style={{
             fontSize: 16,
-            color: '#555',
             textAlign: 'center',
-            marginBottom: 10,
+            color: '#666',
             lineHeight: 24,
+            marginBottom: 48,
+            paddingHorizontal: 20,
           }}>
-            Connect with travelers in your area
+            {detectedLocation
+              ? 'Great! We\'ll show you people and plans in your area'
+              : 'Let us detect your city to show you nearby travelers and local plans'}
           </Text>
 
-          <Text style={{
-            fontSize: 14,
-            color: '#777',
-            textAlign: 'center',
-            marginBottom: 40,
-            lineHeight: 20,
-          }}>
-            We'll detect your current city to help you discover other travelers nearby and local events
-          </Text>
-
-          {/* Location Info Display */}
-          {detectedLocation && (
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              borderRadius: 20,
-              marginBottom: 20,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={{ 
-                marginLeft: 8, 
-                fontSize: 14, 
-                color: '#2E7D32',
-                fontWeight: '600',
-              }}>
-                {detectedLocation.city}, {detectedLocation.country}
-              </Text>
-            </View>
-          )}
-
-          {/* Enable Button */}
+          {/* Action Button */}
           <Pressable
-            onPress={handleEnableLocation}
-            disabled={loading || detectedLocation !== null}
+            onPress={detectedLocation ? handleContinue : handleEnableLocation}
+            disabled={loading}
             style={{
-              backgroundColor: loading || detectedLocation ? '#B0BEC5' : '#4CAF50',
+              backgroundColor: loading || detectedLocation ? '#BDBDBD' : '#007AFF',
               paddingHorizontal: 50,
-              paddingVertical: 16,
+              paddingVertical: 18,
               borderRadius: 30,
               marginBottom: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 3,
+              shadowColor: '#007AFF',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: loading || detectedLocation ? 0 : 0.3,
+              shadowRadius: 12,
+              elevation: loading || detectedLocation ? 0 : 4,
               minWidth: 250,
               alignItems: 'center',
             }}>
@@ -243,7 +236,7 @@ export default function OnboardingLocationScreen() {
                 fontSize: 18,
                 fontWeight: '600',
               }}>
-                Location Saved ✓
+                Continue →
               </Text>
             ) : (
               <Text style={{
@@ -257,15 +250,25 @@ export default function OnboardingLocationScreen() {
           </Pressable>
 
           {/* Privacy Note */}
-          <Text style={{
-            fontSize: 12,
-            color: '#999',
-            textAlign: 'center',
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.6)',
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 12,
             marginTop: 10,
-            paddingHorizontal: 20,
           }}>
-            We only store your city, not your exact location
-          </Text>
+            <Ionicons name="shield-checkmark-outline" size={16} color="#666" />
+            <Text style={{
+              fontSize: 13,
+              color: '#666',
+              marginLeft: 8,
+              fontWeight: '500',
+            }}>
+              We only store your city, not exact location
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     </LinearGradient>

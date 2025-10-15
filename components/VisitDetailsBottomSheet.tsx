@@ -205,7 +205,7 @@ export default function VisitDetailsBottomSheet({
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No travelers yet for these dates</Text>
+                <Text style={styles.emptyText}>No profiles yet for these dates</Text>
               </View>
             )}
           </>

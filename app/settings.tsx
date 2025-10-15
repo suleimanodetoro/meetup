@@ -103,7 +103,7 @@ export default function SettingsScreen() {
 
   const handleReportIssue = () => {
     // Open email client with pre-filled subject
-    Linking.openURL('mailto:support@usewaypoint.app?subject=Issue Report');
+    Linking.openURL('mailto:hello@usewaypoint.app?subject=Issue Report');
   };
 
   const handleLeaveReview = () => {
@@ -117,17 +117,17 @@ export default function SettingsScreen() {
 
   const handleCommunityGuidelines = () => {
     // In production, this would open a web view or external link
-    Alert.alert('Community Guidelines', 'Community guidelines would be shown here');
+    Linking.openURL('https://usewaypoint.app/terms');
   };
 
   const handleTermsAndConditions = () => {
     // In production, this would open a web view or external link
-    Alert.alert('Terms and Conditions', 'Terms and conditions would be shown here');
+    Linking.openURL('https://usewaypoint.app/terms');
   };
 
   const handlePrivacyPolicy = () => {
     // In production, this would open a web view or external link
-    Alert.alert('Privacy Policy', 'Privacy policy would be shown here');
+    Linking.openURL('https://usewaypoint.app/privacy');
   };
 
   const SettingRow = ({ 

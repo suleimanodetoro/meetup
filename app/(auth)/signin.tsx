@@ -49,12 +49,26 @@ export default function SignInScreen() {
   }
 
   const mockSocialSignIn = () => {
+    const provider = Platform.OS === 'ios' ? 'Apple' : 'Google';
     Alert.alert(
       'Social Sign In',
-      'Social auth would go here. For now, use email auth below.',
+      `${provider} auth under review. For now, use email auth below.`,
       [{ text: 'OK', onPress: () => setShowEmailAuth(true) }]
     );
   };
+
+  // Platform-specific social button
+  const socialButtonConfig = Platform.OS === 'ios' 
+    ? { 
+        icon: '🍎', 
+        text: 'Sign in with Apple',
+        isEmoji: true 
+      }
+    : { 
+        icon: 'https://www.google.com/favicon.ico',
+        text: 'Sign in with Google',
+        isEmoji: false 
+      };
 
   return (
     <LinearGradient
@@ -67,13 +81,13 @@ export default function SignInScreen() {
           
           {/* Decorative Elements */}
           <View style={{ position: 'absolute', top: 100, left: 30 }}>
-            <Text style={{ fontSize: 60 }}>✈️</Text>
+            <Text style={{ fontSize: 60 }}>🗺️</Text>
           </View>
           <View style={{ position: 'absolute', top: 150, right: 40 }}>
             <Text style={{ fontSize: 50 }}>🌍</Text>
           </View>
           
-          {/* Cloud decorations */}
+          {/* Subtle decorative shapes */}
           <View style={{
             position: 'absolute',
             bottom: 100,
@@ -82,7 +96,7 @@ export default function SignInScreen() {
             height: 60,
             backgroundColor: 'white',
             borderRadius: 30,
-            opacity: 0.3,
+            opacity: 0.2,
           }} />
           <View style={{
             position: 'absolute',
@@ -92,7 +106,7 @@ export default function SignInScreen() {
             height: 50,
             backgroundColor: 'white',
             borderRadius: 25,
-            opacity: 0.3,
+            opacity: 0.2,
           }} />
 
           <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 30 }}>
@@ -123,17 +137,9 @@ export default function SignInScreen() {
               fontSize: 28,
               fontWeight: 'bold',
               textAlign: 'center',
-              marginBottom: 8,
-            }}>
-              22,345 travelers are active
-            </Text>
-            <Text style={{
-              fontSize: 28,
-              fontWeight: 'bold',
-              textAlign: 'center',
               marginBottom: 16,
             }}>
-              right now!
+              Your next adventure is waiting
             </Text>
             
             <Text style={{
@@ -142,12 +148,12 @@ export default function SignInScreen() {
               textAlign: 'center',
               marginBottom: 40,
             }}>
-              Connect with fellow travelers in real-time
+              Connect with people around the world
             </Text>
 
             {!showEmailAuth ? (
               <>
-                {/* Social Sign In Button */}
+                {/* Social Sign In Button - Platform Specific */}
                 <Pressable
                   onPress={mockSocialSignIn}
                   style={{
@@ -165,12 +171,19 @@ export default function SignInScreen() {
                     shadowRadius: 4,
                     elevation: 3,
                   }}>
-                  <Text style={{ fontSize: 20 }}>🍎</Text>
+                  {socialButtonConfig.isEmoji ? (
+                    <Text style={{ fontSize: 20 }}>{socialButtonConfig.icon}</Text>
+                  ) : (
+                    <Image 
+                      source={{ uri: socialButtonConfig.icon }}
+                      style={{ width: 20, height: 20 }}
+                    />
+                  )}
                   <Text style={{
                     fontSize: 17,
                     fontWeight: '600',
                   }}>
-                    Sign in with Apple
+                    {socialButtonConfig.text}
                   </Text>
                 </Pressable>
 
@@ -191,6 +204,7 @@ export default function SignInScreen() {
                     onChangeText={setEmail}
                     placeholder="Email"
                     keyboardType="email-address"
+                    placeholderTextColor="#999"
                     autoCapitalize="none"
                     style={{
                       backgroundColor: 'white',
@@ -203,6 +217,7 @@ export default function SignInScreen() {
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Password"
+                    placeholderTextColor="#999"
                     secureTextEntry
                     autoCapitalize="none"
                     style={{

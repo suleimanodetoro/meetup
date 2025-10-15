@@ -1,5 +1,5 @@
 // app/(tabs)/map.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,22 +11,14 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  Platform,
-  Linking,
 } from 'react-native';
-import Mapbox, { 
-  Camera, 
-  MapView, 
-  MarkerView,
-  PointAnnotation,
-} from '@rnmapbox/maps';
+import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/countryFlags';
-import { getCityCoordinates } from '~/utils/geographic';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Set Mapbox token
@@ -44,6 +36,29 @@ interface User {
   gender: string | null;
 }
 
+// Mapbox Geocoding API helper
+async function geocodeCity(cityName: string): Promise<{ lat: number; lng: number; cityName: string; country: string } | null> {
+  try {
+    const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cityName)}.json?types=place&limit=1&access_token=${token}`
+    );
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const [lng, lat] = feature.center;
+      const cityName = feature.text || feature.place_name.split(',')[0];
+      const country = feature.context?.find((c: any) => c.id.includes('country'))?.text || '';
+      return { lat, lng, cityName, country };
+    }
+    return null;
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return null;
+  }
+}
+
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
@@ -52,54 +67,215 @@ export default function MapScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [userCity, setUserCity] = useState<string | null>(null);
+  const [displayCity, setDisplayCity] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [usersInCity, setUsersInCity] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-0.1278, 51.5074]); // Default London
-
+  const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0]);
+  const [hasCheckedLocation, setHasCheckedLocation] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   useEffect(() => {
-    loadUserLocationAndFetchUsers();
+    loadUserLocationAndCheckForChanges();
   }, []);
 
-  const loadUserLocationAndFetchUsers = async () => {
-    try {
-      // Get current user's stored location from profile
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('location, location_country, location_country_code')
-        .eq('id', session?.user.id)
-        .single();
+  const loadUserLocationAndCheckForChanges = async () => {
+  try {
+    // 1. Get stored location from database
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('location, location_country, location_country_code')
+      .eq('id', session?.user.id)
+      .single();
 
-      if (error) throw error;
+    if (error) throw error;
 
-      if (profile?.location) {
-        setUserCity(profile.location);
-        setUserCountry(profile.location_country);
-        
-        // Get coordinates for the city to center map
-        const coords = getCityCoordinates(profile.location);
+    const storedCity = profile?.location;
+    const storedCountry = profile?.location_country;
+
+    // 2. Check device location FIRST
+    const { status } = await Location.getForegroundPermissionsAsync();
+    
+    let currentCity: string | null = null;
+    let currentCountry: string | null | undefined = null;
+    let currentCountryCode: string | null | undefined = null;
+    let currentCoords: { latitude: number; longitude: number } | null = null;
+
+    if (status === 'granted') {
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+          timeInterval: 5000,
+          distanceInterval: 0,
+        });
+
+        currentCoords = location.coords;
+
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+
+        if (reverseGeocode && reverseGeocode.length > 0) {
+          const place = reverseGeocode[0];
+          currentCity = place.city || place.district || place.subregion;
+          currentCountry = place.country;
+          currentCountryCode = place.isoCountryCode;
+        }
+      } catch (locError) {
+        console.log('Could not get current location:', locError);
+      }
+    }
+
+    // 3. Decide which location to use
+    let displayLocationCity = storedCity;
+    let displayLocationCountry = storedCountry;
+
+    // If we have current location and it's different from stored, show alert
+    if (currentCity && storedCity && currentCity.toLowerCase() !== storedCity.toLowerCase()) {
+      // Use current location immediately, but ask user
+      displayLocationCity = currentCity;
+      displayLocationCountry = currentCountry;
+      
+      Alert.alert(
+        'Location Changed',
+        `We detected you're now in ${currentCity}. Would you like to update your stored location?`,
+        [
+          { 
+            text: 'Keep ' + storedCity, 
+            onPress: () => {
+              // Revert to stored location
+              setUserCity(storedCity);
+              setDisplayCity(storedCity);
+              setUserCountry(storedCountry);
+              
+              geocodeCity(storedCity).then(coords => {
+                if (coords) {
+                  setMapCenter([coords.lng, coords.lat]);
+                  setTimeout(() => {
+                    cameraRef.current?.setCamera({
+                      centerCoordinate: [coords.lng, coords.lat],
+                      zoomLevel: 12,
+                      animationDuration: 2000,
+                    });
+                  }, 100);
+                }
+              });
+              
+              fetchUsersInCity(storedCity, storedCountry);
+            }
+          },
+          { 
+            text: 'Update to ' + currentCity,
+            onPress: () => updateLocationInDB(currentCity, currentCountry, currentCountryCode),
+            style: 'default'
+          }
+        ]
+      );
+    } else if (!storedCity && currentCity) {
+      // No stored location but we have current location
+      displayLocationCity = currentCity;
+      displayLocationCountry = currentCountry;
+      
+      Alert.alert(
+        'Set Your Location',
+        `We detected you're in ${currentCity}. Set this as your location?`,
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { 
+            text: 'Set Location', 
+            onPress: () => updateLocationInDB(currentCity, currentCountry, currentCountryCode)
+          }
+        ]
+      );
+    } else if (!storedCity && !currentCity) {
+      // No location at all
+      Alert.alert(
+        'Set Your Location',
+        'Please set your current city to see nearby profiles.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Set Location', onPress: () => detectAndSetLocation() }
+        ]
+      );
+    }
+
+    // 4. Set the map to the display location
+    if (displayLocationCity) {
+      setUserCity(storedCity); // Keep stored location in state
+      setDisplayCity(displayLocationCity);
+      setUserCountry(displayLocationCountry);
+      
+      // Use current coords if available, otherwise geocode the city
+      if (currentCoords && displayLocationCity === currentCity) {
+        setMapCenter([currentCoords.longitude, currentCoords.latitude]);
+        setTimeout(() => {
+          cameraRef.current?.setCamera({
+            centerCoordinate: [currentCoords.longitude, currentCoords.latitude],
+            zoomLevel: 12,
+            animationDuration: 2000,
+          });
+        }, 100);
+      } else {
+        const coords = await geocodeCity(displayLocationCity);
         if (coords) {
           setMapCenter([coords.lng, coords.lat]);
+          setTimeout(() => {
+            cameraRef.current?.setCamera({
+              centerCoordinate: [coords.lng, coords.lat],
+              zoomLevel: 12,
+              animationDuration: 2000,
+            });
+          }, 100);
+        }
+      }
+      
+      await fetchUsersInCity(displayLocationCity, displayLocationCountry);
+    }
+
+    setHasCheckedLocation(true);
+  } catch (error) {
+    console.error('Error loading location:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const updateLocationInDB = async (city: string, country: string | null | undefined, countryCode: string | null | undefined) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          location: city,
+          location_country: country,
+          location_country_code: countryCode,
+          location_updated_at: new Date().toISOString(),
+        })
+        .eq('id', session?.user.id);
+
+      if (!error) {
+        setUserCity(city);
+        setDisplayCity(city);
+        setUserCountry(country || null);
+        
+        const coords = await geocodeCity(city);
+        if (coords) {
+          setMapCenter([coords.lng, coords.lat]);
+          setTimeout(() => {
+            cameraRef.current?.setCamera({
+              centerCoordinate: [coords.lng, coords.lat],
+              zoomLevel: 12,
+              animationDuration: 2000,
+            });
+          }, 100);
         }
 
-        // Fetch users in the same city
-        await fetchUsersInCity(profile.location, profile.location_country);
-      } else {
-        // No location set, prompt user to set it
-        Alert.alert(
-          'Set Your Location',
-          'Please set your current city to see nearby travelers.',
-          [
-            { text: 'Later', style: 'cancel' },
-            { text: 'Set Location', onPress: () => detectAndSetLocation() }
-          ]
-        );
+        await fetchUsersInCity(city, country || null);
+        setIsSearching(false);
       }
     } catch (error) {
-      console.error('Error loading location:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error updating location:', error);
     }
   };
 
@@ -107,20 +283,18 @@ export default function MapScreen() {
     try {
       setLoading(true);
       
-      // Request permission if not granted
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required to detect your city.');
+        setLoading(false);
         return;
       }
 
-      // Get current location
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Lowest, // City-level
+        accuracy: Location.Accuracy.Low,
       });
 
-      // Reverse geocode to get city
       const reverseGeocode = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -131,35 +305,9 @@ export default function MapScreen() {
         const city = place.city || place.district || place.subregion;
         
         if (city) {
-          // Update user's location in database
-          const { error } = await supabase
-            .from('profiles')
-            .update({
-              location: city,
-              location_country: place.country,
-              location_country_code: place.isoCountryCode,
-              location_updated_at: new Date().toISOString(),
-            })
-            .eq('id', session?.user.id);
-
-          if (!error) {
-            setUserCity(city);
-            setUserCountry(place.country || null);
-            
-            // Get coordinates and center map
-            const coords = getCityCoordinates(city);
-            if (coords) {
-              setMapCenter([coords.lng, coords.lat]);
-              cameraRef.current?.setCamera({
-                centerCoordinate: [coords.lng, coords.lat],
-                zoomLevel: 12,
-                animationDuration: 2000,
-              });
-            }
-
-            // Fetch users in this city
-            await fetchUsersInCity(city, place.country);
-          }
+          await updateLocationInDB(city, place.country, place.isoCountryCode);
+        } else {
+          Alert.alert('Error', 'Could not determine your city.');
         }
       }
     } catch (error) {
@@ -168,6 +316,31 @@ export default function MapScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const returnToHomeLocation = async () => {
+    if (!userCity) {
+      detectAndSetLocation();
+      return;
+    }
+
+    setIsSearching(false);
+    setDisplayCity(userCity);
+    setSearchQuery('');
+    
+    const coords = await geocodeCity(userCity);
+    if (coords) {
+      setMapCenter([coords.lng, coords.lat]);
+      setTimeout(() => {
+        cameraRef.current?.setCamera({
+          centerCoordinate: [coords.lng, coords.lat],
+          zoomLevel: 12,
+          animationDuration: 1500,
+        });
+      }, 100);
+    }
+    
+    await fetchUsersInCity(userCity, userCountry);
   };
 
   const fetchUsersInCity = async (city: string, country: string | null) => {
@@ -182,6 +355,7 @@ export default function MapScreen() {
       setUsersInCity(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsersInCity([]);
     }
   };
 
@@ -189,36 +363,32 @@ export default function MapScreen() {
     if (!searchQuery.trim()) return;
     
     try {
-      // Search for a city and get its coordinates
-      const coords = getCityCoordinates(searchQuery);
+      setLoading(true);
+      setIsSearching(true);
       
-      if (coords) {
-        // Fly to the searched city
-        cameraRef.current?.setCamera({
-          centerCoordinate: [coords.lng, coords.lat],
-          zoomLevel: 12,
-          animationDuration: 2000,
-        });
+      const result = await geocodeCity(searchQuery);
+      
+      if (result) {
+        setDisplayCity(result.cityName);
+        setMapCenter([result.lng, result.lat]);
         
-        // Fetch users in the searched city
-        await fetchUsersInCity(searchQuery, null);
-      } else {
-        // Try geocoding as fallback
-        const geocode = await Location.geocodeAsync(searchQuery);
-        if (geocode && geocode.length > 0) {
-          const { latitude, longitude } = geocode[0];
-          
+        setTimeout(() => {
           cameraRef.current?.setCamera({
-            centerCoordinate: [longitude, latitude],
+            centerCoordinate: [result.lng, result.lat],
             zoomLevel: 12,
             animationDuration: 2000,
           });
-        } else {
-          Alert.alert('Location not found', 'Please try a different search term.');
-        }
+        }, 100);
+        
+        await fetchUsersInCity(result.cityName, result.country);
+      } else {
+        Alert.alert('Location not found', 'Please try a different search term.');
       }
     } catch (error) {
       console.error('Search error:', error);
+      Alert.alert('Search Error', 'Failed to search for location.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -256,21 +426,35 @@ export default function MapScreen() {
     </Pressable>
   );
 
-  // Generate random positions around city center for user markers
-  const getRandomOffset = (index: number) => {
-    const angle = (index * 137.5) % 360; // Golden angle for better distribution
-    const radius = 0.01 + (index * 0.002) % 0.02; // Vary radius
+  // Generate stable random positions
+  const getRandomOffset = useCallback((index: number) => {
+    const angle = (index * 137.5) % 360;
+    const radius = 0.01 + (index * 0.002) % 0.02;
     const latOffset = radius * Math.cos(angle * Math.PI / 180);
     const lngOffset = radius * Math.sin(angle * Math.PI / 180);
     return { latOffset, lngOffset };
-  };
+  }, []);
 
-  if (loading) {
+  if (loading || !hasCheckedLocation) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading map...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (mapCenter[0] === 0 && mapCenter[1] === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="location-outline" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>No location set</Text>
+          <Pressable style={styles.setLocationButtonCentered} onPress={detectAndSetLocation}>
+            <Text style={styles.setLocationButtonText}>Set My Location</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -286,7 +470,8 @@ export default function MapScreen() {
         compassEnabled
         compassPosition={{ top: 100, right: 20 }}
         logoEnabled={false}
-        attributionEnabled={false}>
+        attributionEnabled={false}
+        onDidFinishLoadingMap={() => setMapReady(true)}> 
         
         <Camera
           ref={cameraRef}
@@ -296,8 +481,7 @@ export default function MapScreen() {
           animationDuration={2000}
         />
 
-        {/* User markers distributed around city center */}
-        {usersInCity.map((user, index) => {
+        {mapReady && usersInCity.map((user, index) => {
           const offset = getRandomOffset(index);
           return (
             <MarkerView
@@ -306,8 +490,7 @@ export default function MapScreen() {
                 mapCenter[0] + offset.lngOffset,
                 mapCenter[1] + offset.latOffset
               ]}
-              anchor={{ x: 0.5, y: 1 }}
-              onPress={() => setSelectedUser(user)}>
+              anchor={{ x: 0.5, y: 1 }}>
               <Pressable 
                 style={styles.markerContainer}
                 onPress={() => setSelectedUser(user)}>
@@ -325,123 +508,100 @@ export default function MapScreen() {
       </MapView>
 
       {/* Search Bar */}
-      <SafeAreaView style={[styles.searchContainer, { top: insets.top }]}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#999" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search city..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Current City Pill */}
-        {userCity && (
-          <View style={styles.currentCityPill}>
-            <Ionicons name="location" size={14} color="#007AFF" />
-            <Text style={styles.currentCityText}>
-              {userCity}, {userCountry}
-            </Text>
+      <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+        <View style={[styles.searchContainer, { top: insets.top + 10 }]}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color="#666" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search for a city..."
+              placeholderTextColor="#999"
+              style={styles.searchInput}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </Pressable>
+            )}
           </View>
-        )}
-      </SafeAreaView>
-
-      {/* Bottom Sheet with users */}
-      <View style={[styles.bottomSheet, { paddingBottom: insets.bottom }]}>
-        <View style={styles.bottomSheetHandle} />
-        <Text style={styles.bottomSheetTitle}>
-          {usersInCity.length} People in {userCity || 'this city'}
-        </Text>
-        
-        <ScrollView 
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.usersScrollContainer}>
-          {usersInCity.length > 0 ? (
-            usersInCity.map(renderUserCard)
-          ) : (
-            <View style={styles.noUsersContainer}>
-              <Text style={styles.noUsersText}>
-                No travelers found in {userCity || 'this city'}
-              </Text>
-              <Text style={styles.noUsersSubtext}>
-                Be the first to explore here!
-              </Text>
+          
+          {userCity && !isSearching && (
+            <View style={styles.currentCityPill}>
+              <Ionicons name="location" size={14} color="#007AFF" />
+              <Text style={styles.currentCityText}>{userCity}</Text>
             </View>
           )}
-        </ScrollView>
 
-        {usersInCity.length > 0 && (
-          <Pressable 
-            style={styles.seeAllButton}
-            onPress={() => router.push('/search-users')}>
-            <Text style={styles.seeAllButtonText}>
-              See all {usersInCity.length} Nearby Travelers
+          {isSearching && displayCity && (
+            <View style={styles.currentCityPill}>
+              <Ionicons name="search" size={14} color="#007AFF" />
+              <Text style={styles.currentCityText}>{displayCity}</Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+
+      {/* Users List */}
+      {usersInCity.length > 0 && (
+        <View style={styles.usersListContainer}>
+          <View style={styles.usersListHeader}>
+            <Text style={styles.usersListTitle}>
+              {usersInCity.length} {usersInCity.length === 1 ? 'person' : 'people'} in {displayCity || userCity}
             </Text>
-          </Pressable>
-        )}
-      </View>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.usersListContent}>
+            {usersInCity.map(renderUserCard)}
+          </ScrollView>
+        </View>
+      )}
 
-      {/* Selected User Popup */}
+      {/* Empty State */}
+      {usersInCity.length === 0 && displayCity && (
+        <View style={styles.emptyStateOverlay}>
+          <View style={styles.emptyStateCard}>
+            <Text style={styles.emptyStateText}>
+              No users found in {displayCity}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Compass Button */}
+      <Pressable 
+        style={[styles.compassButton, { bottom: insets.bottom + (usersInCity.length > 0 ? 200 : 100) }]}
+        onPress={returnToHomeLocation}>
+        <Ionicons name="navigate" size={24} color={isSearching ? '#007AFF' : '#666'} />
+      </Pressable>
+
+      {/* User Detail Modal */}
       {selectedUser && (
         <Pressable 
-          style={styles.selectedUserOverlay}
+          style={styles.modalOverlay}
           onPress={() => setSelectedUser(null)}>
-          <View style={styles.selectedUserCard}>
-            <Pressable 
-              style={styles.closeButton}
-              onPress={() => setSelectedUser(null)}>
-              <Ionicons name="close" size={24} color="#666" />
-            </Pressable>
-            
+          <View style={styles.userModal}>
             <Image
-              source={{ 
-                uri: selectedUser.avatar_url || 'https://via.placeholder.com/100' 
-              }}
-              style={styles.selectedUserAvatar}
+              source={{ uri: selectedUser.avatar_url || 'https://via.placeholder.com/120' }}
+              style={styles.modalAvatar}
             />
-            
-            <Text style={styles.selectedUserName}>
-              {selectedUser.full_name}
-            </Text>
-            
-            <Text style={styles.selectedUserLocation}>
-              {selectedUser.location}, {selectedUser.location_country}
-            </Text>
-            
+            <Text style={styles.modalName}>{selectedUser.full_name}</Text>
             {selectedUser.bio && (
-              <Text style={styles.selectedUserBio} numberOfLines={3}>
-                {selectedUser.bio}
-              </Text>
+              <Text style={styles.modalBio} numberOfLines={3}>{selectedUser.bio}</Text>
             )}
-            
-            <Pressable 
+            <Pressable
               style={styles.viewProfileButton}
               onPress={() => {
                 setSelectedUser(null);
                 router.push(`/profile/${selectedUser.id}`);
               }}>
-              <Text style={styles.viewProfileButtonText}>View Profile</Text>
+              <Text style={styles.viewProfileText}>View Profile</Text>
             </Pressable>
           </View>
-        </Pressable>
-      )}
-
-      {/* Set Location Button (if no location) */}
-      {!userCity && (
-        <Pressable 
-          style={styles.setLocationButton}
-          onPress={detectAndSetLocation}>
-          <Ionicons name="location-outline" size={20} color="white" />
-          <Text style={styles.setLocationButtonText}>Set My Location</Text>
         </Pressable>
       )}
     </View>
@@ -463,10 +623,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 24,
+  },
   searchContainer: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
+    paddingHorizontal: 20,
     zIndex: 10,
   },
   searchBar: {
@@ -527,15 +691,17 @@ const styles = StyleSheet.create({
   markerTail: {
     width: 0,
     height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
     borderTopWidth: 8,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: 'white',
-    marginTop: -2,
+    marginTop: -1,
   },
-  bottomSheet: {
+  usersListContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -543,183 +709,160 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 10,
+    paddingTop: 16,
+    paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
   },
-  bottomSheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 15,
+  usersListHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  bottomSheetTitle: {
-    fontSize: 18,
+  usersListTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    paddingHorizontal: 20,
-    marginBottom: 15,
   },
-  usersScrollContainer: {
+  usersListContent: {
     paddingHorizontal: 20,
+    gap: 12,
   },
   userCard: {
+    width: 280,
     flexDirection: 'row',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
     padding: 12,
-    marginRight: 12,
-    width: 200,
+    alignItems: 'center',
   },
   userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E0E0E0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
   },
   userInfo: {
     flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
   },
   userHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   userName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     flex: 1,
   },
   userFlag: {
-    fontSize: 16,
-    marginLeft: 4,
+    fontSize: 18,
+    marginLeft: 8,
   },
   userLocation: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#666',
-    marginTop: 2,
+    marginBottom: 4,
   },
   userInterests: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#999',
-    marginTop: 2,
   },
-  noUsersContainer: {
-    paddingVertical: 30,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-  },
-  noUsersText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  noUsersSubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  seeAllButton: {
-    backgroundColor: '#007AFF',
-    marginHorizontal: 20,
-    marginTop: 15,
-    marginBottom: 20,
-    paddingVertical: 14,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  seeAllButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  selectedUserOverlay: {
+  compassButton: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 100,
-  },
-  selectedUserCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    width: '85%',
-    alignItems: 'center',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    zIndex: 1,
-  },
-  selectedUserAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 15,
-    backgroundColor: '#E0E0E0',
-  },
-  selectedUserName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  selectedUserLocation: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  selectedUserBio: {
-    fontSize: 14,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  viewProfileButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  viewProfileButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  setLocationButton: {
-    position: 'absolute',
-    bottom: 180,
-    alignSelf: 'center',
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
   },
+  setLocationButtonCentered: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    marginTop: 8,
+  },
   setLocationButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
+  },
+  emptyStateOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+  },
+  emptyStateCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  userModal: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 320,
+  },
+  modalAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
+  },
+  modalName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 8,
+  },
+  modalBio: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  viewProfileButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+  },
+  viewProfileText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

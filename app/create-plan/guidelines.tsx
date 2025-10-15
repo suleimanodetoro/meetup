@@ -5,7 +5,7 @@ import {
   Text,
   ScrollView,
   Pressable,
-  SafeAreaView,
+  SafeAreaView,Linking
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,8 +86,7 @@ export default function GuidelinesScreen() {
           {/* Terms Link */}
           <Pressable 
             onPress={() => {
-              // Open website terms page
-              // Linking.openURL('https://yourapp.com/terms');
+              Linking.openURL('https://usewaypoint.app/terms');
             }}
             className="mt-6 items-center"
           >

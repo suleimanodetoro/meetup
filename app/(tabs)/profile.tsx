@@ -29,12 +29,12 @@ import PersonCard from '~/components/PersonCard';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const C = {
-  bg: '#FFFFFF',         // everything white
+  bg: '#FFFFFF',
   text: '#0B1220',
   sub: '#6B7280',
-  border: '#EAEAEA',     // subtle borders
-  blue: '#007AFF',       // iOS blue for actions/links
-  soft: '#F5F5F5',       // icon chips
+  border: '#EAEAEA',
+  blue: '#007AFF',
+  soft: '#F5F5F5',
   badge: '#FF3B30',
 };
 
@@ -56,7 +56,6 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const onRefresh = useCallback(async () => {
@@ -66,212 +65,146 @@ export default function ProfileScreen() {
   }, []);
 
   const fetchAll = async () => {
-    await Promise.all([fetchProfileData(), fetchFriends()]);
-  };
-
-  const fetchProfileData = async () => {
     if (!session?.user?.id) return;
-
     try {
-      setLoading(true);
-
-      // Profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      if (profileData) setProfile(profileData);
-
-      // Visits
-      const { data: userVisits } = await supabase
-        .from('visits')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('start_date', { ascending: false });
-
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const upcoming: any[] = [];
-      const countries = new Set<string>();
-
-      (userVisits || []).forEach((v) => {
-        if (v.country_code) countries.add(v.country_code);
-        const end = new Date(v.end_date); end.setHours(23, 59, 59, 999);
-        const t = {
-          ...v,
-          user_count: 1,
-          image_url: getCityImageUrl(v.city),
-          recent_users: [
-            { id: session.user.id, full_name: profileData?.full_name, avatar_url: profileData?.avatar_url },
-          ],
-        };
-        if (end >= today) upcoming.push(t);
-      });
-
-      setUpcomingVisits(upcoming);
-      setStats({
-        totalTrips: (userVisits || []).length,
-        countriesVisited: countries.size,
-        plansCount: 0, // will be set after plans fetch below
-      });
-
-      // Joined plans
-      const { data: attendance } = await supabase
-        .from('attendance')
-        .select('event_id')
-        .eq('user_id', session.user.id);
-
-      if (attendance?.length) {
-        const eventIds = attendance.map((a) => a.event_id);
-        const { data: plansWithAttendees, error: rpcError } = await supabase
-          .rpc('get_popular_plans_with_attendees');
-
-        if (!rpcError && plansWithAttendees) {
-          const mine = plansWithAttendees.filter((p: any) => eventIds.includes(p.id));
-          setJoinedPlans(mine);
-          setStats((s) => ({ ...s, plansCount: mine.length }));
-        } else {
-          const { data: events } = await supabase
-            .from('events')
-            .select('*')
-            .in('id', eventIds)
-            .gte('date', new Date().toISOString())
-            .order('date', { ascending: true });
-
-          const fallback = (events || []).map((e: any) => ({ ...e, attendee_count: 0, recent_attendees: [] }));
-          setJoinedPlans(fallback);
-          setStats((s) => ({ ...s, plansCount: fallback.length }));
-        }
-      } else {
-        setJoinedPlans([]);
-        setStats((s) => ({ ...s, plansCount: 0 }));
-      }
-
-      // Pending friend requests
-      const { count } = await supabase
-        .from('friendships')
-        .select('*', { count: 'exact', head: true })
-        .eq('addressee_id', session.user.id)
-        .eq('status', 'pending');
-
-      setPendingRequestsCount(count || 0);
-    } catch (e) {
-      console.error(e);
+      await Promise.all([
+        fetchProfile(),
+        fetchStats(),
+        fetchUpcomingVisits(),
+        fetchJoinedPlans(),
+        fetchFriends(),
+        fetchPendingRequestsCount(),
+      ]);
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const fetchProfile = async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+    if (data) setProfile(data);
+  };
+
+  const fetchStats = async () => {
+    if (!session?.user?.id) return;
+
+    const { data: visitsData } = await supabase
+      .from('visits')
+      .select('city, country')
+      .eq('user_id', session.user.id);
+
+    const uniqueCountries = new Set(visitsData?.map((v) => v.country) || []);
+
+    const { count: plansCount } = await supabase
+      .from('event_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.user.id);
+
+    setStats({
+      totalTrips: visitsData?.length || 0,
+      countriesVisited: uniqueCountries.size,
+      plansCount: plansCount || 0,
+    });
+  };
+
+  const fetchUpcomingVisits = async () => {
+    if (!session?.user?.id) return;
+    const now = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('visits')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .gte('start_date', now)
+      .order('start_date', { ascending: true })
+      .limit(10);
+    setUpcomingVisits(data || []);
+  };
+
+  const fetchJoinedPlans = async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from('event_participants')
+      .select(
+        `
+        event_id,
+        events (
+          id,
+          title,
+          description,
+          start_date,
+          end_date,
+          city,
+          image_uri,
+          event_participants (user_id, profiles (id, full_name, avatar_url))
+        )
+      `
+      )
+      .eq('user_id', session.user.id)
+      .limit(10);
+
+    const plans = (data || []).map((p) => p.events).filter(Boolean);
+    setJoinedPlans(plans);
   };
 
   const fetchFriends = async () => {
     if (!session?.user?.id) return;
+
     try {
-      const { data: friendships } = await supabase
+      // Query the friendships table (not 'friends')
+      const { data, error } = await supabase
         .from('friendships')
         .select(
           `
-          id,
-          requester_id,
-          addressee_id,
-          requester:profiles!friendships_requester_id_fkey(
-            id, full_name, avatar_url, bio, nationality_code
-          ),
-          addressee:profiles!friendships_addressee_id_fkey(
-            id, full_name, avatar_url, bio, nationality_code
-          )
-        `
+        id,
+        requester:profiles!friendships_requester_id_fkey(id, full_name, avatar_url, nationality, nationality_code),
+        addressee:profiles!friendships_addressee_id_fkey(id, full_name, avatar_url, nationality, nationality_code)
+      `
         )
+        .or(`requester_id.eq.${session.user.id},addressee_id.eq.${session.user.id}`)
         .eq('status', 'accepted')
-        .or(
-          `requester_id.eq.${session.user.id},addressee_id.eq.${session.user.id}`
-        );
+        .limit(6);
 
-      const friendProfiles =
-        (friendships || [])
-          .map((f: any) => (f.requester_id === session.user.id ? f.addressee : f.requester))
-          .filter(Boolean) || [];
-      setFriends(friendProfiles);
-    } catch (e) {
-      console.error(e);
+      if (error) {
+        console.error('Error fetching friends:', error);
+        return;
+      }
+
+      // Map to get the friend (the person who is NOT the current user)
+      const friendsList = (data || [])
+        .map((friendship) => {
+          // If I'm the requester, the friend is the addressee, and vice versa
+          return friendship.requester?.id === session.user.id
+            ? friendship.addressee
+            : friendship.requester;
+        })
+        .filter(Boolean);
+
+      setFriends(friendsList);
+    } catch (error) {
+      console.error('Error in fetchFriends:', error);
     }
   };
 
-  const StatBox = ({ value, label }: { value: number; label: string }) => (
-    <View
-      style={{
-        flex: 1,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 12,
-        paddingVertical: 14,
-        alignItems: 'center',
-        backgroundColor: C.bg,
-      }}
-    >
-      <Text style={{ fontSize: 20, fontWeight: '800', color: C.text }}>{value}</Text>
-      <Text style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>{label}</Text>
-    </View>
-  );
+  const fetchPendingRequestsCount = async () => {
+    if (!session?.user?.id) return;
 
-  const SectionHeader = ({
-    title,
-    showSeeAll,
-    onPress,
-  }: { title: string; showSeeAll?: boolean; onPress?: () => void }) => (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 12,
-      }}
-    >
-      <Text style={{ fontSize: 18, fontWeight: '700', color: C.text }}>{title}</Text>
-      {showSeeAll ? (
-        <Pressable onPress={onPress} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ color: C.blue, fontSize: 14, fontWeight: '600' }}>See all</Text>
-          <Ionicons name="chevron-forward" size={16} color={C.blue} />
-        </Pressable>
-      ) : (
-        <View />
-      )}
-    </View>
-  );
+    // Query friendships table (not 'friends')
+    const { count } = await supabase
+      .from('friendships')
+      .select('*', { count: 'exact', head: true })
+      .eq('addressee_id', session.user.id)
+      .eq('status', 'pending');
 
-  const EmptyUpcoming = () => (
-    <View
-      style={{
-        marginHorizontal: 20,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 14,
-        paddingVertical: 24,
-        alignItems: 'center',
-        backgroundColor: C.bg,
-      }}
-    >
-      <Text style={{ fontSize: 48, marginBottom: 10 }}>🌍</Text>
-      <Text style={{ color: C.sub, fontSize: 14, marginBottom: 12 }}>
-        You don't have any upcoming trips yet
-      </Text>
-      <Pressable
-        onPress={() => router.push('/add-trip')}
-        style={{
-          backgroundColor: C.blue,
-          paddingHorizontal: 18,
-          paddingVertical: 12,
-          borderRadius: 22,
-        }}
-      >
-        <Text style={{ color: '#fff', fontWeight: '700' }}>+ Add New Trip</Text>
-      </Pressable>
-    </View>
-  );
+    setPendingRequestsCount(count || 0);
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <StatusBar barStyle="dark-content" />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={C.blue} />
         </View>
@@ -283,41 +216,43 @@ export default function ProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar barStyle="dark-content" />
       <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} />
-        }
-        contentContainerStyle={{ paddingBottom: 28, minHeight: SCREEN_HEIGHT - 80, backgroundColor: C.bg }}
         showsVerticalScrollIndicator={false}
-      >
-        {/* Header (scrolls with content) */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* CLEAN HEADER - No bio section */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+            }}>
+            {/* Profile Info */}
+            <View style={{ flexDirection: 'row', gap: 14, flex: 1 }}>
               <View
                 style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  overflow: 'hidden',
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
                   backgroundColor: C.soft,
-                  borderWidth: 1,
-                  borderColor: C.border,
-                  alignItems: 'center',
+                  overflow: 'hidden',
                   justifyContent: 'center',
-                }}
-              >
+                  alignItems: 'center',
+                }}>
                 {profile?.avatar_url ? (
-                  <Image source={{ uri: profile.avatar_url }} style={{ width: 56, height: 56 }} />
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={{ width: '100%', height: '100%' }}
+                  />
                 ) : (
-                  <Text style={{ fontSize: 22, color: C.sub }}>
+                  <Text style={{ fontSize: 28, fontWeight: '600', color: C.sub }}>
                     {(profile?.full_name?.[0] || 'T').toUpperCase()}
                   </Text>
                 )}
               </View>
 
-              <View>
+              <View style={{ justifyContent: 'center', flex: 1 }}>
                 <Text style={{ fontSize: 22, fontWeight: '800', color: C.text }}>
-                  {profile?.full_name || 'Traveler'}
+                  {profile?.full_name || 'J. Doe'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                   <Text style={{ fontSize: 18 }}>
@@ -330,7 +265,24 @@ export default function ProfileScreen() {
               </View>
             </View>
 
+            {/* Action Buttons */}
             <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => router.push('/edit-profile')}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  backgroundColor: C.bg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                hitSlop={12}>
+                <Ionicons name="create-outline" size={20} color={C.text} />
+              </Pressable>
+
               <Pressable
                 onPress={() => router.push('/friend-requests')}
                 style={{
@@ -343,8 +295,7 @@ export default function ProfileScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
-                }}
-              >
+                }}>
                 <Ionicons name="notifications-outline" size={20} color={C.text} />
                 {pendingRequestsCount > 0 && (
                   <View
@@ -359,8 +310,7 @@ export default function ProfileScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       paddingHorizontal: 4,
-                    }}
-                  >
+                    }}>
                     <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
                       {pendingRequestsCount}
                     </Text>
@@ -380,32 +330,14 @@ export default function ProfileScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                hitSlop={12}
-              >
+                hitSlop={12}>
                 <Ionicons name="settings-outline" size={20} color={C.text} />
               </Pressable>
             </View>
           </View>
-
-          {/* Bio + Edit */}
-          <View style={{ marginTop: 8 }}>
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: 14,
-                color: profile?.bio ? C.sub : '#9CA3AF',
-                fontStyle: profile?.bio ? 'normal' : 'italic',
-              }}
-            >
-              {profile?.bio || 'Add a short bio so travelers know you'}
-            </Text>
-            <Pressable onPress={() => router.push('/edit-profile')} style={{ marginTop: 6 }}>
-              <Text style={{ fontSize: 15, color: C.blue, fontWeight: '700' }}>Edit Profile</Text>
-            </Pressable>
-          </View>
         </View>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 18 }}>
           <StatBox value={stats.plansCount} label="Plans" />
           <StatBox value={stats.totalTrips} label="Trips" />
@@ -413,11 +345,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Upcoming Trips */}
-        <SectionHeader
-          title="Upcoming Trips"
-          showSeeAll={upcomingVisits.length > 0}
-          onPress={() => router.push('/my-trips')}
-        />
+        <SectionHeader title="Upcoming Trips" />
 
         {upcomingVisits.length > 0 ? (
           <FlatList
@@ -435,11 +363,7 @@ export default function ProfileScreen() {
 
         {/* Plans you Joined */}
         <View style={{ marginTop: 24 }}>
-          <SectionHeader
-            title="Plans you Joined"
-            showSeeAll={joinedPlans.length > 0}
-            onPress={() => router.push('/my-plans')}
-          />
+          <SectionHeader title="Plans you Joined" />
 
           {joinedPlans.length > 0 ? (
             <FlatList
@@ -449,80 +373,132 @@ export default function ProfileScreen() {
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ paddingHorizontal: 20 }}
               ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-              renderItem={({ item }) => <PlanCardHome plan={item} />}
+              renderItem={({ item }) => <PlanCardHome event={item} />}
             />
           ) : (
-            <View
-              style={{
-                marginHorizontal: 20,
-                borderWidth: 1,
-                borderColor: C.border,
-                borderRadius: 14,
-                padding: 22,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 40, marginBottom: 4 }}>🎯</Text>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 4 }}>
-                No Plans Yet
-              </Text>
-              <Text style={{ fontSize: 13, color: C.sub, textAlign: 'center' }}>
-                Join plans to meet other travelers
-              </Text>
-            </View>
+            <EmptyPlans />
           )}
         </View>
 
-        {/* Friends */}
-        <View style={{ marginTop: 24 }}>
-          <SectionHeader
-            title={`Friends (${friends.length})`}
-            showSeeAll={friends.length > 0}
-            onPress={() => router.push('/friends')}
-          />
+        {/* My Friends */}
+        <View style={{ marginTop: 24, marginBottom: 40 }}>
+          <SectionHeader title="My Friends" />
 
           {friends.length > 0 ? (
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              data={friends.slice(0, 6)}
+              data={friends}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingHorizontal: 20 }}
-              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
               renderItem={({ item }) => <PersonCard person={item} />}
             />
           ) : (
-            <View
-              style={{
-                marginHorizontal: 20,
-                borderWidth: 1,
-                borderColor: C.border,
-                borderRadius: 14,
-                padding: 22,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 40, marginBottom: 6 }}>👥</Text>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 6 }}>
-                No Friends Yet
-              </Text>
-              <Pressable
-                onPress={() => router.push('/search-users')}
-                style={{
-                  backgroundColor: C.blue,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 20,
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Find Friends</Text>
-              </Pressable>
-            </View>
+            <EmptyFriends />
           )}
         </View>
-
-        <View style={{ height: 28 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Components
+function StatBox({ value, label }: { value: number; label: string }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: C.bg,
+        borderRadius: 16,
+        paddingVertical: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: C.border,
+      }}>
+      <Text style={{ fontSize: 24, fontWeight: '700', color: C.text }}>{value}</Text>
+      <Text style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>{label}</Text>
+    </View>
+  );
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: 20,
+        marginBottom: 16,
+      }}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: C.text }}>{title}</Text>
+    </View>
+  );
+}
+
+function EmptyUpcoming() {
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: C.bg,
+        borderRadius: 16,
+        paddingVertical: 48,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: C.border,
+      }}>
+      <Text style={{ fontSize: 48, marginBottom: 12 }}>🌍</Text>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: C.text, marginBottom: 4 }}>
+        No upcoming trips yet
+      </Text>
+      <Pressable
+        onPress={() => router.push('/add-trip')}
+        style={{
+          backgroundColor: C.blue,
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 24,
+          marginTop: 16,
+        }}>
+        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Add New Trip</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function EmptyPlans() {
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
+        paddingVertical: 32,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+      }}>
+      <Text style={{ fontSize: 48, marginBottom: 8 }}>🗓️</Text>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>No Plans Yet</Text>
+      <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>You haven't joined any plans</Text>
+    </View>
+  );
+}
+
+function EmptyFriends() {
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
+        paddingVertical: 32,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+      }}>
+      <Text style={{ fontSize: 48, marginBottom: 8 }}>👥</Text>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>No Friends Yet</Text>
+      <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>
+        Start connecting with travelers
+      </Text>
+    </View>
   );
 }

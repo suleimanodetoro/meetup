@@ -109,11 +109,7 @@ export default function CreateOptionsModal({ visible, onClose }: CreateOptionsMo
         {/* Handle */}
         <View style={styles.handle} />
         
-        {/* Header with globe and branding */}
-        <View style={styles.header}>
-          <Text style={styles.globe}>🌍</Text>
-          <Text style={styles.brandName}>Waypoint</Text>
-        </View>
+     
 
         {/* Options */}
         <Pressable

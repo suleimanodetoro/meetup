@@ -31,7 +31,7 @@ export default function OnboardingGenderPreferenceScreen() {
 
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -79,6 +79,11 @@ export default function OnboardingGenderPreferenceScreen() {
                   gap: 16,
                   borderWidth: 2,
                   borderColor: genderPreference === option.id ? '#007AFF' : 'white',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 8,
+                  elevation: 2,
                 }}>
                 <View style={{
                   width: 50,

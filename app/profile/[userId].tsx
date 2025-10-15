@@ -1,4 +1,4 @@
-// app/profile/[userId].tsx - FIXED VERSION WITH V3 FUNCTION
+// app/profile/[userId].tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,26 +9,55 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { format } from 'date-fns';
-import { Profile, FriendshipStatus } from '~/types/messaging';
+import { INTERESTS } from '~/utils/constants';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { getCountryFlag } from '~/utils/countryFlags';
+import { getCityImageUrl } from '~/utils/cityImages';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+type FriendshipStatus = 'pending' | 'accepted' | 'blocked' | null;
+
+interface UserProfile {
+  id: string;
+  full_name: string;
+  bio?: string;
+  avatar_url?: string;
+  birth_date?: string;
+  nationality?: string;
+  nationality_code?: string;
+  languages?: string[];
+  interests?: string[];
+  gender?: string;
+  instagram_url?: string;
+  tiktok_url?: string;
+  youtube_url?: string;
+}
 
 export default function UserProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { session } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus | null>(null);
+  
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>(null);
   const [isRequester, setIsRequester] = useState(false);
-  const [canMessage, setCanMessage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
+  
+  // Travel stats
+  const [travelStats, setTravelStats] = useState({
+    totalTrips: 0,
+    countriesVisited: 0,
+  });
+
+  // User's events/plans
+  const [userEvents, setUserEvents] = useState<any[]>([]);
 
   useEffect(() => {
     if (userId) {
@@ -41,73 +70,88 @@ export default function UserProfileScreen() {
 
     try {
       setLoading(true);
+      console.log('🔍 Fetching profile for user:', userId);
       
-      // Fetch user profile
+      // Fetch user profile with social media
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('❌ Profile error:', profileError);
+        throw profileError;
+      }
+      
+      console.log('✅ Profile loaded:', profileData);
       setProfile(profileData);
+
+      // Fetch travel stats
+      const { data: visits } = await supabase
+        .from('visits')
+        .select('country_code')
+        .eq('user_id', userId);
+
+      if (visits) {
+        const uniqueCountries = new Set(visits.map(v => v.country_code).filter(Boolean));
+        setTravelStats({
+          totalTrips: visits.length,
+          countriesVisited: uniqueCountries.size,
+        });
+      }
+
+      // Fetch user's events (both created and attending)
+      const { data: attendance } = await supabase
+        .from('attendance')
+        .select('event_id')
+        .eq('user_id', userId);
+
+      if (attendance && attendance.length > 0) {
+        const eventIds = attendance.map(a => a.event_id);
+        const { data: events } = await supabase
+          .from('events')
+          .select('*')
+          .in('id', eventIds)
+          .gte('date', new Date().toISOString())
+          .order('date', { ascending: true })
+          .limit(3);
+
+        if (events) {
+          console.log('📅 User events:', events);
+          setUserEvents(events);
+        }
+      }
 
       // Check friendship status if not viewing own profile
       if (userId !== session.user.id) {
-        // Handle the array response from get_friendship_status
-        const { data: friendshipData, error: friendshipError } = await supabase
+        const { data: friendshipData } = await supabase
           .rpc('get_friendship_status', {
             user1_id: session.user.id,
             user2_id: userId
           });
 
-        // Debug log to see what we're getting
-        console.log('Friendship data received:', friendshipData);
-
-        // Check if array has data and access first element
-        if (!friendshipError && friendshipData && friendshipData.length > 0) {
+        if (friendshipData && friendshipData.length > 0) {
           const friendship = friendshipData[0];
           setFriendshipStatus(friendship.status as FriendshipStatus);
           setIsRequester(friendship.is_requester);
-          console.log('Friendship status set:', friendship.status, 'Is requester:', friendship.is_requester);
-        } else {
-          // No friendship exists
-          setFriendshipStatus(null);
-          setIsRequester(false);
-          console.log('No friendship found');
+          console.log('👥 Friendship status:', friendship.status);
         }
-
-        // Check if can message - this uses a different RPC that returns boolean
-        const { data: messageCheck } = await supabase
-          .rpc('can_users_message', {
-            sender_id: session.user.id,
-            receiver_id: userId
-          });
-
-        setCanMessage(messageCheck === true);
       }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      Alert.alert('Error', 'Failed to load user profile');
+    } catch (err) {
+      console.error('❌ Error fetching user data:', err);
+      Alert.alert('Error', 'Failed to load profile');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchUserData();
   };
 
   const handleFriendRequest = async () => {
-    if (!session?.user?.id) {
-      router.push('/auth');
-      return;
-    }
+    if (!session?.user?.id || !userId || processingAction) return;
 
-    setProcessingAction(true);
     try {
+      setProcessingAction(true);
+
       if (!friendshipStatus) {
         // Send friend request
         const { error } = await supabase
@@ -115,7 +159,7 @@ export default function UserProfileScreen() {
           .insert({
             requester_id: session.user.id,
             addressee_id: userId,
-            status: 'pending'
+            status: 'pending',
           });
 
         if (error) throw error;
@@ -135,7 +179,6 @@ export default function UserProfileScreen() {
 
         if (error) throw error;
         setFriendshipStatus('accepted');
-        setCanMessage(true);
         Alert.alert('Success', 'Friend request accepted!');
       } else if (friendshipStatus === 'pending' && isRequester) {
         // Cancel friend request
@@ -148,53 +191,39 @@ export default function UserProfileScreen() {
         if (error) throw error;
         setFriendshipStatus(null);
         setIsRequester(false);
-        Alert.alert('Friend request cancelled');
+        Alert.alert('Cancelled', 'Friend request cancelled');
       }
       
-      // Refresh data after action
       await fetchUserData();
     } catch (error) {
       console.error('Error handling friend request:', error);
-      Alert.alert('Error', 'Failed to process friend request');
+      Alert.alert('Error', 'Failed to process request');
     } finally {
       setProcessingAction(false);
     }
   };
 
   const handleMessage = async () => {
-    if (!session?.user?.id) {
-      router.push('/auth');
-      return;
-    }
+    if (!session?.user?.id || !userId) return;
 
     setProcessingAction(true);
     try {
-      // UPDATED: Using the new v3 function with renamed columns
       const { data, error } = await supabase
-        .rpc('get_or_create_dm_conversation_v3', {  // Changed to v3
+        .rpc('get_or_create_dm_conversation_v3', {
           sender_id: session.user.id,
           recipient_id: userId
         });
 
-      if (error) {
-        console.error('RPC Error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('DM creation response:', data);
-
-      // The function returns an array with one object
       const result = Array.isArray(data) ? data[0] : data;
       
-      // UPDATED: Using new column names from v3 function
       if (result?.can_msg_out && result?.conv_id_out) {
-        // Navigate to DM chat
         router.push({
           pathname: '/chat/dm/[conversationId]',
           params: { conversationId: result.conv_id_out.toString() }
         });
       } else {
-        // Show appropriate error message
         Alert.alert(
           'Cannot Message',
           result?.block_msg_out || 'Unable to start conversation'
@@ -202,92 +231,21 @@ export default function UserProfileScreen() {
       }
     } catch (error: any) {
       console.error('Error starting conversation:', error);
-      
-      // Handle specific error cases
-      if (error.message?.includes('sender_id must equal auth.uid()')) {
-        Alert.alert('Error', 'Authentication error. Please try logging in again.');
-      } else if (error.code === '42501') {
-        Alert.alert('Error', 'Permission denied. Please try again.');
-      } else if (error.code === '42702') {
-        Alert.alert('Error', 'Database configuration error. Please contact support.');
-      } else {
-        Alert.alert('Error', 'Failed to start conversation. Please try again.');
-      }
+      Alert.alert('Error', 'Failed to start conversation');
     } finally {
       setProcessingAction(false);
     }
   };
 
-  const handleBlock = () => {
-    Alert.alert(
-      'Block User',
-      `Are you sure you want to block ${profile?.full_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Block', 
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingAction(true);
-            try {
-              const { error } = await supabase
-                .from('blocked_users')
-                .insert({
-                  blocker_id: session?.user?.id,
-                  blocked_id: userId
-                });
-
-              if (error) throw error;
-              Alert.alert('User blocked');
-              router.back();
-            } catch (error) {
-              console.error('Error blocking user:', error);
-              Alert.alert('Error', 'Failed to block user');
-            } finally {
-              setProcessingAction(false);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleUnfriend = () => {
-    Alert.alert(
-      'Remove Friend',
-      `Are you sure you want to remove ${profile?.full_name} as a friend?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingAction(true);
-            try {
-              // Delete friendship (works for both requester and addressee)
-              const { error } = await supabase
-                .from('friendships')
-                .delete()
-                .or(`and(requester_id.eq.${session?.user?.id},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${session?.user?.id})`);
-
-              if (error) throw error;
-              
-              setFriendshipStatus(null);
-              setIsRequester(false);
-              Alert.alert('Friend removed');
-              
-              // Refresh data
-              await fetchUserData();
-            } catch (error) {
-              console.error('Error removing friend:', error);
-              Alert.alert('Error', 'Failed to remove friend');
-            } finally {
-              setProcessingAction(false);
-            }
-          }
-        }
-      ]
-    );
+  const calculateAge = (birthDate: string): number => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   const getFriendButtonText = () => {
@@ -299,149 +257,265 @@ export default function UserProfileScreen() {
     return 'Add Friend';
   };
 
-  const getFriendButtonIcon = () => {
-    if (!friendshipStatus) return 'person-add-outline';
-    if (friendshipStatus === 'pending') {
-      return isRequester ? 'close-outline' : 'checkmark-outline';
-    }
-    if (friendshipStatus === 'accepted') return 'checkmark-circle-outline';
-    return 'person-add-outline';
+  const getInterestDetails = (interestId: string) => {
+    return INTERESTS.find(i => i.id === interestId) || { id: interestId, label: interestId, emoji: '✨' };
   };
 
-  const handleFriendButtonPress = () => {
-    if (friendshipStatus === 'accepted') {
-      // Show options for accepted friendship
-      Alert.alert(
-        'Friend Options',
-        `${profile?.full_name} is your friend`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Remove Friend', 
-            style: 'destructive',
-            onPress: handleUnfriend
-          }
-        ]
-      );
-    } else {
-      handleFriendRequest();
+  const extractSocialUsername = (url: string, platform: 'instagram' | 'tiktok' | 'youtube'): string => {
+    if (!url) return '';
+    
+    try {
+      if (platform === 'instagram') {
+        const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+        return match ? match[1] : '';
+      } else if (platform === 'tiktok') {
+        const match = url.match(/tiktok\.com\/@([a-zA-Z0-9._]+)/);
+        return match ? match[1] : '';
+      } else if (platform === 'youtube') {
+        const match = url.match(/youtube\.com\/(@|c\/|channel\/)([a-zA-Z0-9_-]+)/);
+        return match ? match[2] : '';
+      }
+    } catch (e) {
+      return '';
     }
+    return '';
   };
+
+  const hasSocials = profile?.instagram_url || profile?.tiktok_url || profile?.youtube_url;
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>User not found</Text>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>User not found</Text>
+        <Pressable style={styles.errorButton} onPress={() => router.back()}>
+          <Text style={styles.errorButtonText}>Go Back</Text>
+        </Pressable>
+      </View>
     );
   }
 
   const isOwnProfile = session?.user?.id === userId;
+  const age = profile.birth_date ? calculateAge(profile.birth_date) : null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
+    <View style={styles.container}>
+      {/* Fixed Header Buttons */}
+      <SafeAreaView style={styles.fixedHeaderButtons}>
+        <Pressable 
+          onPress={() => router.back()} 
+          style={styles.headerButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Profile</Text>
         {!isOwnProfile && (
-          <Pressable onPress={handleBlock} style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+          <Pressable style={styles.headerButton}>
+            <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
           </Pressable>
         )}
-      </View>
+      </SafeAreaView>
 
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+      <ScrollView 
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
       >
-        <View style={styles.profileSection}>
+        {/* Header Image - Scrollable */}
+        <View style={styles.headerImageContainer}>
           <Image
             source={{ 
-              uri: profile.avatar_url || 'https://via.placeholder.com/100' 
+              uri: profile.avatar_url || 'https://via.placeholder.com/400' 
             }}
-            style={styles.avatar}
+            style={styles.headerImage}
           />
-          <Text style={styles.name}>{profile.full_name || 'Unknown User'}</Text>
-          {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
           
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.trips_count || 0}</Text>
-              <Text style={styles.statLabel}>Trips</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.friends_count || 0}</Text>
-              <Text style={styles.statLabel}>Friends</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.plans_count || 0}</Text>
-              <Text style={styles.statLabel}>Plans</Text>
+          {/* Name and Location Overlay */}
+          <View style={styles.profileInfoOverlay}>
+            <Text style={styles.profileName}>
+              {profile.full_name}{age ? `, ${age}` : ''}
+            </Text>
+            {profile.nationality && (
+              <View style={styles.locationContainer}>
+                <Text style={styles.locationFlag}>
+                  {getCountryFlag(profile.nationality_code || '')}
+                </Text>
+                <Text style={styles.locationText}>{profile.nationality.toUpperCase()}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {/* Action Buttons */}
+        {!isOwnProfile && (
+          <View style={styles.actionButtons}>
+            <Pressable
+              onPress={handleFriendRequest}
+              disabled={processingAction}
+              style={[
+                styles.actionButton,
+                friendshipStatus === 'accepted' && styles.actionButtonAccepted
+              ]}
+            >
+              <Ionicons 
+                name={
+                  friendshipStatus === 'accepted' 
+                    ? 'checkmark-circle' 
+                    : friendshipStatus === 'pending' && !isRequester
+                    ? 'person-add'
+                    : 'person-add-outline'
+                } 
+                size={20} 
+                color={friendshipStatus === 'accepted' ? '#34C759' : '#000'} 
+              />
+              <Text style={[
+                styles.actionButtonText,
+                friendshipStatus === 'accepted' && styles.actionButtonTextAccepted
+              ]}>
+                {getFriendButtonText()}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleMessage}
+              disabled={processingAction}
+              style={[styles.actionButton, styles.messageButton]}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color="#000" />
+              <Text style={styles.actionButtonText}>Message</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* About Me */}
+        {profile.bio && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About Me</Text>
+            <Text style={styles.bioText}>{profile.bio}</Text>
+          </View>
+        )}
+
+        {/* Socials */}
+        {hasSocials && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Socials</Text>
+            <View style={styles.socialsContainer}>
+              {profile.instagram_url && (
+                <View style={styles.socialPill}>
+                  <Ionicons name="logo-instagram" size={20} color="#000" />
+                  <Text style={styles.socialText}>
+                    {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not Set'}
+                  </Text>
+                </View>
+              )}
+              {profile.tiktok_url && (
+                <View style={styles.socialPill}>
+                  <Ionicons name="logo-tiktok" size={20} color="#000" />
+                  <Text style={styles.socialText}>
+                    {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not Set'}
+                  </Text>
+                </View>
+              )}
+              {profile.youtube_url && (
+                <View style={styles.socialPill}>
+                  <Ionicons name="logo-youtube" size={20} color="#000" />
+                  <Text style={styles.socialText}>
+                    {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not Set'}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
+        )}
 
-          {!isOwnProfile && (
-            <View style={styles.actionButtons}>
-              <Pressable
-                style={[
-                  styles.actionButton,
-                  friendshipStatus === 'accepted' && styles.acceptedButton,
-                  processingAction && styles.disabledButton
-                ]}
-                onPress={handleFriendButtonPress}
-                disabled={processingAction}
-              >
-                <Ionicons 
-                  name={getFriendButtonIcon()} 
-                  size={20} 
-                  color={friendshipStatus === 'accepted' ? '#4CAF50' : '#fff'} 
-                />
-                <Text style={[
-                  styles.actionButtonText,
-                  friendshipStatus === 'accepted' && styles.acceptedButtonText
-                ]}>
-                  {getFriendButtonText()}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.actionButton,
-                  styles.messageButton,
-                  processingAction && styles.disabledButton,
-                  !canMessage && friendshipStatus !== 'accepted' && styles.disabledMessageButton
-                ]}
-                onPress={handleMessage}
-                disabled={processingAction}
-              >
-                <Ionicons name="chatbubble-outline" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Message</Text>
-              </Pressable>
-            </View>
-          )}
+        {/* Travel Stats */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Travel Stats</Text>
+          </View>
+          <Text style={styles.travelStatsText}>
+            <Text style={styles.travelStatsNumber}>{travelStats.totalTrips}</Text>
+            {' '}Trips  •  {' '}
+            <Text style={styles.travelStatsNumber}>{travelStats.countriesVisited}</Text>
+            {' '}Countries
+          </Text>
         </View>
 
-        {/* Additional sections can go here */}
+        {/* Plans */}
+        {userEvents.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Plans</Text>
+            <View style={styles.plansContainer}>
+              {userEvents.map((event) => (
+                <Pressable
+                  key={event.id}
+                  onPress={() => router.push(`/event/${event.id}`)}
+                  style={styles.planCard}
+                >
+                  <Image
+                    source={{ uri: event.image_uri || getCityImageUrl(event.city) }}
+                    style={styles.planImage}
+                  />
+                  <View style={styles.planContent}>
+                    <Text style={styles.planTitle} numberOfLines={1}>
+                      {event.title}
+                    </Text>
+                    <Text style={styles.planLocation} numberOfLines={1}>
+                      📍 {event.city}
+                    </Text>
+                    {event.date && (
+                      <Text style={styles.planDate}>
+                        {new Date(event.date).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Interests */}
+        {profile.interests && profile.interests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Interests</Text>
+            <View style={styles.interestsContainer}>
+              {profile.interests.map((interestId, index) => {
+                const interest = getInterestDetails(interestId);
+                return (
+                  <View key={index} style={styles.interestPill}>
+                    <Text style={styles.interestEmoji}>{interest.emoji}</Text>
+                    <Text style={styles.interestLabel}>{interest.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Languages */}
+        {profile.languages && profile.languages.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Languages</Text>
+            <View style={styles.languagesPill}>
+              <Text style={styles.languagesIcon}>aA</Text>
+              <Text style={styles.languagesText}>
+                {profile.languages.join(', ')}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -450,128 +524,266 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  backButton: {
-    padding: 8,
-  },
-  moreButton: {
-    padding: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
     padding: 20,
   },
   errorText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  profileSection: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
     marginBottom: 16,
   },
-  name: {
-    fontSize: 24,
+  errorButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
   },
-  bio: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  statsContainer: {
+  fixedHeaderButtons: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#e0e0e0',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
-  statItem: {
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
+  scrollContent: {
+    flex: 1,
   },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
+  scrollContentContainer: {
+    paddingBottom: 40,
+  },
+  headerImageContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.6,
+    position: 'relative',
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  profileInfoOverlay: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    right: 20,
+  },
+  profileName: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  locationFlag: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  locationText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '600',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   actionButtons: {
     flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     gap: 12,
-    width: '100%',
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
     gap: 8,
   },
+  actionButtonAccepted: {
+    borderColor: '#34C759',
+    backgroundColor: '#F0FFF4',
+  },
   messageButton: {
-    backgroundColor: '#6C63FF',
-  },
-  disabledMessageButton: {
-    backgroundColor: '#ccc',
-  },
-  acceptedButton: {
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  disabledButton: {
-    opacity: 0.5,
   },
   actionButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#000',
   },
-  acceptedButtonText: {
-    color: '#4CAF50',
+  actionButtonTextAccepted: {
+    color: '#34C759',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 12,
+  },
+  bioText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+  },
+  travelStatsText: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+  },
+  travelStatsNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  interestsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  interestPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    gap: 6,
+  },
+  interestEmoji: {
+    fontSize: 16,
+  },
+  interestLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  languagesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    gap: 12,
+  },
+  languagesIcon: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  languagesText: {
+    fontSize: 16,
+    color: '#000',
+    flex: 1,
+  },
+  socialsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  socialPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    gap: 8,
+  },
+  socialText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#000',
+  },
+  plansContainer: {
+    gap: 12,
+  },
+  planCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    overflow: 'hidden',
+  },
+  planImage: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#F0F0F0',
+  },
+  planContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+  },
+  planTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  planLocation: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  planDate: {
+    fontSize: 13,
+    color: '#007AFF',
+    fontWeight: '500',
   },
 });

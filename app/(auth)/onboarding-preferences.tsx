@@ -12,11 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnboardingPreferencesScreen() {
   const params = useLocalSearchParams();
-  const [meetPreference, setMeetPreference] = useState('travel-together');
+  const [meetPreference, setMeetPreference] = useState('go-together');
 
   const meetOptions = [
-    { id: 'go-together', label: 'Go together', emoji: '✈️' },
-    { id: 'meet-there', label: 'Meet while I\'m there', emoji: '📍' },
+    { id: 'go-together', label: 'Go together', emoji: '🚕' },
+    { id: 'meet-there', label: 'Meet up there', emoji: '📍' },
     { id: 'chat-first', label: 'Message before making plans', emoji: '💬' },
     { id: 'no-plans', label: 'No plans to meet yet', emoji: '✨' }
   ];
@@ -34,7 +34,7 @@ export default function OnboardingPreferencesScreen() {
 
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -60,23 +60,18 @@ export default function OnboardingPreferencesScreen() {
               fontWeight: 'bold',
               marginBottom: 8,
             }}>
-              how do you prefer to meet travelers?
+              how do you prefer to meet people?
             </Text>
             
             <Text style={{
               fontSize: 16,
               color: '#666',
-              marginBottom: 40,
+              marginBottom: 50,
             }}>
-              help us connect you with people who match your vibe 🤝
+              helps us suggest the right connections 🤝
             </Text>
 
-            {/* Pencil decoration */}
-            <View style={{ position: 'absolute', right: 30, top: 100 }}>
-              <Text style={{ fontSize: 60 }}>✏️</Text>
-            </View>
-
-            {/* Meeting Options */}
+            {/* Meeting Preference Options */}
             <View style={{ gap: 16 }}>
               {meetOptions.map((option) => (
                 <Pressable
@@ -91,6 +86,11 @@ export default function OnboardingPreferencesScreen() {
                     gap: 16,
                     borderWidth: 2,
                     borderColor: meetPreference === option.id ? '#007AFF' : 'white',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 8,
+                    elevation: 2,
                   }}>
                   <View style={{
                     width: 50,
@@ -110,39 +110,33 @@ export default function OnboardingPreferencesScreen() {
                   }}>
                     {option.label}
                   </Text>
-                  {meetPreference === option.id && (
-                    <View style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: '#007AFF',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}>
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    borderWidth: 2,
+                    borderColor: meetPreference === option.id ? '#007AFF' : '#E0E0E0',
+                    backgroundColor: meetPreference === option.id ? '#007AFF' : 'white',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    {meetPreference === option.id && (
                       <View style={{
                         width: 8,
                         height: 8,
                         borderRadius: 4,
                         backgroundColor: 'white',
                       }} />
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </Pressable>
               ))}
             </View>
           </View>
         </ScrollView>
 
-        {/* Continue Button - Fixed at bottom */}
-        <View style={{ 
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          paddingHorizontal: 30, 
-          paddingBottom: 30,
-          backgroundColor: 'transparent',
-        }}>
+        {/* Continue Button */}
+        <View style={{ marginTop:10,paddingHorizontal: 30, paddingBottom: 30 }}>
           <Pressable
             onPress={handleContinue}
             style={{

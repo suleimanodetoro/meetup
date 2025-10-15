@@ -43,14 +43,76 @@ export default function DestinationsScreen() {
     updateField('venues', venues);
   }, [venues]);
 
+  // 1) Auto-search with 300ms debounce
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery]);
+
+  // 2) Updated handleSearch with type filtering + better result handling
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     setSearching(true);
     try {
-      const data = await getSuggestions(searchQuery, session?.access_token || 'session-' + Date.now());
-      setSearchResults(data.suggestions || []);
+      const data = await getSuggestions(
+        searchQuery,
+        session?.access_token || 'session-' + Date.now(),
+        {
+          // Filter to actual locations
+          types: ['place', 'poi', 'address'],
+          // Optional country bias:
+          // country: ['NG'],
+        }
+      );
+
+      const results = (data?.suggestions || [])
+        .filter((s: any) =>
+          ['place', 'poi', 'address', 'locality'].includes(s.feature_type)
+        )
+        .sort((a: any, b: any) => {
+          const queryLower = searchQuery.toLowerCase();
+          const aNameMatch = a.name?.toLowerCase().includes(queryLower) ? 1 : 0;
+          const bNameMatch = b.name?.toLowerCase().includes(queryLower) ? 1 : 0;
+          return bNameMatch - aNameMatch;
+        });
+
+      setSearchResults(results);
     } catch (error) {
+      console.error('Search error:', error);
+      Alert.alert('Error', 'Failed to search venues');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // 3) Optional: proximity biasing (lng,lat) if user location is known
+  const handleSearchWithProximity = async (userLat?: number, userLng?: number) => {
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    try {
+      const options: any = { types: ['place', 'poi', 'address'] };
+      if (userLat && userLng) {
+        // Mapbox expects "lng,lat"
+        options.proximity = `${userLng},${userLat}`;
+      }
+
+      const data = await getSuggestions(
+        searchQuery,
+        session?.access_token || 'session-' + Date.now(),
+        options
+      );
+
+      setSearchResults(data?.suggestions || []);
+    } catch (error) {
+      console.error('Search error:', error);
       Alert.alert('Error', 'Failed to search venues');
     } finally {
       setSearching(false);
@@ -65,9 +127,12 @@ export default function DestinationsScreen() {
 
     setSearching(true);
     try {
-      // Need to retrieve full details to get coordinates
-      const details = await retrieveDetails(venue.mapbox_id, session?.access_token || 'session-' + Date.now());
-      
+      // Retrieve full details to get coordinates
+      const details = await retrieveDetails(
+        venue.mapbox_id,
+        session?.access_token || 'session-' + Date.now()
+      );
+
       const feature = details.features?.[0];
       if (!feature) {
         throw new Error('No details found');
@@ -76,10 +141,16 @@ export default function DestinationsScreen() {
       const newVenue: VenueData = {
         name: venue.name || feature.properties?.name,
         address: venue.place_formatted || feature.properties?.place_formatted,
-        city: venue.context?.place?.name || feature.properties?.context?.place?.name,
-        country: venue.context?.country?.name || feature.properties?.context?.country?.name,
-        country_code: venue.context?.country?.country_code || feature.properties?.context?.country?.country_code,
-        lat: feature.geometry?.coordinates?.[1], // Note: GeoJSON is [lng, lat]
+        city:
+          venue.context?.place?.name ||
+          feature.properties?.context?.place?.name,
+        country:
+          venue.context?.country?.name ||
+          feature.properties?.context?.country?.name,
+        country_code:
+          venue.context?.country?.country_code ||
+          feature.properties?.context?.country?.country_code,
+        lat: feature.geometry?.coordinates?.[1], // GeoJSON = [lng, lat]
         lng: feature.geometry?.coordinates?.[0],
       };
 
@@ -108,15 +179,14 @@ export default function DestinationsScreen() {
   };
 
   const getCountryFlag = (code?: string) => {
-    // Simple flag emoji mapping - expand as needed
     const flags: Record<string, string> = {
-      'GB': '🇬🇧',
-      'US': '🇺🇸',
-      'FR': '🇫🇷',
-      'IE': '🇮🇪',
-      'DE': '🇩🇪',
-      'ES': '🇪🇸',
-      'IT': '🇮🇹',
+      GB: '🇬🇧',
+      US: '🇺🇸',
+      FR: '🇫🇷',
+      IE: '🇮🇪',
+      DE: '🇩🇪',
+      ES: '🇪🇸',
+      IT: '🇮🇹',
     };
     return flags[code || ''] || '🌍';
   };
@@ -167,10 +237,9 @@ export default function DestinationsScreen() {
               <View style={styles.venueInfo}>
                 <Text style={styles.venueName}>{venue.name}</Text>
                 <Text style={styles.venueAddress}>
-                  {venue.city && venue.country 
+                  {venue.city && venue.country
                     ? `${venue.city}, ${venue.country}`
-                    : venue.address
-                  }
+                    : venue.address}
                 </Text>
               </View>
               <Pressable
@@ -199,11 +268,7 @@ export default function DestinationsScreen() {
       </View>
 
       {/* Search Modal */}
-      <Modal
-        visible={showSearch}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showSearch} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
@@ -249,7 +314,9 @@ export default function DestinationsScreen() {
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultName}>{item.name}</Text>
-                    <Text style={styles.resultAddress}>{item.place_formatted}</Text>
+                    <Text style={styles.resultAddress}>
+                      {item.place_formatted}
+                    </Text>
                   </View>
                 </Pressable>
               )}
@@ -269,46 +336,20 @@ export default function DestinationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
+  container: { flex: 1, backgroundColor: 'white' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 32,
-  },
+  backButton: { padding: 4 },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  headerSpacer: { width: 32 },
+  scrollView: { flex: 1 },
+  content: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24 },
+  title: { fontSize: 32, fontWeight: '700', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: '#666', marginBottom: 32 },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -319,9 +360,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  addButtonDisabled: {
-    opacity: 0.5,
-  },
+  addButtonDisabled: { opacity: 0.5 },
   addIcon: {
     width: 32,
     height: 32,
@@ -331,15 +370,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  addIconText: {
-    fontSize: 20,
-    color: '#007AFF',
-  },
-  addButtonText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
+  addIconText: { fontSize: 20, color: '#007AFF' },
+  addButtonText: { fontSize: 16, color: '#333', fontWeight: '500' },
   venueCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,47 +391,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  flagEmoji: {
-    fontSize: 24,
-  },
-  venueInfo: {
-    flex: 1,
-  },
-  venueName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  venueAddress: {
-    fontSize: 14,
-    color: '#666',
-  },
-  removeButton: {
-    padding: 8,
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 34,
-  },
+  flagEmoji: { fontSize: 24 },
+  venueInfo: { flex: 1 },
+  venueName: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 },
+  venueAddress: { fontSize: 14, color: '#666' },
+  removeButton: { padding: 8 },
+  footer: { paddingHorizontal: 24, paddingBottom: 34 },
   continueButton: {
     backgroundColor: '#007AFF',
     borderRadius: 28,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  continueButtonDisabled: {
-    backgroundColor: '#C8D7E8',
-  },
-  continueButtonText: {
-    color: 'white',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
+  continueButtonDisabled: { backgroundColor: '#C8D7E8' },
+  continueButtonText: { color: 'white', fontSize: 17, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: 'white' },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -409,14 +415,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
+  modalTitle: { fontSize: 18, fontWeight: '600' },
+  cancelButton: { fontSize: 16, color: '#007AFF' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -426,11 +426,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-  },
+  searchInput: { flex: 1, marginLeft: 12, fontSize: 16 },
   searchResult: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -448,36 +444,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  resultInfo: {
-    flex: 1,
-  },
-  resultName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
-  },
-  resultAddress: {
-    fontSize: 14,
-    color: '#666',
-  },
-  emptyState: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
+  resultInfo: { flex: 1 },
+  resultName: { fontSize: 16, fontWeight: '500', color: '#333', marginBottom: 4 },
+  resultAddress: { fontSize: 14, color: '#666' },
+  emptyState: { padding: 40, alignItems: 'center' },
+  emptyText: { fontSize: 16, color: '#999' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 100 },
+  loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
 });

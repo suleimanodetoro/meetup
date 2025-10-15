@@ -8,8 +8,16 @@ export async function pickAndEncodeImage(
   maxWidth = 2000,
   compress = 0.8
 ): Promise<{ uri: string; base64: string } | null> {
-  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!perm.granted) return null;
+  // Check current permission status first
+  const currentPerm = await ImagePicker.getMediaLibraryPermissionsAsync();
+  
+  // Only request if not already granted or limited
+  if (!currentPerm.granted && currentPerm.status !== 'limited') {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted && perm.status !== 'limited') {
+      return null;
+    }
+  }
 
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: 'images',              

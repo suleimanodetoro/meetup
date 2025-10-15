@@ -55,7 +55,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
     <Pressable
       onPress={() => router.push(`/profile/${person.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`Open profile ${person.full_name ?? 'Traveler'}`}
+      accessibilityLabel={`Open profile ${person.full_name ?? 'Profile'}`}
       hitSlop={8}
       style={{
         width: (SCREEN_WIDTH - 48) / 3,
@@ -132,7 +132,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
         style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }}
         numberOfLines={1}
       >
-        {person.full_name || 'Traveler'}
+        {person.full_name || 'User'}
       </Text>
 
       {typeof age === 'number' && (

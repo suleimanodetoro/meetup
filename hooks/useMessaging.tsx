@@ -34,9 +34,15 @@ export function useConversation(conversationId: string | number) {
     fetchMessages();
     subscribeToConversation();
 
+    // ✅ FIXED: Proper cleanup with unsubscribe
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        channelRef.current.unsubscribe(() => {
+          if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+          }
+        });
       }
     };
   }, [conversationId, session]);
@@ -241,9 +247,15 @@ export function useChatList(filter?: 'all' | 'dms' | 'plans') {
     fetchChats();
     subscribeToUpdates();
 
+    // ✅ FIXED: Proper cleanup with unsubscribe
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        channelRef.current.unsubscribe(() => {
+          if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+          }
+        });
       }
     };
   }, [session, filter]);

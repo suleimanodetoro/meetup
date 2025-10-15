@@ -7,70 +7,10 @@ import {
   Pressable,
   SafeAreaView,
   FlatList,
-  ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const LANGUAGES = [
-  { code: 'ak', name: 'Akan', flag: '🇬🇭' },
-  { code: 'am', name: 'Amharic', flag: '🇪🇹' },
-  { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'az', name: 'Azerbaijani', flag: '🇦🇿' },
-  { code: 'be', name: 'Belarusian', flag: '🇧🇾' },
-  { code: 'bn', name: 'Bengali', flag: '🇧🇩' },
-  { code: 'my', name: 'Burmese', flag: '🇲🇲' },
-  { code: 'zh', name: 'Mandarin Chinese', flag: '🇨🇳' },
-  { code: 'hr', name: 'Serbo-Croatian', flag: '🇷🇸' }, // ISO 639-1 code for Croatian/Serbian
-  { code: 'cs', name: 'Czech', flag: '🇨🇿' },
-  { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'fa', name: 'Persian (Farsi)', flag: '🇮🇷' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'el', name: 'Greek', flag: '🇬🇷' },
-  { code: 'gu', name: 'Gujarati', flag: '🇮🇳' },
-  { code: 'ht', name: 'Haitian Creole', flag: '🇭🇹' },
-  { code: 'ha', name: 'Hausa', flag: '🇳🇬' },
-  { code: 'he', name: 'Hebrew', flag: '🇮🇱' }, // not in your ranking, optional to remove
-  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
-  { code: 'hu', name: 'Hungarian', flag: '🇭🇺' },
-  { code: 'ig', name: 'Igbo', flag: '🇳🇬' },
-  { code: 'id', name: 'Indonesian', flag: '🇮🇩' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'jv', name: 'Javanese', flag: '🇮🇩' },
-  { code: 'kk', name: 'Kazakh', flag: '🇰🇿' },
-  { code: 'kn', name: 'Kannada', flag: '🇮🇳' },
-  { code: 'km', name: 'Khmer', flag: '🇰🇭' },
-  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
-  { code: 'ml', name: 'Malayalam', flag: '🇮🇳' },
-  { code: 'ms', name: 'Malay', flag: '🇲🇾' },
-  { code: 'mr', name: 'Marathi', flag: '🇮🇳' },
-  { code: 'ne', name: 'Nepali', flag: '🇳🇵' },
-  { code: 'or', name: 'Odia', flag: '🇮🇳' },
-  { code: 'pa', name: 'Punjabi', flag: '🇮🇳' },
-  { code: 'ps', name: 'Pashto', flag: '🇦🇫' },
-  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-  { code: 'ro', name: 'Romanian', flag: '🇷🇴' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-  { code: 'si', name: 'Sinhala', flag: '🇱🇰' },
-  { code: 'so', name: 'Somali', flag: '🇸🇴' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'sv', name: 'Swedish', flag: '🇸🇪' },
-  { code: 'ta', name: 'Tamil', flag: '🇮🇳' },
-  { code: 'te', name: 'Telugu', flag: '🇮🇳' },
-  { code: 'th', name: 'Thai', flag: '🇹🇭' },
-  { code: 'tl', name: 'Tagalog', flag: '🇵🇭' },
-  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
-  { code: 'uk', name: 'Ukrainian', flag: '🇺🇦' },
-  { code: 'ur', name: 'Urdu', flag: '🇵🇰' },
-  { code: 'uz', name: 'Uzbek', flag: '🇺🇿' },
-  { code: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
-  { code: 'yo', name: 'Yoruba', flag: '🇳🇬' },
-  { code: 'zu', name: 'Zulu', flag: '🇿🇦' }
-];
+import { LANGUAGES } from '~/utils/constants';
 
 export default function OnboardingLanguagesScreen() {
   const params = useLocalSearchParams();
@@ -129,19 +69,43 @@ export default function OnboardingLanguagesScreen() {
           alignItems: 'center',
           paddingVertical: 16,
           paddingHorizontal: 20,
-          backgroundColor: isSelected ? '#E3F2FD' : 'transparent',
+          backgroundColor: isSelected ? '#E3F2FD' : 'white',
+          marginHorizontal: 20,
+          marginBottom: 8,
+          borderRadius: 16,
+          borderWidth: 2,
+          borderColor: isSelected ? '#007AFF' : '#F0F0F0',
         }}>
-        <Text style={{ fontSize: 24, marginRight: 12 }}>{item.flag}</Text>
+        <View style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: isSelected ? '#007AFF' : '#F5F5F5',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginRight: 12,
+        }}>
+          <Text style={{ fontSize: 20 }}>{item.flag}</Text>
+        </View>
         <Text style={{
           fontSize: 17,
           flex: 1,
-          color: isSelected ? '#1976D2' : '#333',
+          color: '#333',
           fontWeight: isSelected ? '600' : '400',
         }}>
           {item.name}
         </Text>
         {isSelected && (
-          <Text style={{ fontSize: 20, color: '#007AFF' }}>✓</Text>
+          <View style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: '#007AFF',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            <Text style={{ fontSize: 14, color: 'white' }}>✓</Text>
+          </View>
         )}
       </Pressable>
     );
@@ -149,7 +113,7 @@ export default function OnboardingLanguagesScreen() {
 
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -170,67 +134,55 @@ export default function OnboardingLanguagesScreen() {
 
         <View style={{ flex: 1 }}>
           {/* Title Section */}
-          <View style={{ paddingHorizontal: 30, marginBottom: 20 }}>
+          <View style={{ paddingHorizontal: 30, marginBottom: 20, marginTop: 20 }}>
             <Text style={{
               fontSize: 36,
               fontWeight: 'bold',
               marginBottom: 8,
             }}>
-              which languages do you speak?
+              languages you speak
             </Text>
-            
+
             <Text style={{
               fontSize: 16,
               color: '#666',
+              marginBottom: 24,
             }}>
-              helps us match you with other travelers ⭐
+              select all that apply 🌍
             </Text>
-          </View>
 
-          {/* Globe decoration */}
-          <View style={{ position: 'absolute', right: 30, top: 60 }}>
-            <Text style={{ fontSize: 60 }}>🌐</Text>
-          </View>
-
-          {/* Search Bar */}
-          <View style={{
-            marginHorizontal: 30,
-            marginBottom: 10,
-            backgroundColor: 'white',
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: '#E0E0E0',
-          }}>
-            <Text style={{ fontSize: 18, marginRight: 10 }}>🔍</Text>
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search languages"
-              placeholderTextColor="#9E9E9E"
-              style={{
-                flex: 1,
-                fontSize: 16,
-              }}
-            />
+            {/* Search Bar */}
+            <View style={{
+              backgroundColor: 'white',
+              borderRadius: 16,
+              paddingHorizontal: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderWidth: 2,
+              borderColor: '#F0F0F0',
+            }}>
+              <Text style={{ fontSize: 18, marginRight: 10 }}>🔍</Text>
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search languages..."
+                placeholderTextColor="#999"
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  fontSize: 16,
+                }}
+              />
+            </View>
           </View>
 
           {/* Languages List */}
           <FlatList
             data={filteredLanguages}
-            renderItem={({ item }) => <LanguageItem item={item} />}
             keyExtractor={(item) => item.code}
-            style={{
-              flex: 1,
-              backgroundColor: 'white',
-              marginHorizontal: 30,
-              borderRadius: 12,
-              marginBottom: 20,
-            }}
+            renderItem={({ item }) => <LanguageItem item={item} />}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
           />
         </View>
 

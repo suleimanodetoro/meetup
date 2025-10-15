@@ -56,16 +56,14 @@ const CategoryPill = React.memo(
         flexDirection: 'row',
         alignItems: 'center',
         marginRight: 12,
-      }}
-    >
+      }}>
       {icon ? <Text style={{ fontSize: 20, marginRight: 8 }}>{icon}</Text> : null}
       <Text
         style={{
           fontSize: 15,
           fontWeight: '500',
           color: isActive ? 'white' : '#333',
-        }}
-      >
+        }}>
         {label}
       </Text>
     </Pressable>
@@ -109,16 +107,18 @@ export default function HomeScreen() {
       // Trending visits
       const { data: visits, error: visitsError } = await supabase.rpc('get_trending_visits');
       if (visitsError) throw visitsError;
-      
-      const visitsWithImages = (visits || []).map(visit => ({
+
+      const visitsWithImages = (visits || []).map((visit) => ({
         ...visit,
-        image_url: getCityImageUrl(visit.city)
+        image_url: getCityImageUrl(visit.city),
       }));
-      
+
       setTrendingVisits(visitsWithImages.slice(0, 6));
 
       // Popular plans
-      const { data: popular, error: popularError } = await supabase.rpc('get_popular_plans_with_attendees');
+      const { data: popular, error: popularError } = await supabase.rpc(
+        'get_popular_plans_with_attendees'
+      );
       if (popularError) throw popularError;
       setPopularPlans((popular || []).slice(0, 6));
 
@@ -183,27 +183,38 @@ export default function HomeScreen() {
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         showsVerticalScrollIndicator={false}>
-        
         {/* Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
           {/* Top Row with Logo and Profile */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                backgroundColor: '#87CEEB',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 10
-              }}>
-                <Text style={{ fontSize: 20 }}>🌍</Text>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: '#87CEEB',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 10,
+                  overflow: 'hidden',
+                }}>
+                <Image
+                  source={require('../../assets/ios-light.png')}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
               </View>
               <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827' }}>Waypoint</Text>
             </View>
-            <Pressable 
-              onPress={() => router.push('/profile/' + session?.user?.id)}
+            <Pressable
+              onPress={() => router.push('/(tabs)/profile')}
               hitSlop={8}
               style={{
                 width: 36,
@@ -236,8 +247,7 @@ export default function HomeScreen() {
               borderRadius: 12,
               paddingHorizontal: 16,
               paddingVertical: 12,
-            }}
-          >
+            }}>
             <Ionicons name="search" size={20} color="#999" />
             <Text style={{ fontSize: 16, color: '#999', marginLeft: 8 }}>Search trips</Text>
           </Pressable>
@@ -262,9 +272,13 @@ export default function HomeScreen() {
         {trendingVisits.length > 0 && (
           <View style={{ marginTop: 24 }}>
             <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>Trending Trips</Text>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>
+                Trending Trips
+              </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>popular among travelers</Text>
+                <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>
+                  popular among users
+                </Text>
                 <Text style={{ fontSize: 16 }}>📈</Text>
               </View>
             </View>
@@ -289,15 +303,15 @@ export default function HomeScreen() {
                 alignItems: 'center',
                 paddingHorizontal: 20,
                 marginBottom: 16,
-              }}
-            >
+              }}>
               <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>Popular Plans</Text>
               <Pressable
                 onPress={() => router.push('/explore?filter=popular')}
                 accessibilityRole="button"
-                hitSlop={8}
-              >
-                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
+                hitSlop={8}>
+                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>
+                  See more ›
+                </Text>
               </Pressable>
             </View>
             <FlatList
@@ -306,7 +320,11 @@ export default function HomeScreen() {
               data={popularPlans}
               keyExtractor={(item) => `popular-${item.id}`}
               contentContainerStyle={{ paddingHorizontal: 20 }}
-              renderItem={({ item }) => <PlanCardHome plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }} />}
+              renderItem={({ item }) => (
+                <PlanCardHome
+                  plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }}
+                />
+              )}
             />
           </View>
         )}
@@ -320,12 +338,13 @@ export default function HomeScreen() {
                 justifyContent: 'space-between',
                 paddingHorizontal: 20,
                 marginBottom: 16,
-              }}
-            >
+              }}>
               <View>
                 <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>New Plans</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>be one of the first to join</Text>
+                  <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>
+                    be one of the first to join
+                  </Text>
                   <Text style={{ fontSize: 16 }}>✨</Text>
                 </View>
               </View>
@@ -333,9 +352,10 @@ export default function HomeScreen() {
                 onPress={() => router.push('/explore?filter=new')}
                 accessibilityRole="button"
                 hitSlop={8}
-                style={{ justifyContent: 'center' }}
-              >
-                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>See more ›</Text>
+                style={{ justifyContent: 'center' }}>
+                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>
+                  See more ›
+                </Text>
               </Pressable>
             </View>
             <FlatList
@@ -344,7 +364,11 @@ export default function HomeScreen() {
               data={newPlans}
               keyExtractor={(item) => `new-${item.id}`}
               contentContainerStyle={{ paddingHorizontal: 20 }}
-              renderItem={({ item }) => <PlanCardHome plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }} />}
+              renderItem={({ item }) => (
+                <PlanCardHome
+                  plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }}
+                />
+              )}
             />
           </View>
         )}
@@ -353,9 +377,14 @@ export default function HomeScreen() {
         {suggestedPeople.length > 0 && (
           <View style={{ marginTop: 32, marginBottom: 40 }}>
             <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>People you may like</Text>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>
+                People you may like
+              </Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20 }}>
               {suggestedPeople.map((person) => (
                 <PersonCard key={`person-${person.id}`} person={person} />
               ))}
@@ -367,7 +396,14 @@ export default function HomeScreen() {
         {trendingVisits.length === 0 && popularPlans.length === 0 && newPlans.length === 0 && (
           <View style={{ padding: 20, alignItems: 'center', marginTop: 50 }}>
             <Ionicons name="compass-outline" size={64} color="#CCC" />
-            <Text style={{ fontSize: 18, color: '#666', textAlign: 'center', marginTop: 16, marginBottom: 8 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                color: '#666',
+                textAlign: 'center',
+                marginTop: 16,
+                marginBottom: 8,
+              }}>
               No trips or plans available yet
             </Text>
             <Text style={{ fontSize: 14, color: '#999', textAlign: 'center' }}>
@@ -383,8 +419,7 @@ export default function HomeScreen() {
                 paddingHorizontal: 24,
                 paddingVertical: 12,
                 borderRadius: 25,
-              }}
-            >
+              }}>
               <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Create a Plan</Text>
             </Pressable>
           </View>

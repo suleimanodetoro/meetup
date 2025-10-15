@@ -151,7 +151,7 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
               ))}
             </View>
             <Text style={{ fontSize: 13, color: '#6B7280' }}>
-              {plan.attendee_count || 0}+ Travelers
+              {plan.attendee_count || 0}+ Attendees
             </Text>
           </View>
         </View>

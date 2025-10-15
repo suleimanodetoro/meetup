@@ -1,29 +1,38 @@
 // app/add-trip.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  SafeAreaView,
-  Modal,
-  FlatList,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, Pressable, SafeAreaView, Modal, FlatList,
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from './contexts/AuthProvider';
-import { POPULAR_DESTINATIONS } from '~/utils/countryFlags';
+import { getSuggestions } from '~/utils/AddressAutocomplete';
+
+interface Destination {
+  city: string;
+  country: string;
+  country_code: string;
+  flag: string;
+}
+
+const getCountryFlag = (countryCode: string): string => {
+  if (!countryCode || countryCode.length !== 2) return '🌍';
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+};
 
 export default function AddTripScreen() {
   const { session } = useAuth();
+
+  // --- UI state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDestination, setSelectedDestination] = useState<typeof POPULAR_DESTINATIONS[0] | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -31,35 +40,95 @@ export default function AddTripScreen() {
   const [showDestinationSearch, setShowDestinationSearch] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const filteredDestinations = searchQuery
-    ? POPULAR_DESTINATIONS.filter(dest =>
-        dest.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dest.country.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : POPULAR_DESTINATIONS;
+  // --- Search state
+  const [searchResults, setSearchResults] = useState<Destination[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // Keep a stable token for the autocomplete session (only falls back if no auth session)
+  const fallbackSessionRef = useRef('session-' + Date.now());
+
+  // Guard against race conditions from overlapping requests
+  const lastRequestId = useRef(0);
+
+  const handleSearch = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+
+    const requestId = ++lastRequestId.current;
+    try {
+      const data = await getSuggestions(
+        q,
+        session?.access_token ?? fallbackSessionRef.current,
+        {
+          // ✅ these were missing in v2; restores your v1 behavior and English-only results
+          types: ['place', 'locality'],
+          language: 'en',
+        }
+      );
+
+      // Ignore out-of-order responses
+      if (requestId !== lastRequestId.current) return;
+
+      // Map + dedupe by "city|country_code"
+      const seen = new Set<string>();
+      const results: Destination[] = (data?.suggestions ?? [])
+        .filter((s: any) => s?.feature_type === 'place' || s?.feature_type === 'locality')
+        .map((s: any) => {
+          const countryName = s?.context?.country?.name || 'Unknown';
+          const countryCode = s?.context?.country?.country_code || '';
+          return {
+            city: s?.name ?? '',
+            country: countryName,
+            country_code: countryCode,
+            flag: getCountryFlag(countryCode),
+          } as Destination;
+        })
+        .filter((d: Destination) => {
+          const key = `${d.city}|${d.country_code}`;
+          if (seen.has(key) || !d.city) return false;
+          seen.add(key);
+          return true;
+        });
+
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Search error:', err);
+      if (requestId === lastRequestId.current) setSearchResults([]);
+    } finally {
+      if (requestId === lastRequestId.current) setSearching(false);
+    }
+  }, [searchQuery, session?.access_token]);
+
+  // Debounce typing
+  useEffect(() => {
+    const t = setTimeout(handleSearch, 300);
+    return () => clearTimeout(t);
+  }, [handleSearch]);
 
   const canAddTrip = selectedDestination && startDate && endDate;
 
   const handleAddTrip = async () => {
     if (!canAddTrip || !session?.user?.id) return;
-
     setSaving(true);
     try {
       const { error } = await supabase
         .from('visits')
         .insert({
           user_id: session.user.id,
-          city: selectedDestination.city,
-          country: selectedDestination.country,
-          country_code: selectedDestination.code,
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
+          city: selectedDestination!.city,
+          country: selectedDestination!.country,
+          country_code: selectedDestination!.country_code,
+          start_date: startDate!.toISOString().split('T')[0],
+          end_date: endDate!.toISOString().split('T')[0],
         });
-
       if (error) throw error;
-
       Alert.alert('Success', 'Trip added successfully!', [
-        { text: 'OK', onPress: () => router.back() }
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error: any) {
       console.error('Error adding trip:', error);
@@ -70,215 +139,139 @@ export default function AddTripScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={100}
       >
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          backgroundColor: 'white',
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
         }}>
-          <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-            <Ionicons name="close" size={24} color="#333" />
+          <Pressable onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="black" />
           </Pressable>
+          <Text style={{ fontSize: 18, fontWeight: '600' }}>Add a Trip</Text>
+          <View style={{ width: 24 }} />
         </View>
 
-        {/* Content */}
-        <View style={{ flex: 1, backgroundColor: 'white', marginTop: 2 }}>
-          {/* Title */}
-          <View style={{ paddingHorizontal: 30, paddingTop: 30 }}>
-            <Text style={{
-              fontSize: 32,
-              fontWeight: 'bold',
-              marginBottom: 40,
-            }}>
-              Where To?
+        <View style={{ flex: 1, padding: 20 }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>Plan a visit</Text>
+          <Text style={{ fontSize: 16, color: '#666', marginBottom: 32 }}>Add where you're going and when</Text>
+
+          {/* Destination */}
+          <Pressable
+            onPress={() => setShowDestinationSearch(true)}
+            style={{
+              backgroundColor: '#F8F9FA', padding: 20, borderRadius: 16, marginBottom: 20,
+              borderWidth: 2, borderColor: selectedDestination ? '#007AFF' : '#E8E8E8',
+            }}
+          >
+            <Text style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>Destination</Text>
+            <Text style={{ fontSize: 18, fontWeight: '500', color: selectedDestination ? '#000' : '#999' }}>
+              {selectedDestination
+                ? `${selectedDestination.flag} ${selectedDestination.city}, ${selectedDestination.country}`
+                : 'Where are you going?'}
             </Text>
-          </View>
+          </Pressable>
 
-          {/* Destination Input */}
-          <View style={{ paddingHorizontal: 30, marginBottom: 20 }}>
-            <Pressable
-              onPress={() => setShowDestinationSearch(true)}
-              style={{
-                backgroundColor: '#F5F5F5',
-                borderRadius: 16,
-                padding: 20,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <Ionicons name="search" size={20} color="#999" />
-              {selectedDestination ? (
-                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 20 }}>{selectedDestination.flag}</Text>
-                  <Text style={{ fontSize: 16, color: '#333' }}>
-                    {selectedDestination.city}, {selectedDestination.country}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={{ fontSize: 16, color: '#999' }}>Search destination</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {/* When (Dates) */}
-          <View style={{ paddingHorizontal: 30, marginBottom: 20 }}>
+          {/* Dates */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 32 }}>
             <Pressable
               onPress={() => setShowStartDatePicker(true)}
               style={{
-                backgroundColor: '#F5F5F5',
-                borderRadius: 16,
-                padding: 20,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
+                flex: 1, backgroundColor: '#F8F9FA', padding: 20, borderRadius: 16, borderWidth: 2,
+                borderColor: startDate ? '#007AFF' : '#E8E8E8',
               }}
             >
-              <Ionicons name="calendar-outline" size={20} color="#999" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, color: startDate ? '#333' : '#999' }}>
-                  {startDate && endDate
-                    ? `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                    : 'When'}
-                </Text>
-              </View>
+              <Text style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>From</Text>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: startDate ? '#000' : '#999' }}>
+                {startDate ? startDate.toLocaleDateString() : 'Start date'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setShowEndDatePicker(true)}
+              style={{
+                flex: 1, backgroundColor: '#F8F9FA', padding: 20, borderRadius: 16, borderWidth: 2,
+                borderColor: endDate ? '#007AFF' : '#E8E8E8',
+              }}
+            >
+              <Text style={{ fontSize: 14, color: '#666', marginBottom: 4 }}>To</Text>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: endDate ? '#000' : '#999' }}>
+                {endDate ? endDate.toLocaleDateString() : 'End date'}
+              </Text>
             </Pressable>
           </View>
-        </View>
 
-        {/* Add Trip Button */}
-        <View style={{
-          position: 'absolute',
-          bottom: 40,
-          right: 30,
-        }}>
+          {/* Add Button */}
           <Pressable
             onPress={handleAddTrip}
             disabled={!canAddTrip || saving}
             style={{
-              backgroundColor: canAddTrip && !saving ? '#007AFF' : '#E0E0E0',
-              paddingVertical: 16,
-              paddingHorizontal: 40,
-              borderRadius: 30,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-              elevation: 5,
+              backgroundColor: canAddTrip ? '#007AFF' : '#E0E0E0',
+              padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 'auto',
             }}
           >
-            {saving ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <Text style={{ fontSize: 20, color: 'white' }}>+</Text>
-                <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Add trip</Text>
-              </>
+            {saving ? <ActivityIndicator color="white" /> : (
+              <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Add Trip</Text>
             )}
           </Pressable>
         </View>
 
         {/* Destination Search Modal */}
-        <Modal
-          visible={showDestinationSearch}
-          animationType="slide"
-          transparent={false}
-        >
+        <Modal visible={showDestinationSearch} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-            {/* Modal Header */}
             <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: '#F0F0F0',
+              flexDirection: 'row', alignItems: 'center', padding: 16,
+              borderBottomWidth: 1, borderBottomColor: '#E0E0E0',
             }}>
-              <Pressable onPress={() => setShowDestinationSearch(false)} style={{ padding: 8 }}>
-                <Ionicons name="arrow-back" size={24} color="#333" />
+              <Pressable onPress={() => {
+                setShowDestinationSearch(false);
+                setSearchQuery('');
+                setSearchResults([]); // clear
+              }}>
+                <Ionicons name="close" size={28} color="#000" />
               </Pressable>
-              <Text style={{ fontSize: 18, fontWeight: '600', marginLeft: 16 }}>Select Destination</Text>
+              <Text style={{ fontSize: 18, fontWeight: '600', marginLeft: 16 }}>Choose destination</Text>
             </View>
 
-            {/* Search Bar */}
-            <View style={{
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              backgroundColor: 'white',
-              borderBottomWidth: 1,
-              borderBottomColor: '#F0F0F0',
-            }}>
-              <View style={{
-                backgroundColor: '#F5F5F5',
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}>
-                <Ionicons name="search" size={20} color="#999" />
+            <View style={{ padding: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12, paddingHorizontal: 12 }}>
+                <Ionicons name="search" size={20} color="#666" />
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search city or country"
+                  placeholder="Search for a city..."
                   placeholderTextColor="#999"
+                  style={{ flex: 1, padding: 12, fontSize: 16 }}
                   autoFocus
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    fontSize: 16,
-                  }}
+                  returnKeyType="search"
                 />
                 {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery('')}>
+                  <Pressable onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
                     <Ionicons name="close-circle" size={20} color="#999" />
                   </Pressable>
                 )}
               </View>
             </View>
 
-            {/* Popular Destinations */}
-            {!searchQuery && (
-              <View style={{
-                paddingHorizontal: 20,
-                paddingVertical: 12,
-                backgroundColor: '#F5F5F5',
-              }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#666' }}>
-                  POPULAR DESTINATIONS
-                </Text>
-              </View>
-            )}
-
-            {/* Destinations List */}
             <FlatList
-              data={filteredDestinations}
-              keyExtractor={(item) => `${item.city}-${item.code}`}
+              data={searchResults}
+              keyExtractor={(item, index) => `${item.city}-${item.country_code || 'xx'}-${index}`}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => {
                     setSelectedDestination(item);
                     setShowDestinationSearch(false);
                     setSearchQuery('');
+                    setSearchResults([]);
                   }}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#F0F0F0',
-                    backgroundColor: selectedDestination?.city === item.city ? '#F5F5F5' : 'white',
+                    flexDirection: 'row', alignItems: 'center', padding: 20,
+                    backgroundColor: selectedDestination?.city === item.city && selectedDestination?.country_code === item.country_code ? '#F5F5F5' : 'white',
                   }}
                 >
                   <Text style={{ fontSize: 20, marginRight: 12 }}>{item.flag}</Text>
@@ -286,14 +279,22 @@ export default function AddTripScreen() {
                     <Text style={{ fontSize: 16, fontWeight: '500' }}>{item.city}</Text>
                     <Text style={{ fontSize: 14, color: '#666', marginTop: 2 }}>{item.country}</Text>
                   </View>
-                  {selectedDestination?.city === item.city && (
+                  {selectedDestination?.city === item.city && selectedDestination?.country_code === item.country_code && (
                     <Ionicons name="checkmark" size={20} color="#007AFF" />
                   )}
                 </Pressable>
               )}
               ListEmptyComponent={() => (
                 <View style={{ paddingVertical: 60, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 16, color: '#999' }}>No destinations found</Text>
+                  {searchQuery.length === 0 ? (
+                    <Text style={{ fontSize: 16, color: '#999', textAlign: 'center', paddingHorizontal: 40 }}>
+                      Start typing to search for any city in the world
+                    </Text>
+                  ) : searching ? (
+                    <ActivityIndicator size="large" color="#007AFF" />
+                  ) : (
+                    <Text style={{ fontSize: 16, color: '#999' }}>No cities found</Text>
+                  )}
                 </View>
               )}
             />
@@ -307,10 +308,10 @@ export default function AddTripScreen() {
           date={startDate || new Date()}
           mode="date"
           minimumDate={new Date()}
+          title="Select start date (1 of 2)"
           onConfirm={(date) => {
             setStartDate(date);
             setShowStartDatePicker(false);
-            // Auto-show end date picker
             setTimeout(() => setShowEndDatePicker(true), 300);
           }}
           onCancel={() => setShowStartDatePicker(false)}
@@ -323,6 +324,7 @@ export default function AddTripScreen() {
           date={endDate || (startDate ? new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000) : new Date())}
           mode="date"
           minimumDate={startDate || new Date()}
+          title="Select end date (2 of 2)"
           onConfirm={(date) => {
             setEndDate(date);
             setShowEndDatePicker(false);

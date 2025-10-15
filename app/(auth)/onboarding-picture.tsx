@@ -79,7 +79,7 @@ export default function OnboardingPictureScreen() {
 
     if (imageUri && imageBase64) {
       avatarUrl = await uploadAvatar();
-      if (!avatarUrl && imageUri) return; // don’t navigate if upload failed after selection
+      if (!avatarUrl && imageUri) return; // don't navigate if upload failed after selection
     }
 
     // Keep passing avatar_url via params (unchanged flow)
@@ -104,7 +104,7 @@ export default function OnboardingPictureScreen() {
 
   return (
     <LinearGradient
-      colors={['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+      colors={['#E3F2FD', '#BBDEFB', '#90CAF9']}
       style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}

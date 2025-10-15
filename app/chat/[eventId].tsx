@@ -1,6 +1,6 @@
 // app/chat/[eventId].tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import {
 } from '~/types/messaging';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { useChatSubscriptions } from '~/hooks/useChatSubscriptions';
 
 export default function GroupChatScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -58,6 +59,18 @@ export default function GroupChatScreen() {
     return next;
   };
 
+  // ✅ Add realtime subscriptions using centralized hook
+  const { cleanupSubscriptions } = useChatSubscriptions({
+    eventId: Number(eventId),
+    onNewMessage: useCallback((newMessage: MessageWithDetails) => {
+      setMessages(prev => upsertMessage(prev, newMessage));
+      scrollToEnd();
+    }, []),
+    onTypingUpdate: useCallback((users: Profile[]) => {
+      setTypingUsers(users);
+    }, []),
+  });
+
   // ---------- Initial data loading ----------
   useEffect(() => {
     if (session?.user?.id && eventId) {
@@ -72,20 +85,12 @@ export default function GroupChatScreen() {
     }
   }, [conversation?.id]);
 
-  // Set up subscriptions when conversation is known
+  // Cleanup typing timeout on unmount
   useEffect(() => {
-    if (!session?.user?.id || !conversation?.id) return;
-
-    const messageCleanup = subscribeToMessages(conversation.id);
-    const typingCleanup = subscribeToTyping(conversation.id);
-
     return () => {
-      // Clean up both subscriptions and any pending typing timeout
-      messageCleanup && messageCleanup();
-      typingCleanup && typingCleanup();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [session?.user?.id, conversation?.id]);
+  }, []);
 
   const fetchEventAndConversation = async () => {
     try {
@@ -170,80 +175,6 @@ export default function GroupChatScreen() {
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
-  };
-
-  // ---------- Realtime subscriptions ----------
-  const subscribeToMessages = (convId: number) => {
-    const channel = supabase
-      .channel(`messages:${convId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT | UPDATE | DELETE
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${convId}`,
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as any;
-
-            // Stitch minimal user (either known participant or current user)
-            const stitchedUser =
-              participants.find((p) => p.id === row.user_id) ||
-              (session?.user?.id === row.user_id
-                ? (participants.find((p) => p.id === row.user_id) as any)
-                : undefined);
-
-            const stitched: MessageWithDetails = {
-              ...row,
-              user: stitchedUser,
-            };
-
-            setMessages((prev) => upsertMessage(prev, stitched));
-            scrollToEnd();
-          } else if (payload.eventType === 'UPDATE') {
-            const row = payload.new as any;
-            setMessages((prev) => upsertMessage(prev, row));
-          } else if (payload.eventType === 'DELETE') {
-            const row = payload.old as any;
-            setMessages((prev) => prev.filter((m) => m.id !== row.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToTyping = (convId: number) => {
-    const channel = supabase
-      .channel(`typing:${convId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicators',
-          filter: `conversation_id=eq.${convId}`,
-        },
-        async () => {
-          const { data } = await supabase
-            .from('typing_indicators')
-            .select('*, user:profiles(*)')
-            .eq('conversation_id', convId)
-            .neq('user_id', session?.user?.id);
-
-          setTypingUsers(data?.map((t: any) => t.user) || []);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   // ---------- Typing ----------

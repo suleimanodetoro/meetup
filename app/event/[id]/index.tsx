@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { Platform, ToastAndroid } from 'react-native';
+import { getInterestEmoji } from '~/utils/constants';
+
 
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/app/contexts/AuthProvider';
@@ -71,30 +73,7 @@ interface EventDetails {
   }>;
 }
 
-// Interest mapping from your constants
-const INTERESTS = [
-  { id: 'music', label: 'Music', emoji: '🎶' },
-  { id: 'gaming', label: 'Esports', emoji: '🎮' },
-  { id: 'dance', label: 'Dance Nights', emoji: '💃' },
-  { id: 'fitness', label: 'Group Fitness', emoji: '🏋️‍♂️' },
-  { id: 'yoga', label: 'Yoga & Mindfulness', emoji: '🧘‍♀️' },
-  { id: 'foodie', label: 'Food', emoji: '🍣' },
-  { id: 'coffee', label: 'Coffee & Chill', emoji: '☕' },
-  { id: 'arts', label: 'Arts & Crafts', emoji: '🎨' },
-  { id: 'photography', label: 'Photography Walks', emoji: '📸' },
-  { id: 'boardgames', label: 'Game Nights', emoji: '🎲' },
-  { id: 'karaoke', label: 'Karaoke', emoji: '🎤' },
-  { id: 'outdoor', label: 'Outdoor', emoji: '🌳' },
-  { id: 'volunteer', label: 'Volunteering', emoji: '🤝' },
-  { id: 'film', label: 'Movie Nights', emoji: '🎬' },
-  { id: 'fashion', label: 'Fashion', emoji: '🛍️' },
-  { id: 'tech', label: 'Tech Meetups', emoji: '💻' },
-  { id: 'skate', label: 'Skateboarding', emoji: '🛹' },
-  { id: 'sports', label: 'Sports', emoji: '⚽' },
-  { id: 'bookclub', label: 'Book Club', emoji: '📚' },
-  { id: 'creative', label: 'Writing', emoji: '✍️' },
-  { id: 'thrill', label: 'Adventure', emoji: '🏎️' },
-];
+
 
 export default function PlanDetailsScreen() {
   const { id, fromCreation } = useLocalSearchParams<{ id: string; fromCreation?: string }>();
@@ -239,13 +218,7 @@ export default function PlanDetailsScreen() {
     }));
   };
 
-  const getInterestEmoji = (interestLabel: string): string => {
-    const interest = INTERESTS.find(i => 
-      i.label.toLowerCase() === interestLabel.toLowerCase() || 
-      i.id === interestLabel.toLowerCase()
-    );
-    return interest?.emoji || '✨';
-  };
+
 
   // FIXED: Handle back navigation properly
   const handleBack = () => {

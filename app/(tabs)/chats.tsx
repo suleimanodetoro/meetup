@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
@@ -91,8 +91,11 @@ export default function ChatsScreen() {
     }
   }, [session?.user?.id]);
 
-  // Use the centralized subscription hook
+  const [isTabFocused, setIsTabFocused] = useState(false);
+
+  // Use the centralized subscription hook with enabled flag
   const { cleanupSubscriptions } = useChatSubscriptions({
+    enabled: isTabFocused, // ✅ Only subscribe when tab is focused
     onConversationUpdate: useCallback(() => {
       console.log('Chat list update detected, refreshing...');
       fetchConversations();
@@ -105,12 +108,26 @@ export default function ChatsScreen() {
       fetchConversations();
       fetchPendingRequests();
     }
+  }, [session?.user?.id, fetchConversations, fetchPendingRequests]);
 
-    // Cleanup handled by the hook
-    return () => {
-      cleanupSubscriptions();
-    };
-  }, [session?.user?.id]);
+  // ✅ CRITICAL FIX: Enable/disable subscriptions based on tab focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('💚 Chats tab FOCUSED - enabling subscriptions');
+      setIsTabFocused(true);
+      
+      if (session?.user?.id) {
+        fetchConversations();
+        fetchPendingRequests();
+      }
+
+      // Disable when tab loses focus
+      return () => {
+        console.log('💔 Chats tab UNFOCUSED - disabling subscriptions');
+        setIsTabFocused(false);
+      };
+    }, [session?.user?.id, fetchConversations, fetchPendingRequests])
+  );
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -224,16 +241,14 @@ export default function ChatsScreen() {
   // Get filtered data
   const filteredChats = getFilteredChats();
 
-  // Simplified empty state component - REMOVED PROBLEMATIC BUTTONS
+  // Simplified empty state component
   const renderEmptyState = () => {
-    // Return nothing - just empty space
     return null;
   };
 
   // Header component with friend request badge
   const renderHeader = () => (
     <>
-      {/* Friend Requests Card - show at top when there are chats */}
       {pendingRequestsCount > 0 && filteredChats.length > 0 && !searchQuery.trim() && (
         <Pressable 
           style={styles.friendRequestCard}
@@ -288,52 +303,46 @@ export default function ChatsScreen() {
             style={styles.headerButton}
             onPress={() => setShowSearch(!showSearch)}>
             <Ionicons 
-              name={showSearch ? "close" : "search"} 
+              name={showSearch ? 'close' : 'search'} 
               size={24} 
-              color="#333" 
+              color="#007AFF" 
             />
           </Pressable>
         </View>
       </View>
 
-      {/* Search Bar */}
+      {/* Search bar */}
       {showSearch && (
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search conversations..."
+            placeholder="Search chats..."
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
-            returnKeyType="search"
           />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </Pressable>
-          )}
         </View>
       )}
 
       {/* Tabs */}
       <View style={styles.tabs}>
         <View style={styles.tabsContainer}>
-          <Pressable 
+          <Pressable
             style={[styles.tab, activeTab === 'all' && styles.activeTab]}
             onPress={() => setActiveTab('all')}>
             <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
               All
             </Text>
           </Pressable>
-          <Pressable 
+          <Pressable
             style={[styles.tab, activeTab === 'dms' && styles.activeTab]}
             onPress={() => setActiveTab('dms')}>
             <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>
               DMs
             </Text>
           </Pressable>
-          <Pressable 
+          <Pressable
             style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
             onPress={() => setActiveTab('plans')}>
             <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
@@ -343,20 +352,21 @@ export default function ChatsScreen() {
         </View>
       </View>
 
-      {/* Chat List */}
+      {/* Chat list */}
       <FlatList
         data={filteredChats}
         renderItem={renderChatItem}
-        keyExtractor={(item) => `${item.conversation_id}`}
-        contentContainerStyle={filteredChats.length === 0 && styles.emptyListContent}
+        keyExtractor={item => item.conversation_id.toString()}
+        contentContainerStyle={filteredChats.length === 0 ? styles.emptyListContent : undefined}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#007AFF"
+          />
         }
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
       />
     </SafeAreaView>
   );
@@ -377,14 +387,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 0,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E5E5',
   },
   headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: 'bold',
     color: '#000',
-    letterSpacing: -0.5,
   },
   headerActions: {
     flexDirection: 'row',
@@ -392,14 +402,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   requestsButton: {
-    backgroundColor: '#EBF4FF',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 15,
   },
   requestsButtonText: {
-    color: '#007AFF',
     fontSize: 14,
+    color: '#007AFF',
     fontWeight: '600',
   },
   headerButton: {
