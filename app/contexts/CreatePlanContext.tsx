@@ -50,6 +50,7 @@ interface CreatePlanContextType {
   updateField: <K extends keyof PlanFormData>(field: K, value: PlanFormData[K]) => void;
   nextStep: () => void;
   prevStep: () => void;
+  setStep: (step: number) => void; // NEW: explicitly set step
   canContinue: () => boolean;
   resetForm: () => void;
 }
@@ -92,6 +93,13 @@ export function CreatePlanProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // NEW: explicitly set the current step
+  const setStep = (step: number) => {
+    if (step >= 1 && step <= totalSteps) {
+      setCurrentStep(step);
+    }
+  };
+
   const canContinue = (): boolean => {
     switch (currentStep) {
       case 1: // Plan Name
@@ -130,6 +138,7 @@ export function CreatePlanProvider({ children }: { children: ReactNode }) {
         updateField,
         nextStep,
         prevStep,
+        setStep, // NEW: expose setStep
         canContinue,
         resetForm,
       }}

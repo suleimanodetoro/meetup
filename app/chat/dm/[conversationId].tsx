@@ -422,7 +422,6 @@ export default function DMChatScreen() {
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -442,6 +441,7 @@ export default function DMChatScreen() {
             value={inputText}
             onChangeText={handleTextChange}
             placeholder="Type a message..."
+            placeholderTextColor="#999"
             multiline
             maxHeight={100}
             editable={!sending}

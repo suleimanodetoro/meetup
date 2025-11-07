@@ -1,21 +1,18 @@
 // app/create-plan/guidelines.tsx
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  SafeAreaView,Linking
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, SafeAreaView, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 export default function GuidelinesScreen() {
-  const { formData, updateField, nextStep, prevStep } = useCreatePlan();
+  const { formData, updateField, nextStep, prevStep, setStep } = useCreatePlan();
   const [accepted, setAccepted] = useState(formData.guidelinesAccepted || false);
 
+  useEffect(() => {
+    setStep(8);
+  }, [setStep]);
   const handleContinue = () => {
     updateField('guidelinesAccepted', true);
     nextStep();
@@ -37,7 +34,7 @@ export default function GuidelinesScreen() {
       <StepperProgress currentStep={8} totalSteps={9} />
 
       <ScrollView className="flex-1">
-        <View className="px-6 pt-8 pb-6">
+        <View className="px-6 pb-6 pt-8">
           <Text className="text-3xl font-bold">Before you create</Text>
           <Text className="mt-1 text-base text-gray-600">Keep this safe for everyone</Text>
 
@@ -48,17 +45,17 @@ export default function GuidelinesScreen() {
                 <Text className="mr-3 text-gray-400">•</Text>
                 <Text className="flex-1 text-base text-gray-700">No illegal activity</Text>
               </View>
-              
+
               <View className="flex-row">
                 <Text className="mr-3 text-gray-400">•</Text>
                 <Text className="flex-1 text-base text-gray-700">Be respectful to everyone</Text>
               </View>
-              
+
               <View className="flex-row">
                 <Text className="mr-3 text-gray-400">•</Text>
                 <Text className="flex-1 text-base text-gray-700">Keep details accurate</Text>
               </View>
-              
+
               <View className="flex-row">
                 <Text className="mr-3 text-gray-400">•</Text>
                 <Text className="flex-1 text-base text-gray-700">Show up or notify of changes</Text>
@@ -69,13 +66,11 @@ export default function GuidelinesScreen() {
           {/* Single Checkbox */}
           <Pressable
             onPress={() => setAccepted(!accepted)}
-            className="mt-8 flex-row items-center rounded-xl bg-white p-4 shadow-sm"
-          >
+            className="mt-8 flex-row items-center rounded-xl bg-white p-4 shadow-sm">
             <View
               className={`mr-4 h-6 w-6 items-center justify-center rounded-md border-2 ${
                 accepted ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 bg-white'
-              }`}
-            >
+              }`}>
               {accepted && <Ionicons name="checkmark" size={16} color="white" />}
             </View>
             <Text className="flex-1 text-base text-gray-700">
@@ -84,12 +79,11 @@ export default function GuidelinesScreen() {
           </Pressable>
 
           {/* Terms Link */}
-          <Pressable 
+          <Pressable
             onPress={() => {
               Linking.openURL('https://usewaypoint.app/terms');
             }}
-            className="mt-6 items-center"
-          >
+            className="mt-6 items-center">
             <Text className="text-sm text-gray-500">
               View full terms and conditions on our website
             </Text>
@@ -104,8 +98,7 @@ export default function GuidelinesScreen() {
           disabled={!accepted}
           className={`items-center justify-center rounded-2xl py-4 ${
             accepted ? 'bg-indigo-600' : 'bg-gray-300'
-          }`}
-        >
+          }`}>
           <Text className="text-center text-lg font-semibold text-white">Continue</Text>
         </Pressable>
       </View>

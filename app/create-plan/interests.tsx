@@ -8,14 +8,19 @@ import { useCreatePlan } from '../contexts/CreatePlanContext';
 import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
 
 export default function InterestsScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
+  const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
   const [selectedInterests, setSelectedInterests] = useState<InterestId[]>(
     formData.interests as InterestId[]
   );
 
   useEffect(() => {
     updateField('interests', selectedInterests);
-  }, [selectedInterests, updateField]); // ✅ include updateField
+  }, [selectedInterests, updateField]); 
+
+  useEffect(() => {
+  setStep(6);
+}, [setStep]);
+
 
   const toggleInterest = (id: InterestId) => {
     if (selectedInterests.includes(id)) {

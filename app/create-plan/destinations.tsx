@@ -31,7 +31,7 @@ interface VenueData {
 }
 
 export default function DestinationsScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
+  const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
   const { session } = useAuth();
   const [venues, setVenues] = useState<VenueData[]>(formData.venues);
   const [showSearch, setShowSearch] = useState(false);
@@ -54,6 +54,10 @@ export default function DestinationsScreen() {
     }, 300);
     return () => clearTimeout(delaySearch);
   }, [searchQuery]);
+
+  useEffect(() => {
+  setStep(5);
+}, [setStep]);
 
   // 2) Updated handleSearch with type filtering + better result handling
   const handleSearch = async () => {

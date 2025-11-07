@@ -1,5 +1,5 @@
 // app/create-plan/image.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 export default function PlanImageScreen() {
-  const { formData, updateField, nextStep } = useCreatePlan();
+  const { formData, updateField, nextStep, setStep } = useCreatePlan();
   const [busy, setBusy] = useState(false);
 
   const previewUri = useMemo(() => {
@@ -27,6 +27,10 @@ export default function PlanImageScreen() {
     if (formData?.imageBase64) return `data:image/jpeg;base64,${formData.imageBase64}`;
     return undefined;
   }, [formData.imageUri, formData.imageBase64]);
+
+  useEffect(() => {
+    setStep(2);
+  }, [setStep]);
 
   const pickImage = async () => {
     try {
@@ -45,8 +49,8 @@ export default function PlanImageScreen() {
         allowsMultipleSelection: false,
         allowsEditing: true,
         aspect: [16, 9],
-        quality: 1,       // we'll compress via ImageManipulator
-        base64: false,    // we'll read base64 AFTER converting to JPEG
+        quality: 1, // we'll compress via ImageManipulator
+        base64: false, // we'll read base64 AFTER converting to JPEG
         exif: false,
       });
 
@@ -63,11 +67,10 @@ export default function PlanImageScreen() {
         ops.push({ resize: { width: 2000 } });
       }
 
-      const manipulated = await ImageManipulator.manipulateAsync(
-        asset.uri,
-        ops,
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-      );
+      const manipulated = await ImageManipulator.manipulateAsync(asset.uri, ops, {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
 
       // Read final JPEG as raw base64 (no data: prefix)
       const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
@@ -85,7 +88,6 @@ export default function PlanImageScreen() {
       // Persist both: uri for preview, base64 for upload
       updateField('imageUri', manipulated.uri);
       updateField('imageBase64', base64);
-
     } catch (e: any) {
       console.error('pickImage error', e);
       Alert.alert('Image error', e?.message ?? 'Could not pick image.');
@@ -127,8 +129,7 @@ export default function PlanImageScreen() {
         <Pressable
           onPress={pickImage}
           disabled={busy}
-          style={[styles.dropzone, busy && styles.dropzoneDisabled]}
-        >
+          style={[styles.dropzone, busy && styles.dropzoneDisabled]}>
           {previewUri ? (
             <>
               <Image source={{ uri: previewUri }} style={styles.image} />
@@ -138,8 +139,7 @@ export default function PlanImageScreen() {
                     e.stopPropagation();
                     clearImage();
                   }}
-                  style={styles.removeButton}
-                >
+                  style={styles.removeButton}>
                   <Ionicons name="close-circle" size={32} color="white" />
                 </Pressable>
               )}
@@ -166,7 +166,6 @@ export default function PlanImageScreen() {
         <Text style={styles.helperText}>
           This image will be the main visual for your activity plan
         </Text>
-        
       </View>
 
       {/* Continue Button - Always enabled (image is optional) */}
@@ -174,14 +173,8 @@ export default function PlanImageScreen() {
         <Pressable
           onPress={handleContinue}
           disabled={busy}
-          style={[
-            styles.continueButton,
-            busy && styles.continueButtonDisabled,
-          ]}
-        >
-          <Text style={styles.continueButtonText}>
-            {busy ? 'Processing...' : 'Continue'}
-          </Text>
+          style={[styles.continueButton, busy && styles.continueButtonDisabled]}>
+          <Text style={styles.continueButtonText}>{busy ? 'Processing...' : 'Continue'}</Text>
         </Pressable>
       </View>
     </SafeAreaView>

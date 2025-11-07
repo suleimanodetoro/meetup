@@ -24,7 +24,7 @@ interface CostItem {
 }
 
 export default function CostsScreen() {
-  const { formData, updateField, nextStep } = useCreatePlan();
+  const { formData, updateField, nextStep, setStep } = useCreatePlan();
   const [costs, setCosts] = useState<CostItem[]>(
     formData.costs.length > 0 ? formData.costs : [{ name: '', isOptional: false }]
   );
@@ -33,6 +33,9 @@ export default function CostsScreen() {
   useEffect(() => {
     updateField('costs', noCost ? [{ name: 'No expected cost', isOptional: false }] : costs);
   }, [costs, noCost]);
+  useEffect(() => {
+    setStep(7);
+  }, [setStep]);
 
   const addCostItem = () => {
     setCosts([...costs, { name: '', isOptional: false }]);
@@ -53,13 +56,13 @@ export default function CostsScreen() {
   };
 
   const handleContinue = () => {
-    if (noCost || costs.some(c => c.name.trim())) {
+    if (noCost || costs.some((c) => c.name.trim())) {
       nextStep();
       router.push('/create-plan/guidelines');
     }
   };
 
-  const canContinue = noCost || costs.some(c => c.name.trim());
+  const canContinue = noCost || costs.some((c) => c.name.trim());
 
   return (
     <SafeAreaView style={styles.container}>
@@ -116,7 +119,9 @@ export default function CostsScreen() {
                   <View style={styles.row}>
                     <TextInput
                       value={cost.amount?.toString()}
-                      onChangeText={(text) => updateCostItem(index, 'amount', parseFloat(text) || undefined)}
+                      onChangeText={(text) =>
+                        updateCostItem(index, 'amount', parseFloat(text) || undefined)
+                      }
                       placeholder="Amount"
                       placeholderTextColor="#999"
                       keyboardType="decimal-pad"
@@ -152,9 +157,7 @@ export default function CostsScreen() {
             </>
           )}
 
-          <Text style={styles.footerText}>
-            Estimated total is based on items with a number
-          </Text>
+          <Text style={styles.footerText}>Estimated total is based on items with a number</Text>
         </View>
       </ScrollView>
 
@@ -163,11 +166,7 @@ export default function CostsScreen() {
         <Pressable
           onPress={handleContinue}
           disabled={!canContinue}
-          style={[
-            styles.continueButton,
-            !canContinue && styles.continueButtonDisabled,
-          ]}
-        >
+          style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}>
           <Text style={styles.continueButtonText}>Continue</Text>
         </Pressable>
       </View>

@@ -19,7 +19,7 @@ import { useAuth } from '../contexts/AuthProvider';
 import { decode } from 'base64-arraybuffer';
 
 export default function ReviewScreen() {
-  const { formData, resetForm } = useCreatePlan();
+  const { formData, resetForm, setStep } = useCreatePlan();
   const { session } = useAuth();
   const [creating, setCreating] = useState(false);
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
@@ -32,6 +32,10 @@ export default function ReviewScreen() {
       setImagePreviewUri(`data:image/jpeg;base64,${formData.imageBase64}`);
     }
   }, [formData.imageBase64]);
+
+  useEffect(() => {
+  setStep(9);
+}, [setStep]);
 
   const handleCreatePlan = async () => {
     if (!session?.user?.id) {

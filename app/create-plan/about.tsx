@@ -17,13 +17,16 @@ import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 export default function AboutActivityScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
+  const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
   const [localDescription, setLocalDescription] = useState(formData.description);
   const isValid = localDescription.trim().length >= 30;
 
   useEffect(() => {
     updateField('description', localDescription);
   }, [localDescription]);
+  useEffect(() => {
+    setStep(3);
+  }, [setStep]);
 
   const handleContinue = () => {
     if (canContinue()) {
@@ -36,8 +39,7 @@ export default function AboutActivityScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -87,11 +89,7 @@ export default function AboutActivityScreen() {
           <Pressable
             onPress={handleContinue}
             disabled={!isValid}
-            style={[
-              styles.continueButton,
-              !isValid && styles.continueButtonDisabled,
-            ]}
-          >
+            style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}>
             <Text style={styles.continueButtonText}>Continue</Text>
           </Pressable>
         </View>

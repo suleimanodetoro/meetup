@@ -16,13 +16,17 @@ import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 export default function PlanNameScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
+  const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
   const [localTitle, setLocalTitle] = useState(formData.title);
   const isValid = localTitle.trim().length > 0 && localTitle.length <= 60;
 
   useEffect(() => {
     updateField('title', localTitle);
   }, [localTitle]);
+
+  useEffect(() => {
+  setStep(1); // This screen is step 1
+}, [setStep]);
 
   const handleContinue = () => {
     if (canContinue()) {

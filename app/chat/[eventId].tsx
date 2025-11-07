@@ -425,7 +425,6 @@ export default function GroupChatScreen() {
       <KeyboardAvoidingView
         style={styles.messagesContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
       >
         <FlatList
           ref={flatListRef}
@@ -443,6 +442,7 @@ export default function GroupChatScreen() {
           <TextInput
             style={styles.textInput}
             placeholder="Type something..."
+            placeholderTextColor="#999"
             value={inputText}
             onChangeText={handleTextChange}
             multiline

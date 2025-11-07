@@ -15,7 +15,7 @@ import StepperProgress from '~/components/StepperProgress';
 import { useCreatePlan } from '../contexts/CreatePlanContext';
 
 export default function DateScreen() {
-  const { formData, updateField, nextStep, canContinue } = useCreatePlan();
+  const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
   const [startDate, setStartDate] = useState(formData.startDate);
   const [endDate, setEndDate] = useState(formData.endDate || formData.startDate);
   const [isOneDay, setIsOneDay] = useState(formData.isOneDay);
@@ -29,6 +29,10 @@ export default function DateScreen() {
     updateField('isOneDay', isOneDay);
     updateField('isAllDay', isAllDay);
   }, [startDate, endDate, isOneDay, isAllDay]);
+
+  useEffect(() => {
+  setStep(4);
+}, [setStep]);
 
   const handleContinue = () => {
     if (canContinue()) {
