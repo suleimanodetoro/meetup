@@ -1,5 +1,5 @@
 // app/(auth)/signin.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '~/utils/supabase';
 
 export default function SignInScreen() {
@@ -19,56 +21,129 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showEmailAuth, setShowEmailAuth] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   async function signInWithEmail() {
+    if (!isMounted.current) return;
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ 
       email, 
       password 
     });
     
-    if (error) {
+    if (error && isMounted.current) {
       Alert.alert('Error', error.message);
     }
     // Don't navigate - let the NavigationController handle it
-    setLoading(false);
+    if (isMounted.current) {
+      setLoading(false);
+    }
   }
 
   async function signUpWithEmail() {
+    if (!isMounted.current) return;
     setLoading(true);
     const { error } = await supabase.auth.signUp({ 
       email, 
       password 
     });
     
-    if (error) {
+    if (error && isMounted.current) {
       Alert.alert('Error', error.message);
     }
     // Don't navigate - let the NavigationController handle it
-    setLoading(false);
+    if (isMounted.current) {
+      setLoading(false);
+    }
   }
 
-  const mockSocialSignIn = () => {
-    const provider = Platform.OS === 'ios' ? 'Apple' : 'Google';
-    Alert.alert(
-      'Social Sign In',
-      `${provider} auth under review. For now, use email auth below.`,
-      [{ text: 'OK', onPress: () => setShowEmailAuth(true) }]
-    );
-  };
+  async function signInWithApple() {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Not Available', 'Apple Sign In is only available on iOS devices.');
+      return;
+    }
 
-  // Platform-specific social button
-  const socialButtonConfig = Platform.OS === 'ios' 
-    ? { 
-        icon: '🍎', 
-        text: 'Sign in with Apple',
-        isEmoji: true 
+    if (!isMounted.current) return;
+
+    try {
+      setLoading(true);
+      
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!isMounted.current) return;
+
+      // Sign in with Supabase using the identity token
+      const { data: authData, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken!,
+      });
+
+      if (error) {
+        throw error;
       }
-    : { 
-        icon: 'https://www.google.com/favicon.ico',
-        text: 'Sign in with Google',
-        isEmoji: false 
-      };
+
+      if (!isMounted.current) return;
+
+      // Apple only provides the user's name on the first sign-in
+      if (credential.fullName) {
+        const fullName = [
+          credential.fullName.givenName,
+          credential.fullName.middleName,
+          credential.fullName.familyName,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        // Save the name to user metadata for future use
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName,
+            given_name: credential.fullName.givenName,
+            family_name: credential.fullName.familyName,
+          },
+        });
+      }
+    } catch (error: any) {
+      // Handle cancellation - user dismissed the dialog
+      const errorCode = error?.code || error?.type || '';
+      
+      if (
+        errorCode === 'ERR_REQUEST_CANCELED' ||
+        errorCode === 'ERR_CANCELED' ||
+        errorCode === 1001 || // Apple's cancellation code
+        error?.message?.includes('cancel')
+      ) {
+        // User canceled - this is normal, just return silently
+        console.log('Apple Sign In canceled by user');
+        return;
+      }
+
+      // Log the actual error for debugging
+      console.error('Apple Sign In error:', error);
+      
+      // Only show alert if component is still mounted
+      if (isMounted.current) {
+        const errorMessage = error?.message || error?.toString() || 'Failed to sign in with Apple';
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
+    }
+  }
+
 
   return (
     <LinearGradient
@@ -81,10 +156,10 @@ export default function SignInScreen() {
           
           {/* Decorative Elements */}
           <View style={{ position: 'absolute', top: 100, left: 30 }}>
-            <Text style={{ fontSize: 60 }}>🗺️</Text>
+            <Text style={{ fontSize: 60 }}>✈️</Text>
           </View>
           <View style={{ position: 'absolute', top: 150, right: 40 }}>
-            <Text style={{ fontSize: 50 }}>🌍</Text>
+            <Text style={{ fontSize: 50 }}>🎡</Text>
           </View>
           
           {/* Subtle decorative shapes */}
@@ -153,39 +228,36 @@ export default function SignInScreen() {
 
             {!showEmailAuth ? (
               <>
-                {/* Social Sign In Button - Platform Specific */}
-                <Pressable
-                  onPress={mockSocialSignIn}
-                  style={{
-                    backgroundColor: 'white',
-                    paddingVertical: 16,
-                    borderRadius: 30,
-                    alignItems: 'center',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    gap: 12,
-                    marginBottom: 20,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 3,
-                  }}>
-                  {socialButtonConfig.isEmoji ? (
-                    <Text style={{ fontSize: 20 }}>{socialButtonConfig.icon}</Text>
-                  ) : (
-                    <Image 
-                      source={{ uri: socialButtonConfig.icon }}
-                      style={{ width: 20, height: 20 }}
-                    />
-                  )}
-                  <Text style={{
-                    fontSize: 17,
-                    fontWeight: '600',
-                  }}>
-                    {socialButtonConfig.text}
-                  </Text>
-                </Pressable>
+                {/* Apple Sign In Button - iOS Only */}
+                {Platform.OS === 'ios' && (
+                  <Pressable
+                    onPress={signInWithApple}
+                    disabled={loading}
+                    style={{
+                      backgroundColor: loading ? '#ccc' : 'black',
+                      paddingVertical: 16,
+                      borderRadius: 30,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 12,
+                      marginBottom: 20,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 4,
+                      elevation: 3,
+                    }}>
+                    <Ionicons name="logo-apple" size={24} color={loading ? '#999' : 'white'} />
+                    <Text style={{
+                      fontSize: 17,
+                      fontWeight: '600',
+                      color: loading ? '#999' : 'white',
+                    }}>
+                      {loading ? 'Signing in...' : 'Sign in with Apple'}
+                    </Text>
+                  </Pressable>
+                )}
 
                 <Pressable
                   onPress={() => setShowEmailAuth(true)}
@@ -204,7 +276,6 @@ export default function SignInScreen() {
                     onChangeText={setEmail}
                     placeholder="Email"
                     keyboardType="email-address"
-                    placeholderTextColor="#999"
                     autoCapitalize="none"
                     style={{
                       backgroundColor: 'white',
@@ -217,7 +288,6 @@ export default function SignInScreen() {
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Password"
-                    placeholderTextColor="#999"
                     secureTextEntry
                     autoCapitalize="none"
                     style={{

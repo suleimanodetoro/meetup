@@ -16,6 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-video',
     'expo-web-browser',
+    'expo-apple-authentication',
     [
       'expo-image-picker',
       {
@@ -77,6 +78,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: 'app.usewaypoint',
     buildNumber: '2',
+    usesAppleSignIn: true,
     icon: {
       light: './assets/ios-light.png',
       dark: './assets/ios-dark.png',
