@@ -18,6 +18,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-web-browser',
     'expo-apple-authentication',
     [
+      '@react-native-google-signin/google-signin',
+      {
+        iosUrlScheme: 'com.googleusercontent.apps.545991292691-7qfgijc8l5j7de4no0ukkd4mdurcmni8',
+      },
+    ],
+    [
       'expo-image-picker',
       {
         photosPermission:
@@ -86,6 +92,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      CFBundleURLTypes: [
+        {
+          CFBundleURLSchemes: [
+            'waypoint',
+            'com.googleusercontent.apps.545991292691-7qfgijc8l5j7de4no0ukkd4mdurcmni8',
+          ],
+        },
+      ],
     },
   },
   android: {
