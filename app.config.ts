@@ -83,7 +83,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'app.usewaypoint',
-    buildNumber: '2',
+    buildNumber: '10',
     usesAppleSignIn: true,
     icon: {
       light: './assets/ios-light.png',
