@@ -1,6 +1,11 @@
 // app.config.ts
 import 'dotenv/config';
+import dotenv from 'dotenv';
 import { ExpoConfig, ConfigContext } from 'expo/config';
+
+// Load .env.local after .env, allowing it to override (standard dotenv layering).
+// Local dev points the app at local Supabase via .env.local.
+dotenv.config({ path: '.env.local', override: true });
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Waypoint',
