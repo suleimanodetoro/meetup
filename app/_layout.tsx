@@ -40,7 +40,6 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'create-plan',    // covers create-plan/* steps
       'search-users',
       'friend-requests',
-      'modal',
       'explore',        // ADDED EXPLORE HERE!
     ];
 
@@ -116,8 +115,7 @@ export default function RootLayout() {
               <Stack.Screen name="settings/privacy" />
               <Stack.Screen name="search-users" />
               <Stack.Screen name="friend-requests" />
-              <Stack.Screen name="explore" /> 
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="explore" />
 
               {/* 404 */}
               <Stack.Screen name="+not-found" />
