@@ -336,30 +336,6 @@ export default function PrivacySettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Delete Account */}
-        <View style={[styles.section, { marginBottom: 40 }]}>
-          <Pressable
-            style={styles.dangerButton}
-            onPress={() => {
-              Alert.alert(
-                'Delete Account',
-                'Are you sure you want to delete your account? This action cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Delete', 
-                    style: 'destructive',
-                    onPress: () => {
-                      // Implement account deletion
-                    }
-                  },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.dangerButtonText}>Delete Account</Text>
-          </Pressable>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -496,16 +472,5 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 16,
     color: '#000',
-  },
-  dangerButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
