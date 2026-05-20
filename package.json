@@ -20,7 +20,6 @@
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@react-navigation/native": "^7.0.3",
-    "@react-three/fiber": "^9.3.0",
     "@rnmapbox/maps": "^10.1.40",
     "@supabase/supabase-js": "^2.38.4",
     "@turf/helpers": "^7.2.0",
@@ -54,13 +53,11 @@
     "react-native": "0.79.4",
     "react-native-date-picker": "^5.0.12",
     "react-native-gesture-handler": "~2.24.0",
-    "react-native-maps": "1.20.1",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0",
-    "three": "^0.179.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
