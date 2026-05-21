@@ -220,6 +220,8 @@ async function createEvents(personas: Persona[]): Promise<number[]> {
         user_id: creator.id,
         image_uri: `https://api.dicebear.com/9.x/shapes/png?seed=${template.interest}-${i}`,
         city: city.name,
+        country: city.country,
+        country_code: city.countryCode,
         location_point: `POINT(${lng} ${lat})`,
       })
       .select('id')

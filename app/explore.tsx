@@ -1,64 +1,78 @@
-// app/explore.tsx - STANDALONE SCREEN, NOT A TAB!
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  SafeAreaView,
-  ScrollView,
-  TextInput,
-  Pressable,
-  Image,
   ActivityIndicator,
   FlatList,
+  Image,
+  Pressable,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
-import { useAuth } from './contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/countryFlags';
-import type { Event } from '~/types/db';
 
-// Plan Card Component for Explore Screen
-const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
-  const formatDateRange = (startDate: string, endDate?: string) => {
-    const start = new Date(startDate);
-    const end = endDate ? new Date(endDate) : null;
-    
+interface ExplorePlan {
+  id: number;
+  title: string | null;
+  description?: string | null;
+  date: string | null;
+  end_date?: string | null;
+  city: string | null;
+  country?: string | null;
+  country_code?: string | null;
+  image_uri?: string | null;
+  interests?: string[] | null;
+  attendee_count?: number;
+  recent_attendees?: { id?: string; avatar_url?: string | null }[];
+}
+
+/** Stable list of country filter pills. Order matters; no shuffle. */
+const COUNTRY_PILLS: readonly { code: string; label: string; flag: string }[] = [
+  { code: 'GB', label: 'UK', flag: '🇬🇧' },
+  { code: 'US', label: 'USA', flag: '🇺🇸' },
+  { code: 'FR', label: 'France', flag: '🇫🇷' },
+  { code: 'ES', label: 'Spain', flag: '🇪🇸' },
+  { code: 'IT', label: 'Italy', flag: '🇮🇹' },
+  { code: 'JP', label: 'Japan', flag: '🇯🇵' },
+  { code: 'TH', label: 'Thailand', flag: '🇹🇭' },
+  { code: 'DE', label: 'Germany', flag: '🇩🇪' },
+];
+
+const ExplorePlanCard = React.memo(({ plan }: { plan: ExplorePlan }) => {
+  const formatDateRange = (startDate: string | null, endDate?: string | null) => {
+    if (!startDate) return '';
+    // Parse YYYY-MM-DD as local to avoid UTC-midnight drift one day earlier
+    // in negative-UTC zones.
+    const parseLocal = (s: string) => {
+      const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const start = parseLocal(startDate);
+    if (!start) return '';
+    const end = endDate ? parseLocal(endDate) : null;
+
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     if (!end || startDate === endDate) {
       return `${monthNames[start.getMonth()]} ${start.getDate()}`;
     }
-    
     if (start.getMonth() === end.getMonth()) {
       return `${monthNames[start.getMonth()]} ${start.getDate()} - ${end.getDate()}`;
     }
-    
     return `${monthNames[start.getMonth()]} ${start.getDate()} - ${monthNames[end.getMonth()]} ${end.getDate()}`;
   };
 
-  const getCountryFromCity = (city: string): string => {
-    const cityCountryMap: Record<string, string> = {
-      'Madrid': '🇪🇸',
-      'Bangkok': '🇹🇭',
-      'Tokyo': '🇯🇵',
-      'London': '🇬🇧',
-      'Paris': '🇫🇷',
-      'New York': '🇺🇸',
-      'Barcelona': '🇪🇸',
-      'Rome': '🇮🇹',
-      'Milan': '🇮🇹',
-      'Dubai': '🇦🇪',
-      'Singapore': '🇸🇬',
-    };
-    return cityCountryMap[city] || '';
-  };
+  const attendeeCount = plan.attendee_count ?? 0;
+  const flag = plan.country_code ? getCountryFlag(plan.country_code) : '';
 
   return (
     <Pressable
-      onPress={() => router.push(`/event/${plan.id}`)}
+      onPress={() => router.push(`/event/${plan.id}` as never)}
       style={{
         backgroundColor: 'white',
         marginHorizontal: 20,
@@ -73,13 +87,9 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
       }}
     >
       <View style={{ flexDirection: 'row' }}>
-        {/* Image */}
         <View style={{ width: 124, height: 124 }}>
           {plan.image_uri ? (
-            <Image
-              source={{ uri: plan.image_uri }}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <Image source={{ uri: plan.image_uri }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <View
               style={{
@@ -90,42 +100,35 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 40 }}>{plan.interests?.[0] === 'beach' ? '🏖️' : '🌆'}</Text>
+              <Ionicons name="calendar-outline" size={36} color="#9CA3AF" />
             </View>
           )}
         </View>
 
-        {/* Content */}
         <View style={{ flex: 1, padding: 12 }}>
           <Text style={{ fontSize: 17, fontWeight: '600', color: '#111827', marginBottom: 4 }}>
             {plan.title}
           </Text>
-          
-          {/* Date Range */}
+
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
             <Ionicons name="calendar-outline" size={14} color="#6B7280" />
             <Text style={{ fontSize: 14, color: '#6B7280', marginLeft: 4 }}>
               {formatDateRange(plan.date, plan.end_date)}
             </Text>
           </View>
-          
-          {/* Location with flag */}
+
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: 15, marginRight: 6 }}>
-              {getCountryFromCity(plan.city) || getCountryFlag(plan.country_code)}
-            </Text>
+            {flag ? <Text style={{ fontSize: 15, marginRight: 6 }}>{flag}</Text> : null}
             <Text style={{ fontSize: 14, color: '#6B7280' }}>
               {plan.city || 'Location'}
             </Text>
           </View>
-          
-          {/* Attendees */}
+
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Avatar Stack */}
             <View style={{ flexDirection: 'row', marginRight: 8 }}>
-              {plan.recent_attendees?.slice(0, 3).map((attendee: any, index: number) => (
+              {plan.recent_attendees?.slice(0, 3).map((attendee, index) => (
                 <View
-                  key={attendee?.id || index}
+                  key={attendee?.id ?? index}
                   style={{
                     width: 24,
                     height: 24,
@@ -151,7 +154,7 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
               ))}
             </View>
             <Text style={{ fontSize: 13, color: '#6B7280' }}>
-              {plan.attendee_count || 0}+ Attendees
+              {attendeeCount} {attendeeCount === 1 ? 'attendee' : 'attendees'}
             </Text>
           </View>
         </View>
@@ -159,8 +162,8 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: any }) => {
     </Pressable>
   );
 });
+ExplorePlanCard.displayName = 'ExplorePlanCard';
 
-// Filter Pill Component
 const FilterPill = React.memo(({
   label,
   icon,
@@ -186,7 +189,7 @@ const FilterPill = React.memo(({
       marginRight: 8,
     }}
   >
-    {icon && <Text style={{ fontSize: 16, marginRight: 6 }}>{icon}</Text>}
+    {icon ? <Text style={{ fontSize: 16, marginRight: 6 }}>{icon}</Text> : null}
     <Text
       style={{
         fontSize: 14,
@@ -198,104 +201,106 @@ const FilterPill = React.memo(({
     </Text>
   </Pressable>
 ));
+FilterPill.displayName = 'FilterPill';
+
+/** YYYY-MM-DD for "today, local" — for use with postgres DATE columns. */
+function todayLocalDate(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export default function ExploreScreen() {
-  const params = useLocalSearchParams();
-  const { session } = useAuth();
+  const params = useLocalSearchParams<{ filter?: string }>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState(params.filter || 'trending');
-  const [plans, setPlans] = useState<any[]>([]);
-
-  // Generate random country filters
-  const countryFilters = useMemo(() => {
-    const allCountries = [
-      { code: 'ES', label: 'Spain', flag: '🇪🇸' },
-      { code: 'IT', label: 'Italy', flag: '🇮🇹' },
-      { code: 'US', label: 'USA', flag: '🇺🇸' },
-      { code: 'GB', label: 'UK', flag: '🇬🇧' },
-      { code: 'FR', label: 'France', flag: '🇫🇷' },
-      { code: 'JP', label: 'Japan', flag: '🇯🇵' },
-      { code: 'TH', label: 'Thailand', flag: '🇹🇭' },
-      { code: 'AE', label: 'UAE', flag: '🇦🇪' },
-      { code: 'SG', label: 'Singapore', flag: '🇸🇬' },
-      { code: 'NL', label: 'Netherlands', flag: '🇳🇱' },
-    ];
-    
-    // Shuffle and pick 4 random countries
-    const shuffled = [...allCountries].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 4);
-  }, []);
+  const [activeFilter, setActiveFilter] = useState<string>(
+    typeof params.filter === 'string' ? params.filter : 'trending',
+  );
+  const [plans, setPlans] = useState<ExplorePlan[]>([]);
 
   const fetchPlans = useCallback(async () => {
     try {
-      let data: any[] | null = [];
-      let error: any = null;
+      const trimmedQuery = searchQuery.trim();
 
-      // Fetch based on active filter
-      if (activeFilter === 'trending' || activeFilter === 'popular') {
-        ({ data, error } = await supabase.rpc('get_popular_plans_with_attendees'));
+      let data: ExplorePlan[] | null = null;
+      let error: { message: string } | null = null;
+
+      // 1) Search mode: query events directly by city or title across the
+      //    entire upcoming-events set, ignoring the active filter pill.
+      if (trimmedQuery.length > 0) {
+        const escaped = trimmedQuery.replace(/[%_]/g, (m) => `\\${m}`);
+        const r = await supabase
+          .from('events')
+          .select(
+            'id, title, description, date, end_date, city, country, country_code, image_uri, interests',
+          )
+          .or(`city.ilike.%${escaped}%,title.ilike.%${escaped}%`)
+          .gte('date', todayLocalDate())
+          .order('date', { ascending: true })
+          .limit(50);
+        data = (r.data as unknown as ExplorePlan[]) ?? null;
+        error = r.error;
+      }
+      // 2) Trending / popular / new — server-side RPCs, ordered + capped.
+      else if (activeFilter === 'trending' || activeFilter === 'popular') {
+        const r = await supabase.rpc('get_popular_plans_with_attendees');
+        data = (r.data as unknown as ExplorePlan[]) ?? null;
+        error = r.error;
       } else if (activeFilter === 'new') {
-        ({ data, error } = await supabase.rpc('get_new_plans'));
-      } else {
-        // Country filter
-        const country = countryFilters.find(c => c.code === activeFilter);
+        const r = await supabase.rpc('get_new_plans');
+        data = (r.data as unknown as ExplorePlan[]) ?? null;
+        error = r.error;
+      }
+      // 3) Country filter — direct events query by country_code.
+      else {
+        const country = COUNTRY_PILLS.find((c) => c.code === activeFilter);
         if (country) {
-          ({ data, error } = await supabase
+          const r = await supabase
             .from('events')
-            .select('*, profiles!events_user_id_fkey(full_name, avatar_url)')
+            .select(
+              'id, title, description, date, end_date, city, country, country_code, image_uri, interests',
+            )
             .eq('country_code', country.code)
-            .gte('date', new Date().toISOString())
-            .order('created_at', { ascending: false })
-            .limit(20));
+            .gte('date', todayLocalDate())
+            .order('date', { ascending: true })
+            .limit(50);
+          data = (r.data as unknown as ExplorePlan[]) ?? null;
+          error = r.error;
         } else {
-          // Default to all plans
-          ({ data, error } = await supabase.rpc('get_popular_plans_with_attendees'));
+          // Unknown filter — fall back to trending.
+          const r = await supabase.rpc('get_popular_plans_with_attendees');
+          data = (r.data as unknown as ExplorePlan[]) ?? null;
+          error = r.error;
         }
       }
 
       if (error) throw error;
-
-      // Transform data to consistent format
-      const transformedPlans = (data || []).map((plan: any) => ({
-        ...plan,
-        attendee_count: plan.attendee_count || Math.floor(Math.random() * 200) + 50,
-        recent_attendees: plan.recent_attendees || [],
-      }));
-
-      setPlans(transformedPlans);
+      setPlans(data ?? []);
     } catch (err) {
       console.error('Error fetching plans:', err);
+      setPlans([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeFilter, countryFilters]);
+  }, [activeFilter, searchQuery]);
 
   useEffect(() => {
-    fetchPlans();
-  }, [fetchPlans]);
+    setLoading(true);
+    const handle = setTimeout(() => {
+      void fetchPlans();
+    }, searchQuery.trim() ? 250 : 0); // debounce typed queries
+    return () => clearTimeout(handle);
+  }, [fetchPlans, searchQuery]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchPlans();
+    void fetchPlans();
   }, [fetchPlans]);
-
-  const handleFilterPress = (filterId: string) => {
-    setActiveFilter(filterId);
-  };
-
-  const filteredPlans = useMemo(() => {
-    if (!searchQuery.trim()) return plans;
-    
-    const query = searchQuery.toLowerCase();
-    return plans.filter(plan => 
-      plan.title?.toLowerCase().includes(query) ||
-      plan.city?.toLowerCase().includes(query) ||
-      plan.description?.toLowerCase().includes(query)
-    );
-  }, [plans, searchQuery]);
 
   if (loading) {
     return (
@@ -309,7 +314,6 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
-      {/* Header */}
       <View style={{ backgroundColor: 'white', paddingBottom: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 }}>
           <Pressable onPress={() => router.back()} style={{ marginRight: 16 }}>
@@ -317,8 +321,7 @@ export default function ExploreScreen() {
           </Pressable>
           <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827' }}>Explore Plans</Text>
         </View>
-        
-        {/* Search Bar */}
+
         <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
           <View
             style={{
@@ -332,9 +335,11 @@ export default function ExploreScreen() {
           >
             <Ionicons name="search" size={20} color="#9CA3AF" />
             <TextInput
-              placeholder="Search All Plans"
+              placeholder="Search by city or plan title"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
               style={{
                 flex: 1,
                 marginLeft: 8,
@@ -343,42 +348,49 @@ export default function ExploreScreen() {
               }}
               placeholderTextColor="#9CA3AF"
             />
+            {searchQuery.length > 0 ? (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
-        {/* Filter Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16 }}
-        >
-          <FilterPill
-            label="Trending"
-            icon="🔥"
-            isActive={activeFilter === 'trending'}
-            onPress={() => handleFilterPress('trending')}
-          />
-          <FilterPill
-            label="New"
-            icon="👋"
-            isActive={activeFilter === 'new'}
-            onPress={() => handleFilterPress('new')}
-          />
-          {countryFilters.map((country) => (
+        {/* Filter pills are hidden while a search is active — search runs
+            against the whole upcoming events set, not the filtered subset. */}
+        {searchQuery.trim().length === 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16 }}
+          >
             <FilterPill
-              key={country.code}
-              label={country.label}
-              icon={country.flag}
-              isActive={activeFilter === country.code}
-              onPress={() => handleFilterPress(country.code)}
+              label="Trending"
+              icon="🔥"
+              isActive={activeFilter === 'trending'}
+              onPress={() => setActiveFilter('trending')}
             />
-          ))}
-        </ScrollView>
+            <FilterPill
+              label="New"
+              icon="👋"
+              isActive={activeFilter === 'new'}
+              onPress={() => setActiveFilter('new')}
+            />
+            {COUNTRY_PILLS.map((country) => (
+              <FilterPill
+                key={country.code}
+                label={country.label}
+                icon={country.flag}
+                isActive={activeFilter === country.code}
+                onPress={() => setActiveFilter(country.code)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
       </View>
 
-      {/* Plans List */}
       <FlatList
-        data={filteredPlans}
+        data={plans}
         keyExtractor={(item) => `plan-${item.id}`}
         renderItem={({ item }) => <ExplorePlanCard plan={item} />}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}
@@ -390,7 +402,9 @@ export default function ExploreScreen() {
               No plans found
             </Text>
             <Text style={{ fontSize: 14, color: '#9CA3AF', marginTop: 8 }}>
-              Try adjusting your filters or search
+              {searchQuery.trim()
+                ? `Nothing matches "${searchQuery.trim()}" in upcoming plans`
+                : 'Try a different filter'}
             </Text>
           </View>
         }
