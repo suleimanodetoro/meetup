@@ -55,8 +55,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     // ----- Authenticated but not onboarded: send to onboarding, even from (auth) -----
     if (!hasCompletedOnboarding) {
       const onOnboarding =
-        inAuthGroup && (segments[1]?.startsWith('onboarding') ?? false);
-      if (!onOnboarding) router.replace('/onboarding-basic'); // lives in (auth)
+        inAuthGroup && segments[1] === 'onboarding';
+      if (!onOnboarding) router.replace('/onboarding/basic'); // lives in (auth)/onboarding/[step]
       return;
     }
 
