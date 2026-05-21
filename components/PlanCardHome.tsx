@@ -31,22 +31,12 @@ function formatPrice(cost: number, currency: string | null | undefined): string 
   return `${symbol}${cost}`;
 }
 
-/**
- * Format a YYYY-MM-DD date string from a Postgres `DATE` column. Parsing
- * "2025-03-15" via `new Date(...)` treats it as UTC midnight, which drifts
- * one day backward in negative-UTC timezones — so append a local time
- * component before parsing.
- */
-function parseLocalDate(dateString: string): Date | null {
-  if (!dateString) return null;
-  const d = new Date(`${dateString}T00:00:00`);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 function formatDate(dateString: string | null | undefined): string | null {
   if (!dateString) return null;
-  const date = parseLocalDate(dateString);
-  if (!date) return null;
+  // `events.date` is a `timestamp with time zone`. `new Date(...)` reads
+  // the UTC instant; `toLocaleDateString` converts it to local for display.
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return null;
 
   const today = new Date();
   const tomorrow = new Date(today);

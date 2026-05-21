@@ -205,20 +205,15 @@ export default function PlanDetailsScreen() {
     }
   };
 
-  // `events.date` and `events.end_date` are postgres DATE columns
-  // (YYYY-MM-DD). Parsing them via `new Date(...)` treats them as UTC
-  // midnight, which displays as the prior day in negative-UTC timezones.
-  // Append a local time component before parsing.
-  const parseLocalDate = (dateString: string): Date | null => {
-    if (!dateString) return null;
-    const d = new Date(`${dateString}T00:00:00`);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
+  // `events.date` and `events.end_date` are `timestamp with time zone`.
+  // `new Date(...)` reads as the UTC instant; `toLocaleDateString`
+  // renders the local date for the user.
   const formatDate = (dateString: string, endDateString?: string) => {
-    const date = parseLocalDate(dateString);
-    if (!date) return '';
-    const endDate = endDateString ? parseLocalDate(endDateString) : null;
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const endDate = endDateString ? new Date(endDateString) : null;
+    const endValid = endDate && !isNaN(endDate.getTime());
 
     const options: Intl.DateTimeFormatOptions = {
       month: 'short',
@@ -226,8 +221,8 @@ export default function PlanDetailsScreen() {
       year: 'numeric',
     };
 
-    if (endDate && dateString !== endDateString) {
-      return `${date.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+    if (endValid && dateString !== endDateString) {
+      return `${date.toLocaleDateString('en-US', options)} - ${endDate!.toLocaleDateString('en-US', options)}`;
     }
     return date.toLocaleDateString('en-US', options);
   };

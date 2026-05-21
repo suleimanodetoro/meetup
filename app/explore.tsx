@@ -46,25 +46,23 @@ const COUNTRY_PILLS: readonly { code: string; label: string; flag: string }[] = 
 const ExplorePlanCard = React.memo(({ plan }: { plan: ExplorePlan }) => {
   const formatDateRange = (startDate: string | null, endDate?: string | null) => {
     if (!startDate) return '';
-    // Parse YYYY-MM-DD as local to avoid UTC-midnight drift one day earlier
-    // in negative-UTC zones.
-    const parseLocal = (s: string) => {
-      const d = new Date(s.length === 10 ? `${s}T00:00:00` : s);
-      return isNaN(d.getTime()) ? null : d;
-    };
-    const start = parseLocal(startDate);
-    if (!start) return '';
-    const end = endDate ? parseLocal(endDate) : null;
+    // `events.date`/`end_date` are `timestamp with time zone`. Pass the raw
+    // string to `new Date(...)`; it reads as UTC and the formatter renders
+    // local. No local-midnight appending — that breaks the timestamp form.
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) return '';
+    const end = endDate ? new Date(endDate) : null;
+    const endValid = end && !isNaN(end.getTime());
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    if (!end || startDate === endDate) {
+    if (!endValid || startDate === endDate) {
       return `${monthNames[start.getMonth()]} ${start.getDate()}`;
     }
-    if (start.getMonth() === end.getMonth()) {
-      return `${monthNames[start.getMonth()]} ${start.getDate()} - ${end.getDate()}`;
+    if (start.getMonth() === end!.getMonth()) {
+      return `${monthNames[start.getMonth()]} ${start.getDate()} - ${end!.getDate()}`;
     }
-    return `${monthNames[start.getMonth()]} ${start.getDate()} - ${monthNames[end.getMonth()]} ${end.getDate()}`;
+    return `${monthNames[start.getMonth()]} ${start.getDate()} - ${monthNames[end!.getMonth()]} ${end!.getDate()}`;
   };
 
   const attendeeCount = plan.attendee_count ?? 0;
