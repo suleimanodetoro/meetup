@@ -4,12 +4,6 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/app/contexts/AuthProvider';
 import type { Event, MessageWithDetails, Profile } from '~/types/messaging';
 
-// The messaging schema (conversations, messages, typing_indicators,
-// conversation_participants) plus several RPCs are absent from the generated
-// `types/supabase.ts`. Until those are regenerated, route messaging queries
-// through this untyped alias rather than scattering `as any` per call site.
-const db = supabase as any;
-
 export type ChatTarget =
   | { kind: 'dm'; conversationId: number }
   | { kind: 'event'; eventId: number };
@@ -62,7 +56,7 @@ function typingTtlMs(kind: ChatTarget['kind']): number {
 async function resolveConversationId(target: ChatTarget): Promise<number> {
   if (target.kind === 'dm') return target.conversationId;
 
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('conversations')
     .select('id')
     .eq('event_id', target.eventId)
@@ -79,7 +73,7 @@ async function loadHeader(
   userId: string,
 ): Promise<ChatHeader> {
   if (target.kind === 'dm') {
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from('conversations')
       .select(
         `*, conversation_participants!inner(user_id, profiles:user_id(*))`,
@@ -90,30 +84,31 @@ async function loadHeader(
 
     if (error) throw error;
     const participants = data?.conversation_participants ?? [];
-    const otherEntry = participants.find(
-      (p: { user_id: string }) => p.user_id !== userId,
-    );
-    return { kind: 'dm', other: (otherEntry?.profiles as Profile) ?? null };
+    const otherEntry = participants.find((p) => p.user_id !== userId);
+    return {
+      kind: 'dm',
+      other: (otherEntry?.profiles as unknown as Profile) ?? null,
+    };
   }
 
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('events')
     .select(`*, attendees:attendance(user:profiles(*))`)
     .eq('id', target.eventId)
     .single();
 
   if (error) throw error;
-  const attendees: { user?: Profile }[] = data?.attendees ?? [];
+  const attendees = data?.attendees ?? [];
   const participants = attendees
-    .map((a) => a?.user)
+    .map((a) => a.user as unknown as Profile | null)
     .filter((u): u is Profile => Boolean(u));
-  return { kind: 'event', event: data as Event, participants };
+  return { kind: 'event', event: data as unknown as Event, participants };
 }
 
 async function loadMessages(
   conversationId: number,
 ): Promise<MessageWithDetails[]> {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('messages')
     .select(MESSAGE_SELECT)
     .eq('conversation_id', conversationId)
@@ -121,11 +116,11 @@ async function loadMessages(
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as MessageWithDetails[];
+  return (data ?? []) as unknown as MessageWithDetails[];
 }
 
 function markAsRead(conversationId: number, userId: string): void {
-  void db
+  void supabase
     .rpc('mark_conversation_as_read', {
       p_conversation_id: conversationId,
       p_user_id: userId,
@@ -197,7 +192,7 @@ export function useChat(target: ChatTarget): ChatController {
     isTypingRef.current = false;
     const convId = conversationIdRef.current;
     if (!convId || !userId) return;
-    void db
+    void supabase
       .from('typing_indicators')
       .delete()
       .eq('conversation_id', convId)
@@ -207,7 +202,7 @@ export function useChat(target: ChatTarget): ChatController {
   const refreshTypingUsers = useCallback(async () => {
     const convId = conversationIdRef.current;
     if (!convId || !userId) return;
-    const { data } = await db
+    const { data } = await supabase
       .from('typing_indicators')
       .select('*, user:profiles(*)')
       .eq('conversation_id', convId)
@@ -221,13 +216,13 @@ export function useChat(target: ChatTarget): ChatController {
 
   const ingestIncomingMessage = useCallback(
     async (id: number) => {
-      const { data } = await db
+      const { data } = await supabase
         .from('messages')
         .select(MESSAGE_SELECT)
         .eq('id', id)
         .single();
       if (!data || !mountedRef.current) return;
-      const row = data as MessageWithDetails;
+      const row = data as unknown as MessageWithDetails;
       setMessages((prev) => {
         if (prev.some((m) => m.id === row.id)) return prev;
         return [...prev, row];
@@ -372,7 +367,7 @@ export function useChat(target: ChatTarget): ChatController {
 
       if (hasText && !isTypingRef.current) {
         isTypingRef.current = true;
-        void db.from('typing_indicators').upsert({
+        void supabase.from('typing_indicators').upsert({
           conversation_id: convId,
           user_id: userId,
           started_at: new Date().toISOString(),
@@ -420,7 +415,7 @@ export function useChat(target: ChatTarget): ChatController {
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: convId,
@@ -435,7 +430,7 @@ export function useChat(target: ChatTarget): ChatController {
       if (error || !data) throw error ?? new Error('insert returned no row');
       if (!mountedRef.current) return;
 
-      const real = data as MessageWithDetails;
+      const real = data as unknown as MessageWithDetails;
       setMessages((prev) => {
         const realAlreadyArrived = prev.some((m) => m.id === real.id);
         if (realAlreadyArrived) {
