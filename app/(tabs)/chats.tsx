@@ -1,5 +1,5 @@
 // app/(tabs)/chats.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
-import { useChatSubscriptions } from '~/hooks/useChatSubscriptions';
 
 type ChatItem = {
   conversation_id: number;
@@ -91,18 +91,10 @@ export default function ChatsScreen() {
     }
   }, [session?.user?.id]);
 
-  const [isTabFocused, setIsTabFocused] = useState(false);
+  // Refetch the chat list whenever something changes server-side. Channel is
+  // only alive while the tab is focused — outside of focus we don't subscribe.
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  // Use the centralized subscription hook with enabled flag
-  const { cleanupSubscriptions } = useChatSubscriptions({
-    enabled: isTabFocused, // ✅ Only subscribe when tab is focused
-    onConversationUpdate: useCallback(() => {
-      console.log('Chat list update detected, refreshing...');
-      fetchConversations();
-    }, [fetchConversations]),
-  });
-
-  // Initial load effect
   useEffect(() => {
     if (session?.user?.id) {
       fetchConversations();
@@ -110,21 +102,38 @@ export default function ChatsScreen() {
     }
   }, [session?.user?.id, fetchConversations, fetchPendingRequests]);
 
-  // ✅ CRITICAL FIX: Enable/disable subscriptions based on tab focus
   useFocusEffect(
     useCallback(() => {
-      console.log('💚 Chats tab FOCUSED - enabling subscriptions');
-      setIsTabFocused(true);
-      
-      if (session?.user?.id) {
-        fetchConversations();
-        fetchPendingRequests();
-      }
+      if (!session?.user?.id) return;
 
-      // Disable when tab loses focus
+      fetchConversations();
+      fetchPendingRequests();
+
+      const channel = supabase
+        .channel(`chat-list-${session.user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'conversations' },
+          () => fetchConversations(),
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'conversation_participants',
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => fetchConversations(),
+        )
+        .subscribe();
+
+      channelRef.current = channel;
+
       return () => {
-        console.log('💔 Chats tab UNFOCUSED - disabling subscriptions');
-        setIsTabFocused(false);
+        channel.unsubscribe();
+        supabase.removeChannel(channel);
+        channelRef.current = null;
       };
     }, [session?.user?.id, fetchConversations, fetchPendingRequests])
   );
