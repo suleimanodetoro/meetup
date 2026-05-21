@@ -11,7 +11,7 @@ import { useVisitDetails } from '~/hooks/useVisitDetails';
 import { useUpsellTrigger } from '~/hooks/useUpsellTrigger';
 import { getCityCoordinates } from '~/utils/geographic';
 
-Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN);
+Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? null);
 
 export default function VisitDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -109,16 +109,17 @@ export default function VisitDetailsScreen() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onRefresh={refetch}
-        onCardVisibility={handleCardVisibility}
+        onUserCardVisible={handleCardVisibility}
+        loading={loading}
       />
 
       {/* Upsell Modal */}
       <UpsellModal
         visible={showUpsellModal}
         onDismiss={dismissModal}
-        onUpgrade={() => {
+        onSubscribe={() => {
           dismissModal();
-          router.push('/settings/subscription');
+          router.push('/settings' as any);
         }}
       />
     </View>

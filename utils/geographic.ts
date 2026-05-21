@@ -289,11 +289,11 @@ export function getSortedCountries(): Country[] {
  * @returns Array of matching destinations
  */
 export function searchDestinations(query: string): Destination[] {
-  if (!query) return POPULAR_DESTINATIONS;
-  
+  if (!query) return [...POPULAR_DESTINATIONS];
+
   const q = query.toLowerCase();
-  return POPULAR_DESTINATIONS.filter(dest => 
-    dest.city.toLowerCase().includes(q) || 
+  return POPULAR_DESTINATIONS.filter(dest =>
+    dest.city.toLowerCase().includes(q) ||
     dest.country.toLowerCase().includes(q)
   );
 }

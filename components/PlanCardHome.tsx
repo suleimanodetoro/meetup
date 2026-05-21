@@ -86,7 +86,7 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
           <View style={styles.dateContainer}>
             <Ionicons name="calendar-outline" size={14} color="#6B7280" />
             <Text style={styles.dateText} numberOfLines={1}>
-              {formatDate(plan.date)}
+              {formatDate(plan.date ?? '')}
             </Text>
           </View>
         </View>

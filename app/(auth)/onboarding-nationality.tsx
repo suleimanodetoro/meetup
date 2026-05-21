@@ -16,10 +16,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COUNTRIES } from '~/utils/countryFlags';
 
+type Country = (typeof COUNTRIES)[number];
 
 export default function OnboardingNationalityScreen() {
   const params = useLocalSearchParams();
-  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -45,7 +46,7 @@ export default function OnboardingNationalityScreen() {
     }
   };
   
-  const CountryItem = ({ item }) => (
+  const CountryItem = ({ item }: { item: Country }) => (
     <Pressable
       style={styles.countryItem}
       onPress={() => {

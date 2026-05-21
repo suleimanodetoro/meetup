@@ -82,7 +82,7 @@ export default function TabLayout() {
             tabBarLabel: () => null,
             tabBarButton: (props) => (
               <Pressable
-                {...props}
+                {...(props as any)}
                 onPress={() => setShowCreateModal(true)}
               />
             ),

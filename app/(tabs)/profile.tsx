@@ -100,7 +100,7 @@ export default function ProfileScreen() {
     const uniqueCountries = new Set(visitsData?.map((v) => v.country) || []);
 
     const { count: plansCount } = await supabase
-      .from('event_participants')
+      .from('attendance')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', session.user.id);
 
@@ -127,7 +127,7 @@ export default function ProfileScreen() {
   const fetchJoinedPlans = async () => {
     if (!session?.user?.id) return;
     const { data } = await supabase
-      .from('event_participants')
+      .from('attendance')
       .select(
         `
         event_id,
@@ -135,11 +135,11 @@ export default function ProfileScreen() {
           id,
           title,
           description,
-          start_date,
+          date,
           end_date,
           city,
           image_uri,
-          event_participants (user_id, profiles (id, full_name, avatar_url))
+          attendance (user_id, profiles (id, full_name, avatar_url))
         )
       `
       )
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
       .limit(10);
 
     const plans = (data || []).map((p) => p.events).filter(Boolean);
-    setJoinedPlans(plans);
+    setJoinedPlans(plans as any);
   };
 
   const fetchFriends = async () => {
@@ -373,7 +373,7 @@ export default function ProfileScreen() {
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ paddingHorizontal: 20 }}
               ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-              renderItem={({ item }) => <PlanCardHome event={item} />}
+              renderItem={({ item }) => <PlanCardHome plan={item} />}
             />
           ) : (
             <EmptyPlans />

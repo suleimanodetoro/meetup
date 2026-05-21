@@ -64,8 +64,8 @@ export default function ChatsScreen() {
         return;
       }
 
-      // Store all data
-      setChats(data || []);
+      // Store all data (RPC return shape doesn't include the strict ChatItem types)
+      setChats((data || []) as unknown as ChatItem[]);
     } catch (error) {
       console.error('Error fetching chats:', error);
     } finally {

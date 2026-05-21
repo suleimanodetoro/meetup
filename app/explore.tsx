@@ -230,8 +230,8 @@ export default function ExploreScreen() {
 
   const fetchPlans = useCallback(async () => {
     try {
-      let data = [];
-      let error = null;
+      let data: any[] | null = [];
+      let error: any = null;
 
       // Fetch based on active filter
       if (activeFilter === 'trending' || activeFilter === 'popular') {

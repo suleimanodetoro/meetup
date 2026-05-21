@@ -8,13 +8,16 @@ export async function pickAndEncodeImage(
   maxWidth = 2000,
   compress = 0.8
 ): Promise<{ uri: string; base64: string } | null> {
-  // Check current permission status first
+  // Check current permission status first. On iOS the user may grant
+  // "Limited" access (a subset of photos) — `accessPrivileges` exposes that;
+  // the legacy `status` enum does not, so use it for the limited check.
   const currentPerm = await ImagePicker.getMediaLibraryPermissionsAsync();
-  
-  // Only request if not already granted or limited
-  if (!currentPerm.granted && currentPerm.status !== 'limited') {
+  const isLimited = (p: { accessPrivileges?: string }) =>
+    p.accessPrivileges === 'limited';
+
+  if (!currentPerm.granted && !isLimited(currentPerm)) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted && perm.status !== 'limited') {
+    if (!perm.granted && !isLimited(perm)) {
       return null;
     }
   }

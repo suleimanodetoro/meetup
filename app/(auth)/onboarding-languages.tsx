@@ -58,7 +58,7 @@ export default function OnboardingLanguagesScreen() {
     });
   };
 
-  const LanguageItem = ({ item }: { item: typeof LANGUAGES[0] }) => {
+  const LanguageItem = ({ item }: { item: (typeof LANGUAGES)[number] }) => {
     const isSelected = selectedLanguages.includes(item.code);
     
     return (

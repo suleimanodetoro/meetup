@@ -13,7 +13,7 @@ export function useUpsellTrigger() {
   const [hasTriggered, setHasTriggered] = useState(false);
   const [canRetrigger, setCanRetrigger] = useState(true);
   const visibilityState = useRef<VisibilityState>({});
-  const debounceTimer = useRef<NodeJS.Timeout>();
+  const debounceTimer = useRef<NodeJS.Timeout | undefined>(undefined);
   const sessionShownCount = useRef(0);
   const MAX_SHOWS_PER_SESSION = 3; // Limit to 3 shows per app session
   

@@ -196,8 +196,8 @@ export default function ReviewScreen() {
     
     // Pass fromCreation=true to show X button
     router.replace({
-      pathname: `/event/${eventId}`,
-      params: { fromCreation: 'true' }
+      pathname: '/event/[id]',
+      params: { id: String(eventId), fromCreation: 'true' }
     });
     
     // Optional: Reset form after a delay to ensure navigation completes

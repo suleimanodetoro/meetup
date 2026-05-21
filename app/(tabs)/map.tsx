@@ -86,7 +86,7 @@ export default function MapScreen() {
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('location, location_country, location_country_code')
-      .eq('id', session?.user.id)
+      .eq('id', session?.user?.id ?? '')
       .single();
 
     if (error) throw error;
@@ -252,7 +252,7 @@ export default function MapScreen() {
           location_country_code: countryCode,
           location_updated_at: new Date().toISOString(),
         })
-        .eq('id', session?.user.id);
+        .eq('id', session?.user?.id ?? '');
 
       if (!error) {
         setUserCity(city);
@@ -347,12 +347,12 @@ export default function MapScreen() {
     try {
       const { data, error } = await supabase.rpc('get_users_in_city', {
         city_name: city,
-        country_name: country,
+        country_name: country ?? undefined,
       });
 
       if (error) throw error;
 
-      setUsersInCity(data || []);
+      setUsersInCity((data || []) as any);
     } catch (error) {
       console.error('Error fetching users:', error);
       setUsersInCity([]);

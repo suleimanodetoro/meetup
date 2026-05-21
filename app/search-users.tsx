@@ -57,7 +57,7 @@ export default function SearchUsersScreen() {
           limit_count: 10
         });
 
-      setSuggestedUsers(data || []);
+      setSuggestedUsers((data || []) as unknown as SearchResult[]);
     } catch (error) {
       console.error('Error fetching suggested users:', error);
     }
@@ -85,7 +85,7 @@ export default function SearchUsersScreen() {
           });
 
         if (error) throw error;
-        setSearchResults(data || []);
+        setSearchResults((data || []) as unknown as SearchResult[]);
       } catch (error) {
         console.error('Error searching users:', error);
       } finally {
@@ -164,20 +164,24 @@ export default function SearchUsersScreen() {
             </Text>
           )}
           
-          {hasMutualConnections && (
-            <View style={styles.mutualInfo}>
-              {item.mutual_friends_count > 0 && (
-                <Text style={styles.mutualText}>
-                  {item.mutual_friends_count} mutual friend{item.mutual_friends_count > 1 ? 's' : ''}
-                </Text>
-              )}
-              {item.mutual_plans_count > 0 && (
-                <Text style={styles.mutualText}>
-                  {item.mutual_plans_count} mutual plan{item.mutual_plans_count > 1 ? 's' : ''}
-                </Text>
-              )}
-            </View>
-          )}
+          {hasMutualConnections && (() => {
+            const friendCount = item.mutual_friends_count ?? 0;
+            const planCount = item.mutual_plans_count ?? 0;
+            return (
+              <View style={styles.mutualInfo}>
+                {friendCount > 0 && (
+                  <Text style={styles.mutualText}>
+                    {friendCount} mutual friend{friendCount > 1 ? 's' : ''}
+                  </Text>
+                )}
+                {planCount > 0 && (
+                  <Text style={styles.mutualText}>
+                    {planCount} mutual plan{planCount > 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
         </View>
 
         {/* Friend button */}
@@ -281,20 +285,27 @@ export default function SearchUsersScreen() {
             ListEmptyComponent={<NoResults />}
           />
         ) : (
-          <FlatList
+          <FlatList<
+            | { kind: 'header'; title: string }
+            | (SearchResult & { kind: 'user' })
+          >
             data={[
-              ...(recentSearches.length > 0 ? [{ type: 'header', title: 'Recent' }] : []),
-              ...recentSearches.map(u => ({ ...u, type: 'recent' })),
-              ...(suggestedUsers.length > 0 ? [{ type: 'header', title: 'Suggested for You' }] : []),
-              ...suggestedUsers.map(u => ({ ...u, type: 'suggested' })),
+              ...(recentSearches.length > 0
+                ? [{ kind: 'header' as const, title: 'Recent' }]
+                : []),
+              ...recentSearches.map((u) => ({ ...u, kind: 'user' as const })),
+              ...(suggestedUsers.length > 0
+                ? [{ kind: 'header' as const, title: 'Suggested for You' }]
+                : []),
+              ...suggestedUsers.map((u) => ({ ...u, kind: 'user' as const })),
             ]}
             renderItem={({ item }) => {
-              if (item.type === 'header') {
-                return renderSectionHeader(item.title);
-              }
-              return renderUser({ item } as any);
+              if (item.kind === 'header') return renderSectionHeader(item.title);
+              return renderUser({ item });
             }}
-            keyExtractor={(item, index) => item.id || `header-${index}`}
+            keyExtractor={(item, index) =>
+              item.kind === 'header' ? `header-${index}` : item.id
+            }
             contentContainerStyle={
               recentSearches.length === 0 && suggestedUsers.length === 0 && styles.emptyContainer
             }

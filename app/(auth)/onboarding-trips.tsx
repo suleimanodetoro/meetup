@@ -103,8 +103,14 @@ export default function OnboardingTripsScreen() {
 
     setLoading(true);
     try {
+      const userId = session?.user?.id;
+      if (!userId) {
+        Alert.alert('Not signed in');
+        setLoading(false);
+        return;
+      }
       const { error } = await supabase.from('visits').insert({
-        user_id: session?.user.id,
+        user_id: userId,
         city: selectedDestination.city,
         country: selectedDestination.country,
         country_code: selectedDestination.country_code,

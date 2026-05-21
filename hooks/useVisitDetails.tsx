@@ -64,9 +64,9 @@ export function useVisitDetails(visitId: string) {
 
       // Fetch users visiting the same city
       const { data: usersData, error: usersError } = await supabase
-        .rpc('get_visit_users', { 
+        .rpc('get_visit_users', {
           visit_id_param: parseInt(visitId),
-          limit_param: null // Get all users, we'll handle blur on client
+          limit_param: undefined, // Get all users, we'll handle blur on client
         });
 
       if (usersError) throw usersError;

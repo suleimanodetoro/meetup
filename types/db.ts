@@ -8,6 +8,6 @@ export type Attendance = Database['public']['Tables']['attendance']['Row'];
 // Updating the Event type to include all new columns
 export type Event = Database['public']['Tables']['events']['Row'];
 
-// Keeping the NearbyEvent type, which we may use later
+// nearby_events RPC returns an array of rows; this type is one row.
 export type NearbyEvent =
-  Database['public']['Functions']['nearby_events']['Returns'];
+  Database['public']['Functions']['nearby_events']['Returns'][number];

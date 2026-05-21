@@ -71,7 +71,7 @@ export default function OnboardingLocationScreen() {
               location_country_code: place.isoCountryCode,
               location_updated_at: new Date().toISOString(),
             })
-            .eq('id', session?.user.id);
+            .eq('id', session?.user?.id ?? '');
 
           if (error) {
             console.error('Error saving location:', error);
@@ -81,8 +81,8 @@ export default function OnboardingLocationScreen() {
             // Show success feedback
             setDetectedLocation({
               city: city,
-              country: place.country,
-              countryCode: place.isoCountryCode,
+              country: place.country ?? undefined,
+              countryCode: place.isoCountryCode ?? undefined,
             });
             
             // Navigate after showing success (only once!)

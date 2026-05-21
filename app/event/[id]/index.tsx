@@ -133,11 +133,11 @@ export default function PlanDetailsScreen() {
             is_optional
           )
         `)
-        .eq('id', id)
+        .eq('id', Number(id))
         .single();
 
       if (eventError) throw eventError;
-      setEvent(eventData);
+      setEvent(eventData as unknown as EventDetails);
 
       if (session?.user?.id) {
         const isUserAttending = eventData.attendees?.some(
@@ -155,7 +155,7 @@ export default function PlanDetailsScreen() {
 
   const handleJoinPlan = async () => {
     if (!session?.user?.id) {
-      router.push('/auth');
+      router.push('/welcome');
       return;
     }
 
@@ -551,13 +551,13 @@ export default function PlanDetailsScreen() {
               />
             </View>
             {expandedSections.managedBy && event.creator && (
-              <Pressable 
+              <Pressable
                 style={styles.organizerRow}
-                onPress={() => router.push(`/profile/${event.creator.id}`)}
+                onPress={() => router.push(`/profile/${event.creator!.id}`)}
               >
                 <Image
-                  source={{ 
-                    uri: event.creator.avatar_url || `https://i.pravatar.cc/100?u=${event.creator.id}` 
+                  source={{
+                    uri: event.creator.avatar_url || `https://i.pravatar.cc/100?u=${event.creator.id}`
                   }}
                   style={styles.organizerAvatar}
                 />

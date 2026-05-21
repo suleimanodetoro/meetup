@@ -246,7 +246,7 @@ export default function EditProfile() {
         // gender / gender_preference
         if (profile.gender) {
           console.log('🚻 Setting gender:', profile.gender);
-          setGender(profile.gender);
+          setGender(profile.gender as 'female' | 'male' | 'non-binary' | 'prefer-not-to-say');
         }
         if (profile.gender_preference) {
           const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';

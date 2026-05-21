@@ -64,9 +64,9 @@ export default function PrivacySettingsScreen() {
           .select()
           .single();
 
-        setSettings(newSettings);
+        setSettings(newSettings as unknown as UserPrivacySettings | null);
       } else if (data) {
-        setSettings(data);
+        setSettings(data as unknown as UserPrivacySettings);
       }
     } catch (error) {
       console.error('Error fetching privacy settings:', error);
@@ -87,7 +87,7 @@ export default function PrivacySettingsScreen() {
         `)
         .eq('blocker_id', session.user.id);
 
-      setBlockedUsers(data || []);
+      setBlockedUsers((data || []) as unknown as BlockedUser[]);
     } catch (error) {
       console.error('Error fetching blocked users:', error);
     }
@@ -126,11 +126,13 @@ export default function PrivacySettingsScreen() {
         {
           text: 'Unblock',
           onPress: async () => {
+            const blockerId = session?.user?.id;
+            if (!blockerId) return;
             try {
               await supabase
                 .from('blocked_users')
                 .delete()
-                .eq('blocker_id', session?.user?.id)
+                .eq('blocker_id', blockerId)
                 .eq('blocked_id', blockedUserId);
 
               setBlockedUsers(prev => prev.filter(b => b.blocked_id !== blockedUserId));

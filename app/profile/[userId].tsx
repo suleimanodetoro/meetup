@@ -85,7 +85,7 @@ export default function UserProfileScreen() {
       }
       
       console.log('✅ Profile loaded:', profileData);
-      setProfile(profileData);
+      setProfile(profileData as unknown as UserProfile);
 
       // Fetch travel stats
       const { data: visits } = await supabase

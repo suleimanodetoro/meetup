@@ -34,7 +34,8 @@ export default function FriendRequestsScreen() {
   }, [session]);
 
   const fetchFriendRequests = async () => {
-    if (!session?.user?.id) return;
+    const userId = session?.user?.id;
+    if (!userId) return;
 
     try {
       // Fetch pending friend requests
@@ -44,43 +45,46 @@ export default function FriendRequestsScreen() {
           *,
           requester:profiles!friendships_requester_id_fkey(*)
         `)
-        .eq('addressee_id', session.user.id)
+        .eq('addressee_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Transform to FriendRequest format and fetch mutual data
+      // Transform to FriendRequest format and fetch mutual data. Skip any
+      // rows missing a requester_id (the column is nullable in the schema).
       const requestsWithMutuals = await Promise.all(
-        (friendshipData || []).map(async (friendship) => {
-          // Fetch mutual friends
-          const { data: mutualFriends } = await supabase
-            .rpc('get_mutual_friends', {
-              user1_id: session.user.id,
-              user2_id: friendship.requester_id
-            });
+        (friendshipData || [])
+          .filter((f) => typeof f.requester_id === 'string')
+          .map(async (friendship) => {
+            const requesterId = friendship.requester_id as string;
 
-          // Fetch mutual plans (events both users are attending)
-          const { data: mutualPlans } = await supabase
-            .from('attendance')
-            .select('event:events(*)')
-            .eq('user_id', session.user.id)
-            .in('event_id', 
-              await supabase
-                .from('attendance')
-                .select('event_id')
-                .eq('user_id', friendship.requester_id)
-                .then(res => res.data?.map(a => a.event_id) || [])
-            );
+            const { data: mutualFriends } = await supabase
+              .rpc('get_mutual_friends', {
+                user1_id: userId,
+                user2_id: requesterId,
+              });
 
-          return {
-            id: friendship.id,
-            from_user: friendship.requester,
-            created_at: friendship.created_at,
-            mutual_friends: mutualFriends || [],
-            mutual_plans: mutualPlans?.map(a => a.event) || [],
-          } as FriendRequest;
-        })
+            const { data: mutualPlans } = await supabase
+              .from('attendance')
+              .select('event:events(*)')
+              .eq('user_id', userId)
+              .in('event_id',
+                await supabase
+                  .from('attendance')
+                  .select('event_id')
+                  .eq('user_id', requesterId)
+                  .then(res => res.data?.map(a => a.event_id) || [])
+              );
+
+            return {
+              id: friendship.id,
+              from_user: friendship.requester,
+              created_at: friendship.created_at,
+              mutual_friends: mutualFriends || [],
+              mutual_plans: mutualPlans?.map(a => a.event) || [],
+            } as unknown as FriendRequest;
+          })
       );
 
       setRequests(requestsWithMutuals);
@@ -185,22 +189,27 @@ export default function FriendRequestsScreen() {
             </Text>
             
             {/* Mutual connections */}
-            {(item.mutual_friends?.length > 0 || item.mutual_plans?.length > 0) && (
-              <View style={styles.mutualInfo}>
-                {item.mutual_friends?.length > 0 && (
-                  <Text style={styles.mutualText}>
-                    <Ionicons name="people-outline" size={12} color="#666" />
-                    {' '}{item.mutual_friends.length} mutual friend{item.mutual_friends.length > 1 ? 's' : ''}
-                  </Text>
-                )}
-                {item.mutual_plans?.length > 0 && (
-                  <Text style={styles.mutualText}>
-                    <Ionicons name="calendar-outline" size={12} color="#666" />
-                    {' '}{item.mutual_plans.length} mutual plan{item.mutual_plans.length > 1 ? 's' : ''}
-                  </Text>
-                )}
-              </View>
-            )}
+            {(() => {
+              const friends = item.mutual_friends ?? [];
+              const plans = item.mutual_plans ?? [];
+              if (friends.length === 0 && plans.length === 0) return null;
+              return (
+                <View style={styles.mutualInfo}>
+                  {friends.length > 0 && (
+                    <Text style={styles.mutualText}>
+                      <Ionicons name="people-outline" size={12} color="#666" />
+                      {' '}{friends.length} mutual friend{friends.length > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                  {plans.length > 0 && (
+                    <Text style={styles.mutualText}>
+                      <Ionicons name="calendar-outline" size={12} color="#666" />
+                      {' '}{plans.length} mutual plan{plans.length > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
           </View>
         </Pressable>
 

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  type ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
@@ -73,11 +74,16 @@ export default function VisitDetailsBottomSheet({
     minimumViewTime: 120,
   }).current;
 
-  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
-    viewableItems.forEach((item) => {
-      onUserCardVisible(item.index, item.isViewable);
-    });
-  }, [onUserCardVisible]);
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      viewableItems.forEach((item) => {
+        if (item.index !== null) {
+          onUserCardVisible(item.index, item.isViewable);
+        }
+      });
+    },
+    [onUserCardVisible],
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -85,7 +91,7 @@ export default function VisitDetailsBottomSheet({
     setRefreshing(false);
   }, [onRefresh]);
 
-  const renderUserItem = ({ item, index }) => {
+  const renderUserItem = ({ item, index }: { item: any; index: number }) => {
     const isBlurred = !hasSubscription && index >= BLUR_START_INDEX;
     
     return (
@@ -111,7 +117,7 @@ export default function VisitDetailsBottomSheet({
     );
   };
 
-  const renderPlanItem = ({ item }) => (
+  const renderPlanItem = ({ item }: { item: any }) => (
     <Pressable
       style={styles.cardWrapper}
       onPress={() => router.push(`/event/${item.event_id}`)}

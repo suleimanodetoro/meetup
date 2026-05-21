@@ -38,7 +38,7 @@ export function useSubscription() {
         console.error('Error checking subscription:', error);
       }
 
-      setSubscription(data || null);
+      setSubscription((data ?? null) as unknown as Subscription | null);
     } catch (error) {
       console.error('Error checking subscription:', error);
       setSubscription(null);
