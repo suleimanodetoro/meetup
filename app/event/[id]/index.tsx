@@ -345,7 +345,17 @@ export default function PlanDetailsScreen() {
           {/* Title and Location */}
           <View style={styles.titleSection}>
             <Text style={styles.title}>{event.title}</Text>
-            <View style={styles.locationRow}>
+            <Pressable
+              style={styles.locationRow}
+              disabled={!event.city}
+              onPress={() => {
+                if (!event.city) return;
+                router.push(
+                  `/explore?searchQuery=${encodeURIComponent(event.city)}` as never,
+                );
+              }}
+              hitSlop={6}
+            >
               <Text style={styles.locationFlag}>
                 {getCountryFlag(event.country_code)}
               </Text>
@@ -353,7 +363,15 @@ export default function PlanDetailsScreen() {
                 {event.location_name || event.city}
                 {event.country && `, ${event.country}`}
               </Text>
-            </View>
+              {event.city ? (
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color="#9CA3AF"
+                  style={{ marginLeft: 4 }}
+                />
+              ) : null}
+            </Pressable>
           </View>
 
           {/* Date */}

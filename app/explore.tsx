@@ -213,10 +213,12 @@ function todayLocalDate(): string {
 }
 
 export default function ExploreScreen() {
-  const params = useLocalSearchParams<{ filter?: string }>();
+  const params = useLocalSearchParams<{ filter?: string; searchQuery?: string }>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(
+    typeof params.searchQuery === 'string' ? params.searchQuery : '',
+  );
   const [activeFilter, setActiveFilter] = useState<string>(
     typeof params.filter === 'string' ? params.filter : 'trending',
   );
