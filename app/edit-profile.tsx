@@ -18,7 +18,7 @@ import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import { COUNTRIES } from '~/utils/countryFlags';
-import { MEETING_PREFERENCES } from '~/utils/constants';
+import { LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
 import { useAuth } from './contexts/AuthProvider';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 import { Ionicons } from '@expo/vector-icons';
@@ -114,9 +114,10 @@ export default function EditProfile() {
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
 
-  // Gender & Preferences
-  const [gender, setGender] =
-    useState<'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null>(null);
+  // Gender & Preferences. The values mirror onboarding-gender's options
+  // (male / female / other) — using a wider union here silently dropped
+  // any onboarding-written 'other' into a state with no rendered option.
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | null>(null);
   const [genderPreference, setGenderPreference] =
     useState<'everyone' | 'guys' | 'girls'>('everyone');
 
@@ -186,7 +187,6 @@ export default function EditProfile() {
     setLoading(true);
     
     try {
-      // Select base fields + new avatar fields
       const { data: profile, error } = await supabase
         .from('profiles')
         .select(`
@@ -203,7 +203,10 @@ export default function EditProfile() {
           nationality_code,
           interests,
           gender_preference,
-          meeting_preference
+          meeting_preference,
+          instagram_url,
+          tiktok_url,
+          youtube_url
         `)
         .eq('id', session.user.id)
         .single();
@@ -224,11 +227,12 @@ export default function EditProfile() {
         setSecondImage(profile.avatar_url_2 ?? null);
         setThirdImage(profile.avatar_url_3 ?? null);
 
-        // birth_date -> dob
+        // birth_date -> dob. `birth_date` is a postgres DATE (YYYY-MM-DD);
+        // appending a local time avoids the UTC-midnight-drift-into-prev-day
+        // bug in negative-UTC timezones.
         if (profile.birth_date) {
-          const dobDate = new Date(profile.birth_date);
-          console.log('📅 Setting DOB:', dobDate);
-          setDob(dobDate);
+          const dobDate = new Date(`${profile.birth_date}T00:00:00`);
+          if (!isNaN(dobDate.getTime())) setDob(dobDate);
         }
 
         // nationality_code/name -> Country object
@@ -243,10 +247,14 @@ export default function EditProfile() {
         console.log('🌍 Country found:', foundCountry);
         setCountry(foundCountry);
 
-        // gender / gender_preference
+        // gender / gender_preference. Normalize any legacy values to the
+        // onboarding-aligned set; everything else falls through to 'other'.
         if (profile.gender) {
-          console.log('🚻 Setting gender:', profile.gender);
-          setGender(profile.gender as 'female' | 'male' | 'non-binary' | 'prefer-not-to-say');
+          const normalised: 'male' | 'female' | 'other' =
+            profile.gender === 'male' || profile.gender === 'female'
+              ? profile.gender
+              : 'other';
+          setGender(normalised);
         }
         if (profile.gender_preference) {
           const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
@@ -270,26 +278,22 @@ export default function EditProfile() {
           setInterests(profile.interests as string[]);
         }
 
-        // Try to load social media fields if they exist
-        try {
-          const { data: socialData } = await supabase
-            .from('profiles')
-            .select('instagram_url, tiktok_url, youtube_url')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (socialData) {
-            console.log('📱 Social media data loaded:', socialData);
-            // Extract username/handle from URLs for display
-            setInstagramInput(socialData.instagram_url ? socialHelpers.instagram.fromUrl(socialData.instagram_url) : '');
-            setTiktokInput(socialData.tiktok_url ? socialHelpers.tiktok.fromUrl(socialData.tiktok_url) : '');
-            setYoutubeInput(socialData.youtube_url ? socialHelpers.youtube.fromUrl(socialData.youtube_url) : '');
-          }
-        } catch (socialError) {
-          console.log('⚠️ Social media columns not yet added to database (this is OK)');
-        }
-
-        console.log('✅ All profile data set successfully!');
+        // Extract username/handle from URLs for display
+        setInstagramInput(
+          profile.instagram_url
+            ? socialHelpers.instagram.fromUrl(profile.instagram_url)
+            : '',
+        );
+        setTiktokInput(
+          profile.tiktok_url
+            ? socialHelpers.tiktok.fromUrl(profile.tiktok_url)
+            : '',
+        );
+        setYoutubeInput(
+          profile.youtube_url
+            ? socialHelpers.youtube.fromUrl(profile.youtube_url)
+            : '',
+        );
       } else {
         console.log('⚠️ No profile data returned');
       }
@@ -305,11 +309,13 @@ export default function EditProfile() {
 
   // Image picking (storage upload only; DB save happens in saveProfile)
   const pickImage = async (position: 'main' | 'second' | 'third') => {
+    const userId = session?.user?.id;
+    if (!userId) return;
     try {
       const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
       if (!picked) return;
 
-      const fileName = `${session?.user.id}-${position}-${Date.now()}.jpg`;
+      const fileName = `${userId}-${position}-${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -380,35 +386,19 @@ export default function EditProfile() {
       throw baseError;
     }
 
-    console.log('✅ Base profile saved successfully');
-
-    // Convert usernames to full URLs before saving
-    if (instagramInput || tiktokInput || youtubeInput) {
-      try {
-        const socialPayload = {
-          instagram_url: socialHelpers.instagram.toUrl(instagramInput) || null,
-          tiktok_url: socialHelpers.tiktok.toUrl(tiktokInput) || null,
-          youtube_url: socialHelpers.youtube.toUrl(youtubeInput) || null,
-        };
-
-        console.log('📱 Attempting to save social media data:', socialPayload);
-
-        const { error: socialError } = await supabase
-          .from('profiles')
-          .update(socialPayload)
-          .eq('id', session.user.id);
-
-        if (socialError) {
-          console.log('⚠️ Social media fields not saved (columns may not exist yet):', socialError.message);
-        } else {
-          console.log('✅ Social media data saved successfully');
-        }
-      } catch (socialErr) {
-        console.log('⚠️ Could not save social media data (columns may not exist yet)');
-      }
-    }
-
-    console.log('🎉 Profile update complete!');
+    // Save social URLs as part of the same update path. We always include
+    // them — passing null when cleared lets the user actually unset a
+    // previously-saved handle.
+    const socialPayload = {
+      instagram_url: socialHelpers.instagram.toUrl(instagramInput) || null,
+      tiktok_url: socialHelpers.tiktok.toUrl(tiktokInput) || null,
+      youtube_url: socialHelpers.youtube.toUrl(youtubeInput) || null,
+    };
+    const { error: socialError } = await supabase
+      .from('profiles')
+      .update(socialPayload)
+      .eq('id', session.user.id);
+    if (socialError) throw socialError;
     Alert.alert('Saved', 'Your profile has been updated.');
     router.back();
   } catch (err) {
@@ -669,6 +659,39 @@ export default function EditProfile() {
           <Ionicons name="calendar-outline" size={20} color="#666" />
         </Pressable>
 
+        {/* Gender */}
+        <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Gender</Text>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+          {(['male', 'female', 'other'] as const).map((opt) => (
+            <Pressable
+              key={opt}
+              onPress={() => setGender(opt)}
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: gender === opt ? '#007AFF' : '#E0E0E0',
+                backgroundColor: gender === opt ? '#EAF3FF' : 'white',
+              }}
+            >
+              <Text style={{ fontSize: 18, marginRight: 6 }}>
+                {opt === 'male' ? '👨' : opt === 'female' ? '👩' : '✨'}
+              </Text>
+              <Text style={{
+                fontSize: 14,
+                fontWeight: gender === opt ? '600' : '400',
+                color: gender === opt ? '#007AFF' : '#666',
+              }}>
+                {opt.charAt(0).toUpperCase() + opt.slice(1)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         {/* Gender Preference */}
         <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Gender Preference</Text>
         <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>You'll only receive messages from this gender</Text>
@@ -867,16 +890,26 @@ export default function EditProfile() {
         >
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {languages.length > 0 ? (
-              languages.map((lang, idx) => (
-                <View key={idx} style={{ 
-                  backgroundColor: '#007AFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 16
-                }}>
-                  <Text style={{ color: 'white', fontSize: 13, fontWeight: '500' }}>{lang}</Text>
-                </View>
-              ))
+              languages.map((code) => {
+                const lang = LANGUAGES.find((l) => l.code === code);
+                return (
+                  <View
+                    key={code}
+                    style={{
+                      backgroundColor: '#007AFF',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                    }}
+                  >
+                    <Text
+                      style={{ color: 'white', fontSize: 13, fontWeight: '500' }}
+                    >
+                      {lang ? lang.name : code}
+                    </Text>
+                  </View>
+                );
+              })
             ) : (
               <Text style={{ color: '#999', fontSize: 15 }}>Add languages</Text>
             )}
@@ -1037,32 +1070,37 @@ export default function EditProfile() {
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
-            {/* why are we hard coding languages here ??? */}
-            {['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Russian', 'Hindi', 'Hausa'].map((lang) => (
-              <Pressable
-                key={lang}
-                onPress={() => {
-                  if (languages.includes(lang)) {
-                    setLanguages(languages.filter((l) => l !== lang));
-                  } else {
-                    setLanguages([...languages, lang]);
-                  }
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 14,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#F0F0F0'
-                }}
-              >
-                <Text style={{ fontSize: 16 }}>{lang}</Text>
-                {languages.includes(lang) && (
-                  <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-                )}
-              </Pressable>
-            ))}
+            {LANGUAGES.map((lang) => {
+              const selected = languages.includes(lang.code);
+              return (
+                <Pressable
+                  key={lang.code}
+                  onPress={() => {
+                    if (selected) {
+                      setLanguages(languages.filter((c) => c !== lang.code));
+                    } else {
+                      setLanguages([...languages, lang.code]);
+                    }
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F0F0F0',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 24, marginRight: 10 }}>{lang.flag}</Text>
+                    <Text style={{ fontSize: 16 }}>{lang.name}</Text>
+                  </View>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </SafeAreaView>
       </Modal>

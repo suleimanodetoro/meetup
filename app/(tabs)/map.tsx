@@ -1,5 +1,5 @@
 // app/(tabs)/map.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '../contexts/AuthProvider';
@@ -76,9 +76,16 @@ export default function MapScreen() {
   const [hasCheckedLocation, setHasCheckedLocation] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  useEffect(() => {
-    loadUserLocationAndCheckForChanges();
-  }, []);
+
+  // Re-run on every tab focus so changes made in edit-profile (or anywhere
+  // else that updates `profiles.location`) are reflected when the user
+  // comes back to the map. Tab screens stay mounted across tab switches,
+  // so a plain useEffect on [] would only run once at first mount.
+  useFocusEffect(
+    useCallback(() => {
+      loadUserLocationAndCheckForChanges();
+    }, [session?.user?.id]),
+  );
 
   const loadUserLocationAndCheckForChanges = async () => {
   try {
@@ -243,6 +250,8 @@ export default function MapScreen() {
 };
 
   const updateLocationInDB = async (city: string, country: string | null | undefined, countryCode: string | null | undefined) => {
+    const userId = session?.user?.id;
+    if (!userId) return;
     try {
       const { error } = await supabase
         .from('profiles')
@@ -252,30 +261,34 @@ export default function MapScreen() {
           location_country_code: countryCode,
           location_updated_at: new Date().toISOString(),
         })
-        .eq('id', session?.user?.id ?? '');
+        .eq('id', userId);
 
-      if (!error) {
-        setUserCity(city);
-        setDisplayCity(city);
-        setUserCountry(country || null);
-        
-        const coords = await geocodeCity(city);
-        if (coords) {
-          setMapCenter([coords.lng, coords.lat]);
-          setTimeout(() => {
-            cameraRef.current?.setCamera({
-              centerCoordinate: [coords.lng, coords.lat],
-              zoomLevel: 12,
-              animationDuration: 2000,
-            });
-          }, 100);
-        }
+      if (error) throw error;
 
-        await fetchUsersInCity(city, country || null);
-        setIsSearching(false);
+      setUserCity(city);
+      setDisplayCity(city);
+      setUserCountry(country || null);
+
+      const coords = await geocodeCity(city);
+      if (coords) {
+        setMapCenter([coords.lng, coords.lat]);
+        setTimeout(() => {
+          cameraRef.current?.setCamera({
+            centerCoordinate: [coords.lng, coords.lat],
+            zoomLevel: 12,
+            animationDuration: 2000,
+          });
+        }, 100);
       }
-    } catch (error) {
-      console.error('Error updating location:', error);
+
+      await fetchUsersInCity(city, country || null);
+      setIsSearching(false);
+    } catch (err) {
+      console.error('Error updating location:', err);
+      Alert.alert(
+        "Couldn't update location",
+        'Please try again in a moment.',
+      );
     }
   };
 

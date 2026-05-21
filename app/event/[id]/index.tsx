@@ -1,5 +1,4 @@
-// app/event/[id]/index.tsx - FIXED VERSION
-
+// app/event/[id]/index.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -27,6 +26,12 @@ import { useAuth } from '~/app/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/geographic';
 
 const { width, height } = Dimensions.get('window');
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$',
+  CHF: 'CHF', CNY: '¥', SEK: 'kr', NOK: 'kr', DKK: 'kr',
+  INR: '₹', NGN: '₦', ZAR: 'R', BRL: 'R$', MXN: 'MX$',
+};
 
 interface EventDetails {
   id: number;
@@ -158,21 +163,26 @@ export default function PlanDetailsScreen() {
       router.push('/welcome');
       return;
     }
+    const eventId = Number(id);
+    if (!Number.isFinite(eventId)) {
+      Alert.alert('Error', 'Invalid plan id');
+      return;
+    }
 
     setJoining(true);
     try {
       const { error } = await supabase
         .from('attendance')
         .insert({
-          event_id: parseInt(id),
+          event_id: eventId,
           user_id: session.user.id,
         });
 
       if (error) throw error;
-      router.push(`/chat/${id}`);
+      router.push(`/chat/${id}` as never);
     } catch (error: any) {
       if (error?.code === '23505') {
-        router.push(`/chat/${id}`);
+        router.push(`/chat/${id}` as never);
       } else {
         console.error('Error joining plan:', error);
         Alert.alert('Error', 'Failed to join plan');
@@ -195,16 +205,27 @@ export default function PlanDetailsScreen() {
     }
   };
 
+  // `events.date` and `events.end_date` are postgres DATE columns
+  // (YYYY-MM-DD). Parsing them via `new Date(...)` treats them as UTC
+  // midnight, which displays as the prior day in negative-UTC timezones.
+  // Append a local time component before parsing.
+  const parseLocalDate = (dateString: string): Date | null => {
+    if (!dateString) return null;
+    const d = new Date(`${dateString}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const formatDate = (dateString: string, endDateString?: string) => {
-    const date = new Date(dateString);
-    const endDate = endDateString ? new Date(endDateString) : null;
-    
+    const date = parseLocalDate(dateString);
+    if (!date) return '';
+    const endDate = endDateString ? parseLocalDate(endDateString) : null;
+
     const options: Intl.DateTimeFormatOptions = {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     };
-    
+
     if (endDate && dateString !== endDateString) {
       return `${date.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
     }
@@ -249,9 +270,9 @@ export default function PlanDetailsScreen() {
   const formatCost = (amount: number | null) => {
     if (amount === null || amount === undefined) return null;
     if (amount === 0) return 'Free';
-    
-    const currency = event?.cost_currency || 'USD';
-    const symbol = currency === 'USD' ? '$' : currency;
+
+    const code = (event?.cost_currency ?? 'USD').toUpperCase();
+    const symbol = CURRENCY_SYMBOLS[code] ?? `${code} `;
     return `${symbol}${amount.toFixed(0)}`;
   };
 
@@ -278,11 +299,7 @@ export default function PlanDetailsScreen() {
     );
   }
 
-  const isCreator = session?.user?.id === event.user_id;
   const attendeeCount = event.attendees?.length || 0;
-  const spotsLeft = event.max_attendees 
-    ? Math.max(0, event.max_attendees - attendeeCount)
-    : null;
   const totalCost = calculateTotalCost();
   const costDisplay = formatCost(totalCost);
 
