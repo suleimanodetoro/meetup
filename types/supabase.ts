@@ -800,6 +800,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_city_meta_window: {
+        Args: { city_name: string; window_from?: string; window_to?: string }
+        Returns: {
+          city: string
+          country: string
+          country_code: string
+          user_count: number
+          plan_count: number
+        }[]
+      }
       get_city_overview: {
         Args: { city_name: string }
         Returns: {
@@ -810,6 +820,50 @@ export type Database = {
           plan_count: number
           users: Json
           plans: Json
+        }[]
+      }
+      get_city_plans_ranked: {
+        Args: {
+          city_name: string
+          window_from?: string
+          window_to?: string
+          page_limit?: number
+          page_offset?: number
+        }
+        Returns: {
+          event_id: number
+          title: string
+          description: string
+          image_uri: string
+          date: string
+          end_date: string
+          location_name: string
+          cost: number
+          cost_currency: string
+          attendee_count: number
+          host_name: string
+          host_avatar: string
+          match_score: number
+        }[]
+      }
+      get_city_users_ranked: {
+        Args: {
+          city_name: string
+          window_from?: string
+          window_to?: string
+          page_limit?: number
+          page_offset?: number
+        }
+        Returns: {
+          user_id: string
+          full_name: string
+          avatar_url: string
+          bio: string
+          nationality_code: string
+          is_verified: boolean
+          visit_start: string
+          visit_end: string
+          match_score: number
         }[]
       }
       get_friendship_status: {
@@ -1052,6 +1106,15 @@ export type Database = {
           dist_meters: number
         }[]
       }
+      search_cities: {
+        Args: { query: string; max_results?: number }
+        Returns: {
+          city: string
+          country: string
+          country_code: string
+          activity_count: number
+        }[]
+      }
       search_users_for_friends: {
         Args: { searcher_id: string; search_term: string; limit_count?: number }
         Returns: {
@@ -1188,3 +1251,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
