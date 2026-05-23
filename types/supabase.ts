@@ -810,18 +810,6 @@ export type Database = {
           plan_count: number
         }[]
       }
-      get_city_overview: {
-        Args: { city_name: string }
-        Returns: {
-          city: string
-          country: string
-          country_code: string
-          user_count: number
-          plan_count: number
-          users: Json
-          plans: Json
-        }[]
-      }
       get_city_plans_ranked: {
         Args: {
           city_name: string
