@@ -237,7 +237,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
           <Pressable
-            onPress={() => router.push('/explore')}
+            onPress={() => router.push('/search')}
             accessibilityRole="button"
             hitSlop={8}
             style={{
@@ -249,7 +249,9 @@ export default function HomeScreen() {
               paddingVertical: 12,
             }}>
             <Ionicons name="search" size={20} color="#999" />
-            <Text style={{ fontSize: 16, color: '#999', marginLeft: 8 }}>Search trips</Text>
+            <Text style={{ fontSize: 16, color: '#999', marginLeft: 8 }}>
+              Search a city or date range
+            </Text>
           </Pressable>
         </View>
 
