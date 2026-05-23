@@ -7,11 +7,10 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
   type ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import UserCard from './UserCard';
@@ -19,53 +18,32 @@ import PlanCard from './PlanCard';
 import { useSubscription } from '~/hooks/useSubscription';
 import { getCountryFlag } from '~/utils/countryFlags';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BLUR_START_INDEX = 10;
 
-// `start_date` / `end_date` are postgres DATE columns (YYYY-MM-DD), so
-// parse as local midnight to avoid UTC drift in negative-UTC zones.
-const formatDateRange = (startDate: string, endDate: string) => {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
-
-  const options: Intl.DateTimeFormatOptions = {
-    month: 'short',
-    day: 'numeric',
-  };
-  const startFormatted = start.toLocaleDateString('en-US', options);
-  const endFormatted = end.toLocaleDateString('en-US', options);
-
-  if (start.getMonth() === end.getMonth()) {
-    return `${startFormatted} - ${end.getDate()}, ${end.getFullYear()}`;
-  }
-  return `${startFormatted} - ${endFormatted}, ${end.getFullYear()}`;
-};
-
 interface Props {
-  // The bottom-sheet header takes a generic shape that's compatible with
-  // both the city-name-keyed overview (no date range) and the legacy
-  // visit-id-keyed view (with a date range). When start_date / end_date
-  // are absent, the date label is hidden and the empty-state copy
-  // changes accordingly.
   visit: {
     city: string;
     country?: string | null;
     country_code?: string | null;
-    start_date?: string | null;
-    end_date?: string | null;
   };
+  /** Optional window label, e.g. "May 24 – May 31". Hidden when omitted. */
+  windowLabel?: string | null;
   users: any[];
   plans: any[];
   activeTab: 'users' | 'plans';
   onTabChange: (tab: 'users' | 'plans') => void;
   onUserCardVisible: (index: number, isVisible: boolean) => void;
   loading: boolean;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
+  onLoadMoreUsers: () => void;
+  onLoadMorePlans: () => void;
+  usersLoadingMore: boolean;
+  plansLoadingMore: boolean;
 }
 
 export default function VisitDetailsBottomSheet({
   visit,
+  windowLabel,
   users,
   plans,
   activeTab,
@@ -73,15 +51,18 @@ export default function VisitDetailsBottomSheet({
   onUserCardVisible,
   loading,
   onRefresh,
+  onLoadMoreUsers,
+  onLoadMorePlans,
+  usersLoadingMore,
+  plansLoadingMore,
 }: Props) {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['35%', '75%', '95%'], []);
   const { hasSubscription } = useSubscription();
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Track visible items for upsell trigger - FIXED
+
   const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 90,
+    viewAreaCoveragePercentThreshold: 60,
     minimumViewTime: 120,
   }).current;
 
@@ -96,54 +77,123 @@ export default function VisitDetailsBottomSheet({
     [onUserCardVisible],
   );
 
+  const viewabilityConfigCallbackPairs = useRef([
+    { viewabilityConfig, onViewableItemsChanged },
+  ]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await onRefresh();
     setRefreshing(false);
   }, [onRefresh]);
 
-  const renderUserItem = ({ item, index }: { item: any; index: number }) => {
-    const isBlurred = !hasSubscription && index >= BLUR_START_INDEX;
-    
-    return (
+  const renderUserItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const isBlurred = !hasSubscription && index >= BLUR_START_INDEX;
+      return (
+        <Pressable
+          style={styles.cardWrapper}
+          onPress={() => !isBlurred && router.push(`/profile/${item.user_id}`)}
+          disabled={isBlurred}
+        >
+          <UserCard user={item} />
+          {isBlurred && (
+            <>
+              <BlurView intensity={40} style={StyleSheet.absoluteFillObject} tint="light" />
+              <View style={styles.blurOverlay}>
+                <Ionicons name="lock-closed" size={24} color="rgba(0,0,0,0.5)" />
+              </View>
+            </>
+          )}
+        </Pressable>
+      );
+    },
+    [hasSubscription],
+  );
+
+  const renderPlanItem = useCallback(
+    ({ item }: { item: any }) => (
       <Pressable
         style={styles.cardWrapper}
-        onPress={() => !isBlurred && router.push(`/profile/${item.user_id}`)}
-        disabled={isBlurred}
+        onPress={() => router.push(`/event/${item.event_id}`)}
       >
-        <UserCard user={item} />
-        {isBlurred && (
-          <>
-            <BlurView
-              intensity={40}
-              style={StyleSheet.absoluteFillObject}
-              tint="light"
-            />
-            <View style={styles.blurOverlay}>
-              <Ionicons name="lock-closed" size={24} color="rgba(0,0,0,0.5)" />
-            </View>
-          </>
-        )}
+        <PlanCard plan={item} />
       </Pressable>
+    ),
+    [],
+  );
+
+  const renderHeader = () => (
+    <>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.cityRow}>
+            <Text style={styles.cityName}>{visit.city}</Text>
+            <Text style={styles.flag}>{getCountryFlag(visit.country_code)}</Text>
+          </View>
+          {visit.country ? <Text style={styles.country}>{visit.country}</Text> : null}
+        </View>
+        {windowLabel ? (
+          <View style={styles.windowChip}>
+            <Ionicons name="calendar-outline" size={14} color="#007AFF" />
+            <Text style={styles.windowChipText}>{windowLabel}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.tabs}>
+        <Pressable
+          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+          onPress={() => onTabChange('users')}
+        >
+          <Ionicons name="people" size={20} color={activeTab === 'users' ? '#007AFF' : '#999'} />
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
+            Users {users.length > 0 && `(${users.length})`}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
+          onPress={() => onTabChange('plans')}
+        >
+          <Ionicons name="calendar" size={20} color={activeTab === 'plans' ? '#007AFF' : '#999'} />
+          <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
+            Plans {plans.length > 0 && `(${plans.length})`}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.divider} />
+    </>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyText}>
+        {activeTab === 'users'
+          ? windowLabel
+            ? 'No profiles match these dates'
+            : 'No upcoming visitors yet'
+          : windowLabel
+            ? 'No plans match these dates'
+            : 'No upcoming plans yet'}
+      </Text>
+    </View>
+  );
+
+  const renderFooter = () => {
+    const isLoadingMore = activeTab === 'users' ? usersLoadingMore : plansLoadingMore;
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator color="#007AFF" />
+      </View>
     );
   };
 
-  const renderPlanItem = ({ item }: { item: any }) => (
-    <Pressable
-      style={styles.cardWrapper}
-      onPress={() => router.push(`/event/${item.event_id}`)}
-    >
-      <PlanCard plan={item} />
-    </Pressable>
-  );
-
-  // Add debug logging
-  console.log('BottomSheet rendering with:', {
-    visit: visit?.city,
-    users: users?.length,
-    plans: plans?.length,
-    activeTab,
-  });
+  const handleEndReached = useCallback(() => {
+    if (activeTab === 'users') onLoadMoreUsers();
+    else onLoadMorePlans();
+  }, [activeTab, onLoadMoreUsers, onLoadMorePlans]);
 
   return (
     <BottomSheet
@@ -155,105 +205,41 @@ export default function VisitDetailsBottomSheet({
       enablePanDownToClose={false}
       enableOverDrag={true}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.cityRow}>
-            <Text style={styles.cityName}>{visit.city}</Text>
-            <Text style={styles.flag}>{getCountryFlag(visit.country_code)}</Text>
-          </View>
-          {visit.country ? (
-            <Text style={styles.country}>{visit.country}</Text>
-          ) : null}
-        </View>
-        {visit.start_date && visit.end_date ? (
-          <Text style={styles.dateRange}>
-            {formatDateRange(visit.start_date, visit.end_date)}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* Tab Buttons */}
-      <View style={styles.tabs}>
-        <Pressable
-          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-          onPress={() => onTabChange('users')}
-        >
-          <Ionicons 
-            name="people" 
-            size={20} 
-            color={activeTab === 'users' ? '#007AFF' : '#999'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
-            Users {users.length > 0 && `(${users.length})`}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
-          onPress={() => onTabChange('plans')}
-        >
-          <Ionicons 
-            name="calendar" 
-            size={20} 
-            color={activeTab === 'plans' ? '#007AFF' : '#999'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
-            Plans {plans.length > 0 && `(${plans.length})`}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* Content wrapped in BottomSheetScrollView for proper scrolling */}
-      <BottomSheetScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {loading ? (
+      {loading ? (
+        <>
+          {renderHeader()}
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
           </View>
-        ) : activeTab === 'users' ? (
-          <>
-            {users.length > 0 ? (
-              users.map((user, index) => (
-                <View key={user.user_id}>
-                  {renderUserItem({ item: user, index })}
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>
-                  {visit.start_date && visit.end_date
-                    ? 'No profiles yet for these dates'
-                    : 'No upcoming visitors yet'}
-                </Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            {plans.length > 0 ? (
-              plans.map((plan) => (
-                <View key={plan.event_id}>
-                  {renderPlanItem({ item: plan })}
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>
-                  {visit.start_date && visit.end_date
-                    ? 'No plans scheduled for these dates'
-                    : 'No upcoming plans yet'}
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-      </BottomSheetScrollView>
+        </>
+      ) : activeTab === 'users' ? (
+        <BottomSheetFlatList
+          data={users}
+          keyExtractor={(item) => `user-${item.user_id}`}
+          renderItem={renderUserItem}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+        />
+      ) : (
+        <BottomSheetFlatList
+          data={plans}
+          keyExtractor={(item) => `plan-${item.event_id}`}
+          renderItem={renderPlanItem}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+        />
+      )}
     </BottomSheet>
   );
 }
@@ -264,10 +250,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
@@ -282,7 +265,6 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     paddingVertical: 20,
-    borderBottomWidth: 0,
   },
   headerLeft: {
     marginBottom: 8,
@@ -305,10 +287,21 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  dateRange: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
+  windowChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#E8F2FF',
+    borderRadius: 999,
+    marginTop: 8,
+  },
+  windowChipText: {
+    fontSize: 13,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   tabs: {
     flexDirection: 'row',
@@ -364,6 +357,10 @@ const styles = StyleSheet.create({
   loaderContainer: {
     paddingVertical: 100,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerLoader: {
+    paddingVertical: 16,
     alignItems: 'center',
   },
   emptyState: {

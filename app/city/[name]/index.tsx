@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,16 +19,55 @@ import { getCityCoordinates } from '~/utils/geographic';
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? null);
 
 /**
- * City-name-keyed city detail screen. Replaces the old visit-id-keyed
- * `/visit/[id]`. Always renders — even for cities with no current
- * visitors or no upcoming plans. The bottom sheet just shows empty
- * lists in those cases.
+ * City-name-keyed city detail. URL: /city/<name>?from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * Both window params are optional. When omitted, the underlying RPC defaults
+ * to "today → today + 90 days" so the screen still renders sensibly.
  */
+function isValidDateString(s: string | undefined): s is string {
+  if (!s) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(`${s}T00:00:00`).getTime());
+}
+
+function formatWindowLabel(from?: string, to?: string): string | null {
+  if (!isValidDateString(from) || !isValidDateString(to)) return null;
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+    return `${start.toLocaleDateString('en-US', opts)} – ${end.getDate()}`;
+  }
+  return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
+}
+
 export default function CityDetailScreen() {
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name, from, to } = useLocalSearchParams<{
+    name: string;
+    from?: string;
+    to?: string;
+  }>();
   const cityName = name ? decodeURIComponent(name) : undefined;
+  const fromParam = isValidDateString(from) ? from : undefined;
+  const toParam = isValidDateString(to) ? to : undefined;
+  const window = useMemo(
+    () => ({ from: fromParam, to: toParam }),
+    [fromParam, toParam],
+  );
+
   const insets = useSafeAreaInsets();
-  const { overview, users, plans, loading, refetch, error } = useCityOverview(cityName);
+  const {
+    overview,
+    users,
+    plans,
+    loading,
+    refetch,
+    error,
+    loadMoreUsers,
+    loadMorePlans,
+    usersLoadingMore,
+    plansLoadingMore,
+  } = useCityOverview(cityName, window);
+
   const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users');
   const [cityCoordinates, setCityCoordinates] = useState<{ lat: number; lng: number } | null>(
     null,
@@ -37,8 +76,11 @@ export default function CityDetailScreen() {
 
   const { showUpsellModal, handleCardVisibility, dismissModal } = useUpsellTrigger();
 
-  // Resolve a map centre for the city; fall back to a generic mid-Atlantic
-  // point if the geocoder can't find it.
+  const windowLabel = useMemo(
+    () => formatWindowLabel(fromParam, toParam),
+    [fromParam, toParam],
+  );
+
   useEffect(() => {
     if (!overview?.city) return;
     setCoordsLoading(true);
@@ -82,8 +124,6 @@ export default function CityDetailScreen() {
     );
   }
 
-  // overview is always non-null here — the RPC returns a single row even
-  // when no visits and no plans exist, with empty users/plans arrays.
   const headerVisit = {
     city: overview?.city ?? cityName,
     country: overview?.country ?? null,
@@ -110,6 +150,7 @@ export default function CityDetailScreen() {
 
       <VisitDetailsBottomSheet
         visit={headerVisit}
+        windowLabel={windowLabel}
         users={users}
         plans={plans}
         activeTab={activeTab}
@@ -117,6 +158,10 @@ export default function CityDetailScreen() {
         onRefresh={refetch}
         onUserCardVisible={handleCardVisibility}
         loading={loading}
+        onLoadMoreUsers={loadMoreUsers}
+        onLoadMorePlans={loadMorePlans}
+        usersLoadingMore={usersLoadingMore}
+        plansLoadingMore={plansLoadingMore}
       />
 
       <UpsellModal
