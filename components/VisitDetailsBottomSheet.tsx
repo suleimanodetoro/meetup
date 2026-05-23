@@ -1,5 +1,5 @@
 // components/VisitDetailsBottomSheet.tsx
-import React, { useRef, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -61,25 +61,39 @@ export default function VisitDetailsBottomSheet({
   const { hasSubscription } = useSubscription();
   const [refreshing, setRefreshing] = useState(false);
 
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 60,
-    minimumViewTime: 120,
-  }).current;
-
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      viewableItems.forEach((item) => {
-        if (item.index !== null) {
-          onUserCardVisible(item.index, item.isViewable);
-        }
-      });
-    },
-    [onUserCardVisible],
-  );
+  // FlatList rejects any change to viewabilityConfigCallbackPairs after
+  // mount ("Changing viewabilityConfigCallbackPairs on the fly is not
+  // supported"), but we still need the latest hasSubscription and
+  // onUserCardVisible at call time. Cache them in refs and read inside a
+  // stable callback. The whole pairs array is also captured via .current
+  // so the FlatList sees a single identity for its lifetime.
+  const hasSubscriptionRef = useRef(hasSubscription);
+  const onUserCardVisibleRef = useRef(onUserCardVisible);
+  useEffect(() => {
+    hasSubscriptionRef.current = hasSubscription;
+  }, [hasSubscription]);
+  useEffect(() => {
+    onUserCardVisibleRef.current = onUserCardVisible;
+  }, [onUserCardVisible]);
 
   const viewabilityConfigCallbackPairs = useRef([
-    { viewabilityConfig, onViewableItemsChanged },
-  ]);
+    {
+      viewabilityConfig: {
+        viewAreaCoveragePercentThreshold: 60,
+        minimumViewTime: 120,
+      },
+      onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        // Only blurred-tier cards (free users, index >= BLUR_START_INDEX)
+        // count toward the upsell trigger.
+        if (hasSubscriptionRef.current) return;
+        viewableItems.forEach((item) => {
+          if (item.index !== null && item.index >= BLUR_START_INDEX) {
+            onUserCardVisibleRef.current(item.index, item.isViewable);
+          }
+        });
+      },
+    },
+  ]).current;
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -214,6 +228,7 @@ export default function VisitDetailsBottomSheet({
         </>
       ) : activeTab === 'users' ? (
         <BottomSheetFlatList
+          key="city-users-list"
           data={users}
           keyExtractor={(item) => `user-${item.user_id}`}
           renderItem={renderUserItem}
@@ -224,10 +239,11 @@ export default function VisitDetailsBottomSheet({
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
-          viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+          viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
         />
       ) : (
         <BottomSheetFlatList
+          key="city-plans-list"
           data={plans}
           keyExtractor={(item) => `plan-${item.event_id}`}
           renderItem={renderPlanItem}
