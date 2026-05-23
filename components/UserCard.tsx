@@ -2,7 +2,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getCountryFlag } from '~/utils/countryFlags';
 
 interface UserCardProps {
   user: {
@@ -12,25 +11,26 @@ interface UserCardProps {
     bio?: string;
     nationality_code?: string;
     is_verified: boolean;
-    overlap_days: number;
     visit_start: string;
     visit_end: string;
   };
 }
 
-export default function UserCard({ user }: UserCardProps) {
-  const getMatchBadge = () => {
-    if (user.overlap_days >= 5) {
-      return { text: `${user.overlap_days} days match!`, color: '#4CAF50' };
-    } else if (user.overlap_days >= 3) {
-      return { text: `${user.overlap_days} days match`, color: '#FF9800' };
-    } else if (user.overlap_days > 0) {
-      return { text: `${user.overlap_days} day${user.overlap_days > 1 ? 's' : ''} overlap`, color: '#2196F3' };
-    }
-    return null;
-  };
+function formatVisitWindow(start?: string, end?: string): string | null {
+  if (!start || !end) return null;
+  const parse = (s: string) => new Date(`${s.slice(0, 10)}T00:00:00`);
+  const s = parse(start);
+  const e = parse(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  const startStr = s.toLocaleDateString('en-US', opts);
+  if (s.getTime() === e.getTime()) return startStr;
+  const endStr = e.toLocaleDateString('en-US', opts);
+  return `${startStr} – ${endStr}`;
+}
 
-  const badge = getMatchBadge();
+export default function UserCard({ user }: UserCardProps) {
+  const window = formatVisitWindow(user.visit_start, user.visit_end);
 
   return (
     <View style={styles.container}>
@@ -51,33 +51,23 @@ export default function UserCard({ user }: UserCardProps) {
             </View>
           )}
         </View>
-        
+
         <View style={styles.info}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
               {user.full_name}
             </Text>
-            {user.nationality_code && (
-              <Text style={styles.flag}>{getCountryFlag(user.nationality_code)}</Text>
-            )}
+            {window && <Text style={styles.window} numberOfLines={1}>{window}</Text>}
           </View>
-          
+
           {user.bio && (
             <Text style={styles.bio} numberOfLines={2}>
               {user.bio}
             </Text>
           )}
-          
-          {badge && (
-            <View style={[styles.badge, { backgroundColor: `${badge.color}20` }]}>
-              <Text style={[styles.badgeText, { color: badge.color }]}>
-                {badge.text}
-              </Text>
-            </View>
-          )}
         </View>
       </View>
-      
+
       <Ionicons name="chevron-forward" size={20} color="#C0C0C0" />
     </View>
   );
@@ -142,23 +132,16 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
-  flag: {
-    fontSize: 16,
+  window: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+    marginLeft: 8,
+    flexShrink: 0,
   },
   bio: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
     lineHeight: 18,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
 });
