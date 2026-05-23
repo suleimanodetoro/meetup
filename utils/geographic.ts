@@ -161,49 +161,9 @@ export const COUNTRIES = [
   { name: 'Zambia', code: 'ZM', flag: '🇿🇲' },
   { name: 'Zimbabwe', code: 'ZW', flag: '🇿🇼' },
 ];
-// ============= POPULAR DESTINATIONS =============
-export const POPULAR_DESTINATIONS = [
-  { city: 'London', country: 'United Kingdom', code: 'GB', flag: '🇬🇧' },
-  { city: 'Paris', country: 'France', code: 'FR', flag: '🇫🇷' },
-  { city: 'Tokyo', country: 'Japan', code: 'JP', flag: '🇯🇵' },
-  { city: 'New York', country: 'United States', code: 'US', flag: '🇺🇸' },
-  { city: 'Barcelona', country: 'Spain', code: 'ES', flag: '🇪🇸' },
-  { city: 'Amsterdam', country: 'Netherlands', code: 'NL', flag: '🇳🇱' },
-  { city: 'Dubai', country: 'United Arab Emirates', code: 'AE', flag: '🇦🇪' },
-  { city: 'Singapore', country: 'Singapore', code: 'SG', flag: '🇸🇬' },
-  { city: 'Bangkok', country: 'Thailand', code: 'TH', flag: '🇹🇭' },
-  { city: 'Rome', country: 'Italy', code: 'IT', flag: '🇮🇹' },
-  { city: 'Sydney', country: 'Australia', code: 'AU', flag: '🇦🇺' },
-  { city: 'Istanbul', country: 'Turkey', code: 'TR', flag: '🇹🇷' },
-  { city: 'Los Angeles', country: 'United States', code: 'US', flag: '🇺🇸' },
-  { city: 'Berlin', country: 'Germany', code: 'DE', flag: '🇩🇪' },
-  { city: 'Madrid', country: 'Spain', code: 'ES', flag: '🇪🇸' },
-  { city: 'Seoul', country: 'South Korea', code: 'KR', flag: '🇰🇷' },
-  { city: 'Mumbai', country: 'India', code: 'IN', flag: '🇮🇳' },
-  { city: 'Cairo', country: 'Egypt', code: 'EG', flag: '🇪🇬' },
-  { city: 'Rio de Janeiro', country: 'Brazil', code: 'BR', flag: '🇧🇷' },
-  { city: 'Cape Town', country: 'South Africa', code: 'ZA', flag: '🇿🇦' },
-  { city: 'Toronto', country: 'Canada', code: 'CA', flag: '🇨🇦' },
-  { city: 'Mexico City', country: 'Mexico', code: 'MX', flag: '🇲🇽' },
-  { city: 'Buenos Aires', country: 'Argentina', code: 'AR', flag: '🇦🇷' },
-  { city: 'Moscow', country: 'Russia', code: 'RU', flag: '🇷🇺' },
-  { city: 'Hong Kong', country: 'China', code: 'HK', flag: '🇭🇰' },
-  { city: 'Lisbon', country: 'Portugal', code: 'PT', flag: '🇵🇹' },
-  { city: 'Prague', country: 'Czech Republic', code: 'CZ', flag: '🇨🇿' },
-  { city: 'Vienna', country: 'Austria', code: 'AT', flag: '🇦🇹' },
-  { city: 'Athens', country: 'Greece', code: 'GR', flag: '🇬🇷' },
-  { city: 'Venice', country: 'Italy', code: 'IT', flag: '🇮🇹' },
-] as const;
 // ============= TYPE DEFINITIONS =============
 export type Country = {
   name: string;
-  code: string;
-  flag: string;
-};
-
-export type Destination = {
-  city: string;
-  country: string;
   code: string;
   flag: string;
 };
@@ -281,91 +241,6 @@ export function getSortedCountries(): Country[] {
   return [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// ============= DESTINATION HELPERS =============
-
-/**
- * Search destinations by city or country name
- * @param query - Search query
- * @returns Array of matching destinations
- */
-export function searchDestinations(query: string): Destination[] {
-  if (!query) return [...POPULAR_DESTINATIONS];
-
-  const q = query.toLowerCase();
-  return POPULAR_DESTINATIONS.filter(dest =>
-    dest.city.toLowerCase().includes(q) ||
-    dest.country.toLowerCase().includes(q)
-  );
-}
-
-/**
- * Get destinations by country code
- * @param countryCode - ISO country code
- * @returns Array of destinations in that country
- */
-export function getDestinationsByCountry(countryCode: string): Destination[] {
-  if (!countryCode) return [];
-  
-  return POPULAR_DESTINATIONS.filter(dest => 
-    dest.code === countryCode.toUpperCase()
-  );
-}
-
-/**
- * Get destination by city name
- * @param cityName - City name
- * @returns Destination object or null
- */
-export function getDestinationByCity(cityName: string): Destination | null {
-  if (!cityName) return null;
-  
-  return POPULAR_DESTINATIONS.find(dest => 
-    dest.city.toLowerCase() === cityName.toLowerCase()
-  ) || null;
-}
-
-/**
- * Get unique countries from destinations
- * @returns Array of unique countries that have popular destinations
- */
-export function getDestinationCountries(): Country[] {
-  const uniqueCodes = [...new Set(POPULAR_DESTINATIONS.map(d => d.code))];
-  return uniqueCodes
-    .map(code => getCountryByCode(code))
-    .filter((c): c is Country => c !== null);
-}
-
-
-/**
- * Sort destinations alphabetically by city name
- * @returns Sorted array of destinations
- */
-export function getSortedDestinations(): Destination[] {
-  return [...POPULAR_DESTINATIONS].sort((a, b) => a.city.localeCompare(b.city));
-}
-
-/**
- * Sort destinations by country, then by city
- * @returns Sorted array of destinations grouped by country
- */
-export function getDestinationsGroupedByCountry(): Destination[] {
-  return [...POPULAR_DESTINATIONS].sort((a, b) => {
-    const countryCompare = a.country.localeCompare(b.country);
-    if (countryCompare !== 0) return countryCompare;
-    return a.city.localeCompare(b.city);
-  });
-}
-
-/**
- * Get random destinations
- * @param count - Number of random destinations to return
- * @returns Array of random destinations
- */
-export function getRandomDestinations(count: number = 5): Destination[] {
-  const shuffled = [...POPULAR_DESTINATIONS].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, Math.min(count, shuffled.length));
-}
-
 /**
  * Check if a country code is valid
  * @param code - Country code to validate
@@ -373,17 +248,6 @@ export function getRandomDestinations(count: number = 5): Destination[] {
  */
 export function isValidCountryCode(code: string): boolean {
   return COUNTRIES.some(c => c.code === code.toUpperCase());
-}
-
-/**
- * Check if a city is in popular destinations
- * @param cityName - City name to check
- * @returns Boolean indicating if city is popular
- */
-export function isPopularDestination(cityName: string): boolean {
-  return POPULAR_DESTINATIONS.some(d => 
-    d.city.toLowerCase() === cityName.toLowerCase()
-  );
 }
 
 // ============= FORMATTING HELPERS =============
