@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   SafeAreaView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -15,12 +15,15 @@ import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
+import { getSuggestions } from '~/utils/AddressAutocomplete';
+import { useAuth } from './contexts/AuthProvider';
 
 interface CityResult {
   city: string;
   country: string;
   country_code: string;
   activity_count: number;
+  source: 'db' | 'mapbox';
 }
 
 /** YYYY-MM-DD in local time, suitable for postgres DATE columns. */
@@ -36,19 +39,24 @@ function formatChip(d: Date): string {
 }
 
 export default function SearchScreen() {
+  const { session } = useAuth();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CityResult[]>([]);
+  const [dbResults, setDbResults] = useState<CityResult[]>([]);
+  const [mapboxResults, setMapboxResults] = useState<CityResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState<Date | null>(null);
   const [toDate, setToDate] = useState<Date | null>(null);
   const [fromPickerOpen, setFromPickerOpen] = useState(false);
   const [toPickerOpen, setToPickerOpen] = useState(false);
   const requestId = useRef(0);
+  // Stable Mapbox session token for billing — one session per screen lifetime.
+  const mapboxSessionRef = useRef(`search-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     const myId = ++requestId.current;
     const timer = setTimeout(async () => {
       setLoading(true);
+      setMapboxResults([]);
       try {
         const { data, error } = await supabase.rpc('search_cities', {
           query: query.trim(),
@@ -56,16 +64,59 @@ export default function SearchScreen() {
         });
         if (myId !== requestId.current) return;
         if (error) throw error;
-        setResults((data ?? []) as unknown as CityResult[]);
+        const db = ((data ?? []) as unknown as Omit<CityResult, 'source'>[]).map(
+          (r) => ({ ...r, source: 'db' as const }),
+        );
+        setDbResults(db);
+
+        // Fallback to Mapbox autocomplete only when the local DB has no
+        // hits AND the query has something meaningful in it. One extra API
+        // call per empty search; not per keystroke.
+        if (db.length === 0 && query.trim().length >= 2) {
+          try {
+            const mb = await getSuggestions(
+              query.trim(),
+              session?.access_token ?? mapboxSessionRef.current,
+              { types: ['place', 'locality'], language: 'en' },
+            );
+            if (myId !== requestId.current) return;
+            const seen = new Set<string>();
+            const mapped: CityResult[] = (mb?.suggestions ?? [])
+              .filter(
+                (s: any) =>
+                  s?.feature_type === 'place' || s?.feature_type === 'locality',
+              )
+              .map((s: any) => ({
+                city: (s?.name ?? '') as string,
+                country: (s?.context?.country?.name ?? '') as string,
+                country_code: ((s?.context?.country?.country_code ?? '') as string)
+                  .toUpperCase(),
+                activity_count: 0,
+                source: 'mapbox' as const,
+              }))
+              .filter((c: CityResult) => {
+                const key = `${c.city}|${c.country_code}`;
+                if (!c.city || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            setMapboxResults(mapped);
+          } catch (err) {
+            console.error('Mapbox fallback failed:', err);
+          }
+        }
       } catch (err) {
         console.error('search_cities error:', err);
-        if (myId === requestId.current) setResults([]);
+        if (myId === requestId.current) {
+          setDbResults([]);
+          setMapboxResults([]);
+        }
       } finally {
         if (myId === requestId.current) setLoading(false);
       }
     }, query.trim() ? 200 : 0);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, session?.access_token]);
 
   const openCity = useCallback(
     (city: string) => {
@@ -155,18 +206,29 @@ export default function SearchScreen() {
         </Pressable>
       </View>
 
-      <Text style={styles.sectionLabel}>
-        {query.trim() ? 'Results' : 'Popular cities'}
-      </Text>
-
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator color="#007AFF" />
         </View>
       ) : (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => `${item.country_code}-${item.city}`}
+        <SectionList
+          sections={[
+            ...(dbResults.length > 0
+              ? [
+                  {
+                    title: query.trim() ? 'Results' : 'Popular cities',
+                    data: dbResults,
+                  },
+                ]
+              : []),
+            ...(mapboxResults.length > 0
+              ? [{ title: 'Discover cities', data: mapboxResults }]
+              : []),
+          ]}
+          keyExtractor={(item) => `${item.source}-${item.country_code}-${item.city}`}
+          renderSectionHeader={({ section }) => (
+            <Text style={styles.sectionLabel}>{section.title}</Text>
+          )}
           renderItem={({ item }) => (
             <Pressable style={styles.resultRow} onPress={() => openCity(item.city)}>
               <Text style={styles.resultFlag}>
@@ -174,7 +236,11 @@ export default function SearchScreen() {
               </Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.resultCity}>{item.city}</Text>
-                <Text style={styles.resultCountry}>{item.country ?? ''}</Text>
+                <Text style={styles.resultCountry}>
+                  {item.source === 'mapbox'
+                    ? `${item.country} · No activity yet`
+                    : item.country ?? ''}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#C0C0C0" />
             </Pressable>
@@ -187,6 +253,7 @@ export default function SearchScreen() {
             </View>
           }
           keyboardShouldPersistTaps="handled"
+          stickySectionHeadersEnabled={false}
         />
       )}
 
