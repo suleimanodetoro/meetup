@@ -78,7 +78,12 @@ export default function CityDetailScreen() {
   );
   const [coordsLoading, setCoordsLoading] = useState(false);
 
-  const { showUpsellModal, handleCardVisibility, dismissModal } = useUpsellTrigger();
+  const {
+    visible: upsellVisible,
+    cardEntered: onPaywallCardEntered,
+    cardLeft: onPaywallCardLeft,
+    dismiss: dismissUpsell,
+  } = useUpsellTrigger();
 
   const windowLabel = useMemo(
     () => formatWindowLabel(fromParam, toParam),
@@ -160,7 +165,8 @@ export default function CityDetailScreen() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onRefresh={refetch}
-        onUserCardVisible={handleCardVisibility}
+        onPaywallCardEntered={onPaywallCardEntered}
+        onPaywallCardLeft={onPaywallCardLeft}
         loading={loading}
         onLoadMoreUsers={loadMoreUsers}
         onLoadMorePlans={loadMorePlans}
@@ -169,10 +175,10 @@ export default function CityDetailScreen() {
       />
 
       <UpsellModal
-        visible={showUpsellModal}
-        onDismiss={dismissModal}
+        visible={upsellVisible}
+        onDismiss={dismissUpsell}
         onSubscribe={() => {
-          dismissModal();
+          dismissUpsell();
           router.push('/settings' as never);
         }}
       />

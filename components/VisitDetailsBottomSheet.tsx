@@ -32,7 +32,10 @@ interface Props {
   plans: any[];
   activeTab: 'users' | 'plans';
   onTabChange: (tab: 'users' | 'plans') => void;
-  onUserCardVisible: (index: number, isVisible: boolean) => void;
+  /** A paywall-eligible card just entered the viewport. */
+  onPaywallCardEntered: (index: number) => void;
+  /** A paywall-eligible card just left the viewport. */
+  onPaywallCardLeft: (index: number) => void;
   loading: boolean;
   onRefresh: () => void | Promise<void>;
   onLoadMoreUsers: () => void;
@@ -48,7 +51,8 @@ export default function VisitDetailsBottomSheet({
   plans,
   activeTab,
   onTabChange,
-  onUserCardVisible,
+  onPaywallCardEntered,
+  onPaywallCardLeft,
   loading,
   onRefresh,
   onLoadMoreUsers,
@@ -62,35 +66,54 @@ export default function VisitDetailsBottomSheet({
   const [refreshing, setRefreshing] = useState(false);
 
   // FlatList rejects any change to viewabilityConfigCallbackPairs after
-  // mount ("Changing viewabilityConfigCallbackPairs on the fly is not
-  // supported"), but we still need the latest hasSubscription and
-  // onUserCardVisible at call time. Cache them in refs and read inside a
-  // stable callback. The whole pairs array is also captured via .current
-  // so the FlatList sees a single identity for its lifetime.
+  // mount, so we cannot rebuild it when hasSubscription or the callbacks
+  // change. Instead, cache the latest values in refs and read them at
+  // call time inside a callback whose identity is stable for the
+  // FlatList's lifetime.
   const hasSubscriptionRef = useRef(hasSubscription);
-  const onUserCardVisibleRef = useRef(onUserCardVisible);
-  useEffect(() => {
-    hasSubscriptionRef.current = hasSubscription;
-  }, [hasSubscription]);
-  useEffect(() => {
-    onUserCardVisibleRef.current = onUserCardVisible;
-  }, [onUserCardVisible]);
+  const onEnteredRef = useRef(onPaywallCardEntered);
+  const onLeftRef = useRef(onPaywallCardLeft);
+  useEffect(() => { hasSubscriptionRef.current = hasSubscription; }, [hasSubscription]);
+  useEffect(() => { onEnteredRef.current = onPaywallCardEntered; }, [onPaywallCardEntered]);
+  useEffect(() => { onLeftRef.current = onPaywallCardLeft; }, [onPaywallCardLeft]);
+
+  // Track which paywall-eligible indices are currently in view. Each
+  // viewability event computes the set difference vs the previous set
+  // to emit explicit enter/leave events to the trigger hook. Items that
+  // briefly flash into view as the FlatList materialises rows and then
+  // leave before the dwell completes will enter+leave in quick
+  // succession, which cancels their pending timer in the hook.
+  const visibleIndicesRef = useRef<Set<number>>(new Set());
 
   const viewabilityConfigCallbackPairs = useRef([
     {
       viewabilityConfig: {
-        viewAreaCoveragePercentThreshold: 60,
-        minimumViewTime: 120,
+        // Card counts as visible when >= 50% of itself is on-screen.
+        // Keeps cards at the bottom edge of the bottom sheet from
+        // briefly counting as visible just because their top pixel
+        // peeked through.
+        itemVisiblePercentThreshold: 50,
       },
       onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-        // Only blurred-tier cards (free users, index >= BLUR_START_INDEX)
-        // count toward the upsell trigger.
         if (hasSubscriptionRef.current) return;
-        viewableItems.forEach((item) => {
-          if (item.index !== null && item.index >= BLUR_START_INDEX) {
-            onUserCardVisibleRef.current(item.index, item.isViewable);
+
+        const next = new Set<number>();
+        for (const vt of viewableItems) {
+          if (vt.index !== null && vt.index >= BLUR_START_INDEX) {
+            next.add(vt.index);
           }
-        });
+        }
+
+        // Items entering view (in next but not in prev).
+        for (const i of next) {
+          if (!visibleIndicesRef.current.has(i)) onEnteredRef.current(i);
+        }
+        // Items leaving view (in prev but not in next).
+        for (const i of visibleIndicesRef.current) {
+          if (!next.has(i)) onLeftRef.current(i);
+        }
+
+        visibleIndicesRef.current = next;
       },
     },
   ]).current;
