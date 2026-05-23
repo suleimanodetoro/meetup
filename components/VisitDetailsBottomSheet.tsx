@@ -22,28 +22,39 @@ import { getCountryFlag } from '~/utils/countryFlags';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BLUR_START_INDEX = 10;
 
-// Add the missing formatDateRange function
+// `start_date` / `end_date` are postgres DATE columns (YYYY-MM-DD), so
+// parse as local midnight to avoid UTC drift in negative-UTC zones.
 const formatDateRange = (startDate: string, endDate: string) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  const options: Intl.DateTimeFormatOptions = { 
-    month: 'short', 
-    day: 'numeric' 
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
   };
-  
   const startFormatted = start.toLocaleDateString('en-US', options);
   const endFormatted = end.toLocaleDateString('en-US', options);
-  
+
   if (start.getMonth() === end.getMonth()) {
     return `${startFormatted} - ${end.getDate()}, ${end.getFullYear()}`;
   }
-  
   return `${startFormatted} - ${endFormatted}, ${end.getFullYear()}`;
 };
 
 interface Props {
-  visit: any;
+  // The bottom-sheet header takes a generic shape that's compatible with
+  // both the city-name-keyed overview (no date range) and the legacy
+  // visit-id-keyed view (with a date range). When start_date / end_date
+  // are absent, the date label is hidden and the empty-state copy
+  // changes accordingly.
+  visit: {
+    city: string;
+    country?: string | null;
+    country_code?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+  };
   users: any[];
   plans: any[];
   activeTab: 'users' | 'plans';
@@ -151,11 +162,15 @@ export default function VisitDetailsBottomSheet({
             <Text style={styles.cityName}>{visit.city}</Text>
             <Text style={styles.flag}>{getCountryFlag(visit.country_code)}</Text>
           </View>
-          <Text style={styles.country}>{visit.country}</Text>
+          {visit.country ? (
+            <Text style={styles.country}>{visit.country}</Text>
+          ) : null}
         </View>
-        <Text style={styles.dateRange}>
-          {formatDateRange(visit.start_date, visit.end_date)}
-        </Text>
+        {visit.start_date && visit.end_date ? (
+          <Text style={styles.dateRange}>
+            {formatDateRange(visit.start_date, visit.end_date)}
+          </Text>
+        ) : null}
       </View>
 
       {/* Tab Buttons */}
@@ -211,7 +226,11 @@ export default function VisitDetailsBottomSheet({
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No profiles yet for these dates</Text>
+                <Text style={styles.emptyText}>
+                  {visit.start_date && visit.end_date
+                    ? 'No profiles yet for these dates'
+                    : 'No upcoming visitors yet'}
+                </Text>
               </View>
             )}
           </>
@@ -225,7 +244,11 @@ export default function VisitDetailsBottomSheet({
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No plans scheduled for these dates</Text>
+                <Text style={styles.emptyText}>
+                  {visit.start_date && visit.end_date
+                    ? 'No plans scheduled for these dates'
+                    : 'No upcoming plans yet'}
+                </Text>
               </View>
             )}
           </>

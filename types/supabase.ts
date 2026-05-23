@@ -800,6 +800,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_city_overview: {
+        Args: { city_name: string }
+        Returns: {
+          city: string
+          country: string
+          country_code: string
+          user_count: number
+          plan_count: number
+          users: Json
+          plans: Json
+        }[]
+      }
       get_friendship_status: {
         Args: { user1_id: string; user2_id: string }
         Returns: {

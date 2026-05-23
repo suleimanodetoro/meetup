@@ -83,8 +83,8 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
   return (
     <Pressable
       onPress={() => {
-        console.log("Navigating to visit:", visit.id);
-        router.push(`/visit/${visit?.id}`);
+        if (!visit?.city) return;
+        router.push(`/city/${encodeURIComponent(visit.city)}` as never);
       }}
       accessibilityRole="button"
       accessibilityLabel={`Open visit to ${visit.city}`}

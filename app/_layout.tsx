@@ -30,7 +30,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     const currentRoute = first;
 
     // Dynamic (parameterized) top-level folders
-    const dynamicRoutes = ['event', 'chat', 'visit', 'profile'];
+    const dynamicRoutes = ['event', 'chat', 'visit', 'city', 'profile'];
 
     // Static top-level folders/pages (include parents for nested pages)
     const staticRoutes = [
@@ -104,6 +104,7 @@ export default function RootLayout() {
               {/* Dynamic deep-linkable routes */}
               <Stack.Screen name="event/[id]" />
               <Stack.Screen name="visit/[id]" />
+              <Stack.Screen name="city/[name]" />
               <Stack.Screen name="chat/[eventId]" />
               <Stack.Screen name="chat/dm/[conversationId]" />
               <Stack.Screen name="profile/[userId]" />

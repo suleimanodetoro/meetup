@@ -205,34 +205,12 @@ export default function PlanDetailsScreen() {
     }
   };
 
-  // Tapping the city/country row in the event detail opens the same
-  // city-overview UI the trending-city cards on the home screen do:
-  // map background + bottom sheet listing users overlapping in that city
-  // and plans happening there. That UI is /visit/[id] driven by
-  // get_visit_details(visit_id). We find any current/upcoming visit row
-  // to this city and route there. If no such visit exists, fall back to
-  // explore with the city pre-populated in search.
-  const openCityDetail = async (city: string | null | undefined) => {
+  // Tap the city row → city-name-keyed overview screen. The screen
+  // always renders, even for cities with no current visitors and/or no
+  // upcoming plans — no visit_id lookup, no explore fallback.
+  const openCityDetail = (city: string | null | undefined) => {
     if (!city) return;
-    const today = new Date();
-    const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    try {
-      const { data } = await supabase
-        .from('visits')
-        .select('id')
-        .eq('city', city)
-        .gte('end_date', todayLocal)
-        .order('start_date', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (data?.id) {
-        router.push(`/visit/${data.id}` as never);
-        return;
-      }
-    } catch (err) {
-      console.error('Error looking up visit for city:', err);
-    }
-    router.push(`/explore?searchQuery=${encodeURIComponent(city)}` as never);
+    router.push(`/city/${encodeURIComponent(city)}` as never);
   };
 
   // `events.date` and `events.end_date` are `timestamp with time zone`.
