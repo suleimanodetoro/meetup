@@ -113,9 +113,7 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
             position: 'absolute',
           }}
           resizeMode="cover"
-          onError={(e) => {
-            console.log(`Image failed to load for ${visit.city}:`, e.nativeEvent.error);
-          }}
+          onError={() => {}}
         />
       )}
 

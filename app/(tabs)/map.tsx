@@ -130,8 +130,9 @@ export default function MapScreen() {
           currentCountry = place.country;
           currentCountryCode = place.isoCountryCode;
         }
-      } catch (locError) {
-        console.log('Could not get current location:', locError);
+      } catch {
+        // Location lookup is best-effort; we fall back to the stored profile
+        // location below if reverse-geocoding fails.
       }
     }
 

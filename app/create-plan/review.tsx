@@ -23,9 +23,6 @@ export default function ReviewScreen() {
   const { session } = useAuth();
   const [creating, setCreating] = useState(false);
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
-  
-  // Log formData to debug
-  console.log('Review formData:', formData);
 
   useEffect(() => {
     if (formData.imageBase64) {
@@ -44,17 +41,7 @@ export default function ReviewScreen() {
     }
 
     setCreating(true);
-    
-    // Debug logging
-    console.log('Starting plan creation with formData:', {
-      title: formData.title,
-      description: formData.description,
-      hasVenues: formData.venues?.length,
-      hasDestinations: formData.destinations?.length,
-      hasInterests: formData.interests?.length,
-      hasCosts: formData.costs?.length,
-    });
-    
+
     try {
       // Step 1: Upload image if exists
       let imageUrl = null;
@@ -108,11 +95,8 @@ export default function ReviewScreen() {
       }
       
       if (!event) {
-        console.error('No event data returned');
         throw new Error('No event data returned from database');
       }
-      
-      console.log('Event created successfully:', event.id);
 
       // Step 3: Add venues
       if (venues.length > 0) {
@@ -192,8 +176,7 @@ export default function ReviewScreen() {
 
       // Step 7: Navigate WITHOUT resetting form immediately
       const eventId = event.id;
-    console.log('Navigating to event:', eventId);
-    
+
     // Pass fromCreation=true to show X button
     router.replace({
       pathname: '/event/[id]',

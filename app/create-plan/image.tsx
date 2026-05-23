@@ -77,14 +77,6 @@ export default function PlanImageScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      console.log('Image processed:', {
-        originalWidth: asset.width,
-        originalHeight: asset.height,
-        base64Length: base64.length,
-        base64SizeKB: Math.round(base64.length / 1024),
-        base64SizeMB: (base64.length / (1024 * 1024)).toFixed(2),
-      });
-
       // Persist both: uri for preview, base64 for upload
       updateField('imageUri', manipulated.uri);
       updateField('imageBase64', base64);

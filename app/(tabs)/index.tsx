@@ -136,7 +136,6 @@ export default function HomeScreen() {
           console.error('Error fetching suggested users:', peopleError);
         } else if (people) {
           setSuggestedPeople(people); // Function already returns 7 max, no need to slice
-          console.log('Suggested people returned:', people.length);
         }
       }
     } catch (err) {
@@ -227,7 +226,7 @@ export default function HomeScreen() {
                 <Image
                   source={{ uri: userProfile.avatar_url }}
                   style={{ width: '100%', height: '100%' }}
-                  onError={() => console.log('Avatar failed to load')}
+                  onError={() => {}}
                 />
               ) : (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

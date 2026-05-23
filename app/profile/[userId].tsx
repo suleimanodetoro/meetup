@@ -70,8 +70,7 @@ export default function UserProfileScreen() {
 
     try {
       setLoading(true);
-      console.log('🔍 Fetching profile for user:', userId);
-      
+
       // Fetch user profile with social media
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -80,11 +79,10 @@ export default function UserProfileScreen() {
         .single();
 
       if (profileError) {
-        console.error('❌ Profile error:', profileError);
+        console.error('Profile error:', profileError);
         throw profileError;
       }
-      
-      console.log('✅ Profile loaded:', profileData);
+
       setProfile(profileData as unknown as UserProfile);
 
       // Fetch travel stats
@@ -118,7 +116,6 @@ export default function UserProfileScreen() {
           .limit(3);
 
         if (events) {
-          console.log('📅 User events:', events);
           setUserEvents(events);
         }
       }
@@ -135,11 +132,10 @@ export default function UserProfileScreen() {
           const friendship = friendshipData[0];
           setFriendshipStatus(friendship.status as FriendshipStatus);
           setIsRequester(friendship.is_requester);
-          console.log('👥 Friendship status:', friendship.status);
         }
       }
     } catch (err) {
-      console.error('❌ Error fetching user data:', err);
+      console.error('Error fetching user data:', err);
       Alert.alert('Error', 'Failed to load profile');
     } finally {
       setLoading(false);

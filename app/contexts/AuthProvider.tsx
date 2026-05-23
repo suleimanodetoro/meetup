@@ -38,8 +38,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   // Function to check onboarding status
   const checkOnboardingStatus = async (userId: string) => {
     try {
-      console.log('Checking onboarding status for:', userId);
-      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('onboarding_completed, onboarding_step')
@@ -50,7 +48,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching profile:', error);
         // If profile doesn't exist, create it
         if (error.code === 'PGRST116') {
-          console.log('Profile not found, creating...');
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
@@ -70,7 +67,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const isOnboarded = profile?.onboarding_completed === true;
-      console.log('Profile onboarding status:', isOnboarded, 'Step:', profile?.onboarding_step);
       setHasCompletedOnboarding(isOnboarded);
       return isOnboarded;
       
@@ -108,7 +104,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.id);
       setSession(session);
       
       if (session?.user?.id) {
@@ -122,7 +117,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', _event, session?.user?.id);
       setSession(session);
       
       if (session?.user?.id) {

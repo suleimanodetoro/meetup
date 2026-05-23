@@ -178,12 +178,7 @@ export default function EditProfile() {
   // Load profile (schema-correct)
   useEffect(() => {
   (async () => {
-    if (!session?.user?.id) {
-      console.log('❌ No session user ID found');
-      return;
-    }
-    
-    console.log('🔄 Loading profile for user:', session.user.id);
+    if (!session?.user?.id) return;
     setLoading(true);
     
     try {
@@ -211,16 +206,12 @@ export default function EditProfile() {
         .eq('id', session.user.id)
         .single();
 
-      console.log('📦 Profile query result:', { profile, error });
-
       if (error) {
-        console.error('❌ Profile query error:', error);
+        console.error('Profile query error:', error);
         throw error;
       }
 
       if (profile) {
-        console.log('✅ Profile data loaded successfully');
-        
         setFullName(profile.full_name ?? '');
         setBio(profile.bio ?? '');
         setMainImage(profile.avatar_url ?? null);
@@ -244,7 +235,6 @@ export default function EditProfile() {
             ? COUNTRIES.find((c) => c.name === profile.nationality)
             : null;
         const foundCountry = byCode ?? byName ?? null;
-        console.log('🌍 Country found:', foundCountry);
         setCountry(foundCountry);
 
         // gender / gender_preference. Normalize any legacy values to the
@@ -258,23 +248,19 @@ export default function EditProfile() {
         }
         if (profile.gender_preference) {
           const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
-          console.log('👥 Setting gender preference:', gp);
           setGenderPreference(gp);
         }
 
         // Meeting preference
         if (profile.meeting_preference) {
-          console.log('🤝 Setting meeting preference:', profile.meeting_preference);
           setMeetingPreference(profile.meeting_preference);
         }
 
         // languages / interests (jsonb arrays)
         if (Array.isArray(profile.languages)) {
-          console.log('🗣️ Setting languages:', profile.languages);
           setLanguages(profile.languages as string[]);
         }
         if (Array.isArray(profile.interests)) {
-          console.log('❤️ Setting interests:', profile.interests);
           setInterests(profile.interests as string[]);
         }
 
@@ -294,15 +280,12 @@ export default function EditProfile() {
             ? socialHelpers.youtube.fromUrl(profile.youtube_url)
             : '',
         );
-      } else {
-        console.log('⚠️ No profile data returned');
       }
     } catch (err) {
-      console.error('❌ Failed to load profile:', err);
+      console.error('Failed to load profile:', err);
       Alert.alert('Error', 'Failed to load your profile.');
     } finally {
       setLoading(false);
-      console.log('🏁 Profile loading complete');
     }
   })();
 }, [session?.user?.id]);
@@ -353,7 +336,6 @@ export default function EditProfile() {
 
   try {
     setSaving(true);
-    console.log('💾 Starting profile save...');
 
     // Base payload with ALL avatar URLs
     const basePayload: any = {
@@ -373,8 +355,6 @@ export default function EditProfile() {
       meeting_preference: meetingPreference ?? null,
     };
 
-    console.log('📝 Base payload:', basePayload);
-
     // Try to save base fields first
     const { error: baseError } = await supabase
       .from('profiles')
@@ -382,7 +362,7 @@ export default function EditProfile() {
       .eq('id', session.user.id);
 
     if (baseError) {
-      console.error('❌ Base save error:', baseError);
+      console.error('Base save error:', baseError);
       throw baseError;
     }
 
@@ -402,7 +382,7 @@ export default function EditProfile() {
     Alert.alert('Saved', 'Your profile has been updated.');
     router.back();
   } catch (err) {
-    console.error('❌ Save failed:', err);
+    console.error('Save failed:', err);
     Alert.alert('Error', 'Failed to save profile.');
   } finally {
     setSaving(false);

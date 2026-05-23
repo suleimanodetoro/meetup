@@ -158,7 +158,6 @@ export default function DestinationsScreen() {
         lng: feature.geometry?.coordinates?.[0],
       };
 
-      console.log('Adding venue with coordinates:', newVenue);
       setVenues([...venues, newVenue]);
       setShowSearch(false);
       setSearchQuery('');

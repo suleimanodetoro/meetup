@@ -131,8 +131,7 @@ export default function SignInScreen() {
         errorCode === 1001 || // Apple's cancellation code
         error?.message?.includes('cancel')
       ) {
-        // User canceled - this is normal, just return silently
-        console.log('Apple Sign In canceled by user');
+        // User canceled - normal, return silently.
         return;
       }
 
@@ -165,7 +164,6 @@ export default function SignInScreen() {
 
       // Check if sign in was cancelled
       if (response.type === 'cancelled') {
-        console.log('Google Sign In canceled by user');
         return;
       }
 
@@ -204,16 +202,13 @@ export default function SignInScreen() {
         });
       }
 
-      console.log('Google Sign In successful');
     } catch (error: any) {
       // Handle different error types
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.log('Google Sign In canceled by user');
         return;
       }
 
       if (error.code === statusCodes.IN_PROGRESS) {
-        console.log('Google Sign In already in progress');
         return;
       }
 
