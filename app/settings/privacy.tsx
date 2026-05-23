@@ -20,7 +20,7 @@ import {
   ProfileVisibility,
   BlockedUser 
 } from '~/types/messaging';
-import { useAuth } from '../contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 
 export default function PrivacySettingsScreen() {

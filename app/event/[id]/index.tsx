@@ -22,7 +22,7 @@ import { getInterestEmoji } from '~/utils/constants';
 
 
 import { supabase } from '~/utils/supabase';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/geographic';
 
 const { width, height } = Dimensions.get('window');

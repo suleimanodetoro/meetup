@@ -1,7 +1,7 @@
 // hooks/useSubscription.ts
 import { useState, useEffect } from 'react';
 import { supabase } from '~/utils/supabase';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 
 interface Subscription {
   id: number;

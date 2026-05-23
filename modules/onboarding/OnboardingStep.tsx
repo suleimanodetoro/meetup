@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { OnboardingFrame } from './OnboardingFrame';
 import {
   FIRST_STEP_SLUG,

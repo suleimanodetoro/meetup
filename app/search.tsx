@@ -16,7 +16,7 @@ import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
-import { useAuth } from './contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 
 interface CityResult {
   city: string;

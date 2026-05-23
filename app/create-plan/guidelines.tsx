@@ -4,7 +4,7 @@ import { View, Text, ScrollView, Pressable, SafeAreaView, Linking } from 'react-
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
-import { useCreatePlan } from '../contexts/CreatePlanContext';
+import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function GuidelinesScreen() {
   const { formData, updateField, nextStep, prevStep, setStep } = useCreatePlan();

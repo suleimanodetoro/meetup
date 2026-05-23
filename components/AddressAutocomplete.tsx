@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { getSuggestions, retrieveDetails } from '~/utils/AddressAutocomplete';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 
 interface Suggestion {
   mapbox_id: string;

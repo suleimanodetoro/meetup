@@ -16,7 +16,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
-import { useCreatePlan } from '../contexts/CreatePlanContext';
+import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function PlanImageScreen() {
   const { formData, updateField, nextStep, setStep } = useCreatePlan();

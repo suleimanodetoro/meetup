@@ -14,7 +14,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
-import { useCreatePlan } from '../contexts/CreatePlanContext';
+import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 interface CostItem {
   name: string;

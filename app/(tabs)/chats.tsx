@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useAuth } from '../contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 
 type ChatItem = {

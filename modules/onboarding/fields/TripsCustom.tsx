@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import DatePicker from 'react-native-date-picker';
-import { useAuth } from '~/app/contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
 import { OnboardingFrame } from '../OnboardingFrame';

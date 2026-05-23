@@ -19,7 +19,7 @@ import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import { COUNTRIES } from '~/utils/countryFlags';
 import { LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
-import { useAuth } from './contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 import { Ionicons } from '@expo/vector-icons';
 import InterestsSelector from '~/components/InterestsSelector';

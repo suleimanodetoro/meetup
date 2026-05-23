@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
-import { useAuth } from './contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
 
 interface Destination {

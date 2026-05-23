@@ -16,9 +16,9 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
-import { useCreatePlan } from '../contexts/CreatePlanContext';
+import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { getSuggestions, retrieveDetails } from '~/utils/AddressAutocomplete';
-import { useAuth } from '../contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 
 interface VenueData {
   name: string;

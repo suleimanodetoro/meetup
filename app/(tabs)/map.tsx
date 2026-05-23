@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '~/utils/supabase';
-import { useAuth } from '../contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

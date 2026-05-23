@@ -23,7 +23,7 @@ import { router } from 'expo-router';
 
 import debounce from 'lodash.debounce';
 import { Profile, FriendshipStatus } from '~/types/messaging';
-import { useAuth } from './contexts/AuthProvider';
+import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 
 interface SearchResult extends Profile {

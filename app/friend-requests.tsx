@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import { FriendRequest, Profile, Event } from '~/types/messaging';
-import AuthProvider, { useAuth } from './contexts/AuthProvider';
+import AuthProvider, { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 
 export default function FriendRequestsScreen() {

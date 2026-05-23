@@ -4,7 +4,7 @@ import { View, Text, Pressable, SafeAreaView, StyleSheet, ScrollView, Alert } fr
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
-import { useCreatePlan } from '../contexts/CreatePlanContext';
+import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
 
 export default function InterestsScreen() {
