@@ -41,14 +41,18 @@ function formatWindowLabel(from?: string, to?: string): string | null {
 }
 
 export default function CityDetailScreen() {
-  const { name, from, to } = useLocalSearchParams<{
+  const { name, from, to, cc, country } = useLocalSearchParams<{
     name: string;
     from?: string;
     to?: string;
+    cc?: string;
+    country?: string;
   }>();
   const cityName = name ? decodeURIComponent(name) : undefined;
   const fromParam = isValidDateString(from) ? from : undefined;
   const toParam = isValidDateString(to) ? to : undefined;
+  const ccHint = typeof cc === 'string' && cc.length === 2 ? cc.toUpperCase() : undefined;
+  const countryHint = typeof country === 'string' ? country : undefined;
   const window = useMemo(
     () => ({ from: fromParam, to: toParam }),
     [fromParam, toParam],
@@ -126,8 +130,8 @@ export default function CityDetailScreen() {
 
   const headerVisit = {
     city: overview?.city ?? cityName,
-    country: overview?.country ?? null,
-    country_code: overview?.country_code ?? null,
+    country: overview?.country ?? countryHint ?? null,
+    country_code: overview?.country_code ?? ccHint ?? null,
   };
 
   return (

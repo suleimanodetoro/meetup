@@ -119,11 +119,16 @@ export default function SearchScreen() {
   }, [query, session?.access_token]);
 
   const openCity = useCallback(
-    (city: string) => {
+    (item: CityResult) => {
       const qs = new URLSearchParams();
       if (fromDate) qs.append('from', toIsoDate(fromDate));
       if (toDate) qs.append('to', toIsoDate(toDate));
-      const path = `/city/${encodeURIComponent(city)}${
+      // Forward the country hint the user just picked. When the DB has no
+      // row for this city yet, the detail screen falls back to these so we
+      // don't lose Mapbox's answer across navigation.
+      if (item.country_code) qs.append('cc', item.country_code);
+      if (item.country) qs.append('country', item.country);
+      const path = `/city/${encodeURIComponent(item.city)}${
         qs.toString() ? `?${qs.toString()}` : ''
       }`;
       router.replace(path as never);
@@ -230,7 +235,7 @@ export default function SearchScreen() {
             <Text style={styles.sectionLabel}>{section.title}</Text>
           )}
           renderItem={({ item }) => (
-            <Pressable style={styles.resultRow} onPress={() => openCity(item.city)}>
+            <Pressable style={styles.resultRow} onPress={() => openCity(item)}>
               <Text style={styles.resultFlag}>
                 {item.country_code ? getCountryFlag(item.country_code) : '🌍'}
               </Text>
