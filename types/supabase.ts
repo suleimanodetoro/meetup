@@ -1028,48 +1028,6 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_visit_details: {
-        Args: { visit_id_param: number }
-        Returns: {
-          id: number
-          city: string
-          country: string
-          country_code: string
-          start_date: string
-          end_date: string
-          user_count: number
-          plan_count: number
-        }[]
-      }
-      get_visit_plans: {
-        Args: { visit_id_param: number }
-        Returns: {
-          event_id: number
-          title: string
-          description: string
-          image_uri: string
-          date: string
-          location_name: string
-          cost: number
-          attendee_count: number
-          host_name: string
-          host_avatar: string
-        }[]
-      }
-      get_visit_users: {
-        Args: { visit_id_param: number; limit_param?: number }
-        Returns: {
-          user_id: string
-          full_name: string
-          avatar_url: string
-          bio: string
-          nationality_code: string
-          is_verified: boolean
-          visit_start: string
-          visit_end: string
-          overlap_days: number
-        }[]
-      }
       is_conversation_member: {
         Args: { conv_id: number }
         Returns: boolean
