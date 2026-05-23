@@ -4,6 +4,52 @@ Tracking items deferred from cleanup passes. Each entry should explain *why* it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
+## Verify production parity with local
+
+A lot of this branch's work is local-only at the time of writing. Before
+relying on production behaviour, walk through this list:
+
+**Migrations.** Supabase Branching applies migrations to preview DBs
+automatically; whether it auto-applies to production on merge depends on the
+project's branch settings (Dashboard → Branches → Settings → "Auto-merge
+migrations"). If that toggle is off, production still doesn't have the new
+RPCs. Check from the production SQL editor:
+
+```sql
+SELECT proname
+FROM pg_proc
+WHERE proname IN (
+  'search_cities',
+  'get_city_meta_window',
+  'get_city_users_ranked',
+  'get_city_plans_ranked',
+  'get_city_overview',          -- should be ABSENT post-merge
+  'get_visit_details'           -- should be ABSENT post-merge
+)
+ORDER BY proname;
+```
+
+Expect four rows (the new ones), and the two old ones gone. If anything is
+off, trigger the migration from the Branches tab manually.
+
+**Seed data.** The seed (`scripts/seed/`) is run only against local /
+preview DBs, never production. Production has whatever real users have
+created. Faker-generated visit/event data, the `pro` subscription row, and
+the city distributions you've been testing against are local-only.
+
+**Mapbox token.** `EXPO_PUBLIC_MAPBOX_TOKEN` needs to be set in whatever
+environment runs the production build (Expo EAS secrets, .env in CI, etc.),
+not just local `.env`. `/search`'s Mapbox fallback and `getCityCoordinates`
+both fail silently without it.
+
+**Type regen.** `types/supabase.ts` is generated from the local Supabase
+schema with `supabase gen types typescript --local`. If production has
+schema that local doesn't (or vice versa), the types will drift. Regenerate
+post-merge from prod once migrations are confirmed applied.
+
+**Storage buckets.** None of this branch's work creates new buckets, but
+the Wikimedia image hydration (below) will need one — flag if that lands.
+
 ## Delete `/explore`
 
 [app/explore.tsx](app/explore.tsx) is partially obsoleted by `/search`
