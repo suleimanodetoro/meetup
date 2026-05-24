@@ -1,7 +1,11 @@
 // hooks/useSubscription.tsx
 import { useCallback, useEffect, useState } from 'react';
+import Purchases, { type CustomerInfo } from 'react-native-purchases';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { isRevenueCatConfigured } from '~/lib/revenuecat';
+
+const ENTITLEMENT_ID = 'premium';
 
 interface SubscriptionRow {
   id: number;
@@ -34,6 +38,13 @@ export function useSubscription() {
   const userId = session?.user?.id;
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // RC's own view of the user's entitlement, held alongside the DB row.
+  // RC's local customerInfo updates the instant a purchase succeeds, well
+  // before the webhook + realtime chain delivers a fresh row from Supabase
+  // (which can be 3–10 seconds). Without this, the UI stays locked for that
+  // entire window even though the user just paid.
+  const [rcEntitled, setRcEntitled] = useState(false);
 
   const fetchSubscription = useCallback(async () => {
     if (!userId) {
@@ -87,12 +98,40 @@ export function useSubscription() {
     };
   }, [userId, fetchSubscription]);
 
-  // Source-of-truth derivation. Callers must not add ad-hoc gates on
-  // subscription_type or is_active — both are gone or redundant now.
-  const hasSubscription =
+  // Hook RC's customerInfo so the moment a purchase clears (or a restore
+  // succeeds, or the app foregrounds and RC re-syncs), we flip rcEntitled
+  // immediately. Also opportunistically re-fetches the DB row — by the time
+  // we get here the webhook may already have landed.
+  useEffect(() => {
+    if (!isRevenueCatConfigured()) return;
+    // Seed from current customerInfo without waiting for an event.
+    Purchases.getCustomerInfo()
+      .then((info) => setRcEntitled(!!info.entitlements.active[ENTITLEMENT_ID]))
+      .catch(() => {
+        /* fail open — DB row will still gate access */
+      });
+
+    const listener = (info: CustomerInfo) => {
+      const entitled = !!info.entitlements.active[ENTITLEMENT_ID];
+      setRcEntitled(entitled);
+      // If RC just turned us on, the webhook is in flight — grab the row
+      // when it lands.
+      if (entitled) void fetchSubscription();
+    };
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }, [fetchSubscription]);
+
+  // Either source confirming the entitlement is enough. RC's local state is
+  // fast, the DB row is authoritative long-term. Both sources falling silent
+  // (RC says inactive, DB row is null/expired) means no access.
+  const dbEntitled =
     subscription !== null &&
     subscription.entitlement_id !== null &&
     (subscription.expires_at === null || new Date(subscription.expires_at) > new Date());
+  const hasSubscription = rcEntitled || dbEntitled;
 
   return {
     subscription,
