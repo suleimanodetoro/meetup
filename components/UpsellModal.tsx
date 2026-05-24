@@ -112,8 +112,13 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
           );
         }
       } catch (err: any) {
-        if (err?.userCancelled) {
-          // silent — user backed out of Apple's purchase sheet
+        const isCancel =
+          err?.userCancelled ||
+          err?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
+        if (isCancel) {
+          // Silent. Covers both Apple's "Cancel" button and tap-outside /
+          // backgrounding the purchase sheet, which different RC SDK
+          // versions raise via different paths.
         } else if (err?.code === PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR) {
           // Family sharing / SCA — payment is in flight but not yet approved.
           Alert.alert(
