@@ -25,8 +25,10 @@ import {
   GENDER_PREFS,
   MEETING_PREFS,
   EVENT_TEMPLATES,
+  EVENT_IMAGES,
   MESSAGE_OPENERS,
   BIO_FRAGMENTS,
+  getAvatarUrl,
   pick,
   pickMany,
   jitter,
@@ -34,8 +36,8 @@ import {
   type City,
 } from './data';
 
-const USER_COUNT = 25;
-const EVENT_COUNT = 30;
+const USER_COUNT = 75;
+const EVENT_COUNT = 90;
 
 type Persona = {
   id: string;
@@ -58,7 +60,7 @@ async function createPersona(idx: number, city: City): Promise<Persona> {
   const username = `${firstName}_${lastName}_${idx}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
   const email = `${username}${SEED_EMAIL_DOMAIN}`;
   const fullName = `${firstName} ${lastName}`;
-  const avatarUrl = `https://api.dicebear.com/9.x/lorelei/png?seed=${username}`;
+  const avatarUrl = getAvatarUrl(idx, gender);
 
   const { data: created, error: authError } = await admin.auth.admin.createUser({
     email,
@@ -218,7 +220,7 @@ async function createEvents(personas: Persona[]): Promise<number[]> {
         description: template.desc,
         date: eventDate.toISOString(),
         user_id: creator.id,
-        image_uri: `https://api.dicebear.com/9.x/shapes/png?seed=${template.interest}-${i}`,
+        image_uri: EVENT_IMAGES[i % EVENT_IMAGES.length],
         city: city.name,
         country: city.country,
         country_code: city.countryCode,

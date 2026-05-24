@@ -78,6 +78,43 @@ export const BIO_FRAGMENTS = [
   'will absolutely show up to your weird hobby thing.',
 ];
 
+// Curated Pexels stock photos used for event/plan covers. Picked to read like
+// real meetup/travel content rather than the abstract DiceBear shapes the old
+// seed used. Pexels URLs stay stable long-term, so they're safe to bake in.
+export const EVENT_IMAGES = [
+  'https://images.pexels.com/photos/2167673/pexels-photo-2167673.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/3171837/pexels-photo-3171837.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1267697/pexels-photo-1267697.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/2014773/pexels-photo-2014773.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1647962/pexels-photo-1647962.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1851415/pexels-photo-1851415.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/904616/pexels-photo-904616.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1812964/pexels-photo-1812964.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/3621104/pexels-photo-3621104.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/1407322/pexels-photo-1407322.jpeg?auto=compress&cs=tinysrgb&w=800',
+  'https://images.pexels.com/photos/2747508/pexels-photo-2747508.jpeg?auto=compress&cs=tinysrgb&w=800',
+];
+
+/**
+ * Return a stable randomuser.me portrait URL for a seeded persona. They look
+ * like real photos (which DiceBear cartoons emphatically don't), and the
+ * portrait pool has 99 of each gender so 75 users fit comfortably with no
+ * duplication within a gender.
+ *
+ * `lego` for the 'other' gender bucket isn't a real photo but keeps the
+ * non-binary persona visually distinct without misgendering.
+ */
+export function getAvatarUrl(idx: number, gender: (typeof GENDERS)[number]): string {
+  const bucket = gender === 'female' ? 'women' : gender === 'male' ? 'men' : 'lego';
+  const n = idx % 99;
+  return `https://randomuser.me/api/portraits/${bucket}/${n}.jpg`;
+}
+
 export function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
