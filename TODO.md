@@ -4,6 +4,122 @@ Tracking items deferred from cleanup passes. Each entry should explain *why* it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
+## Wire up RevenueCat (external steps)
+
+The code is in place ([lib/revenuecat.ts](lib/revenuecat.ts),
+[components/UpsellModal.tsx](components/UpsellModal.tsx),
+[supabase/functions/revenuecat-webhook/index.ts](supabase/functions/revenuecat-webhook/index.ts))
+but it needs dashboard config and secrets before purchases actually flow
+end-to-end.
+
+### 1. RevenueCat dashboard
+
+Sign up at <https://app.revenuecat.com>. Free tier covers up to $10k/month.
+
+- **Project**: create one named `Waypoint`.
+- **Entitlement**: create one called `premium`. This matches the string the
+  code checks (`customerInfo.entitlements.active['premium']`).
+- **Products**: created later in App Store Connect, then mirrored here. Use
+  identifiers like `app.usewaypoint.premium.monthly` and
+  `app.usewaypoint.premium.yearly`. Attach both to the `premium` entitlement.
+- **Offering**: create `default`, add both products as packages. The SDK's
+  `Purchases.getOfferings()` returns whichever offering is marked
+  "Current" — keep `default` as current unless you're A/B-ing.
+- **App Store Connect API key**: generate in App Store Connect (Users →
+  Integrations → App Store Connect API), upload to RC at
+  Project Settings → Apps → iOS → App Store Connect API. Without this RC
+  can't verify Apple receipts.
+- **iOS Public SDK Key + Android Public SDK Key**: copy from Project
+  Settings → API Keys. These go into local `.env.local` and EAS secrets as
+  `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` and
+  `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`. They're "public" — safe to
+  ship in the bundle.
+
+### 2. App Store Connect products
+
+In App Store Connect → Your App → In-App Purchases:
+
+- Create one auto-renewing subscription group, e.g. `premium_access`.
+- Add subscriptions inside it matching the RC product IDs above
+  (`app.usewaypoint.premium.monthly`, `.yearly`).
+- Set pricing, localization (title + description that show in the Apple
+  purchase sheet), and submit them for review *alongside* the first app
+  build that uses them — Apple ties IAP approval to a binary.
+- Mirror the IDs back in the RC dashboard's Products section.
+
+### 3. Sandbox testing
+
+You need a physical device, not the simulator, for full end-to-end
+sandbox purchases through RC.
+
+- App Store Connect → Users and Access → Sandbox Testers → add a fake
+  email (doesn't have to actually exist).
+- On the device: Settings → App Store → Sandbox Account → sign in with
+  the sandbox tester.
+- Run the dev build (not Expo Go — RC requires native code).
+- Open the paywall and tap a package. Apple's purchase sheet should
+  show "[Environment: Sandbox]" at the top. Confirm with Face ID.
+- Verify in the RC dashboard's Customer view that the event appeared.
+- Verify in Supabase that the user_subscriptions row updated.
+
+### 4. Supabase Edge Function deploy
+
+The webhook code lives in
+[supabase/functions/revenuecat-webhook/index.ts](supabase/functions/revenuecat-webhook/index.ts).
+
+```bash
+# Pick any long random string. Set the same value in both places.
+WEBHOOK_AUTH=$(openssl rand -hex 32)
+
+# 1. Set the secret on the function side.
+supabase secrets set REVENUECAT_WEBHOOK_AUTH=$WEBHOOK_AUTH
+
+# 2. Deploy the function.
+supabase functions deploy revenuecat-webhook
+
+# 3. In the RC dashboard (Project Settings -> Integrations -> Webhooks),
+#    add the URL:
+#      https://<project-ref>.supabase.co/functions/v1/revenuecat-webhook
+#    and set the Authorization header to:
+#      Bearer <WEBHOOK_AUTH>
+```
+
+`verify_jwt = false` is set in supabase/config.toml so the function
+accepts RC's unauthenticated POSTs; auth lives in the shared-secret
+Bearer header inside the function itself.
+
+### 5. Env vars summary
+
+Production / dev build needs:
+
+```
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_xxxxxxxxxxxx
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxx
+```
+
+Set in:
+- `.env.local` for local dev (already gitignored)
+- EAS secrets (`eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_IOS_API_KEY --value appl_...`) for production builds
+
+Edge Function needs:
+
+```
+REVENUECAT_WEBHOOK_AUTH=<the long random string you generated above>
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase
+into Edge Functions automatically — no setup needed.
+
+### 6. Switching to corporate Apple account later
+
+Apps transfer between Apple Developer accounts via App Store Connect once
+both are enrolled. IAP subscription history transfers with the app. Don't
+block the initial launch on the corporate switch — ship under the
+individual account first, switch when D-U-N-S / Companies House
+verification is done.
+
+---
+
 ## Verify production parity with local
 
 A lot of this branch's work is local-only at the time of writing. Before
