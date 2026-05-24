@@ -306,3 +306,9 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# RevenueCat webhook receives unauthenticated POSTs from RC's servers
+# (the auth lives in a shared-secret Bearer header inside the function
+# itself), so the Supabase JWT check has to be off for this endpoint.
+[functions.revenuecat-webhook]
+verify_jwt = false
