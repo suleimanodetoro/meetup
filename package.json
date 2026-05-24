@@ -53,6 +53,7 @@
     "react-native": "0.79.4",
     "react-native-date-picker": "^5.0.12",
     "react-native-gesture-handler": "~2.24.0",
+    "react-native-purchases": "^10.1.2",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",

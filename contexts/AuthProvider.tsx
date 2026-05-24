@@ -9,6 +9,7 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '~/utils/supabase';
 import { ActivityIndicator, View } from 'react-native';
+import { identifyRevenueCatUser, signOutOfRevenueCat } from '~/lib/revenuecat';
 
 type AuthContextType = {
   session: Session | null;
@@ -105,8 +106,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      
+
       if (session?.user?.id) {
+        void identifyRevenueCatUser(session.user.id);
         checkOnboardingStatus(session.user.id).finally(() => {
           setIsLoading(false);
         });
@@ -115,13 +117,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Listen for auth changes
+    // Listen for auth changes. We mirror the Supabase user id into
+    // RevenueCat so RC's customerInfo + webhook payloads carry our user
+    // UUID rather than an anonymous device-scoped id.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      
+
       if (session?.user?.id) {
+        void identifyRevenueCatUser(session.user.id);
         checkOnboardingStatus(session.user.id);
       } else {
+        void signOutOfRevenueCat();
         setHasCompletedOnboarding(false);
       }
     });

@@ -8,6 +8,12 @@ import { CreatePlanProvider } from '~/contexts/CreatePlanContext';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { configureRevenueCat } from '~/lib/revenuecat';
+
+// Configure the RC SDK once at module load. Idempotent; no-op when the
+// platform's API key env var isn't set, so dev environments without an
+// RC project don't crash the app.
+configureRevenueCat();
 
 
 
