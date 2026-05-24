@@ -185,7 +185,7 @@ export default function VisitDetailsBottomSheet({
         >
           <Ionicons name="people" size={20} color={activeTab === 'users' ? '#007AFF' : '#999'} />
           <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
-            Users {users.length > 0 && `(${users.length})`}
+            Users
           </Text>
         </Pressable>
         <Pressable
@@ -194,7 +194,7 @@ export default function VisitDetailsBottomSheet({
         >
           <Ionicons name="calendar" size={20} color={activeTab === 'plans' ? '#007AFF' : '#999'} />
           <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
-            Plans {plans.length > 0 && `(${plans.length})`}
+            Plans
           </Text>
         </Pressable>
       </View>
