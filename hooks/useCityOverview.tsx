@@ -182,7 +182,14 @@ export function useCityOverview(
       );
       if (rpcError) throw rpcError;
       const rows = (data ?? []) as unknown as CityUser[];
-      setUsers((prev) => [...prev, ...rows]);
+      setUsers((prev) => {
+        // Dedupe on append: when the SQL ORDER BY has tied scores, the same
+        // user_id can land at the end of one page and the start of the next.
+        // Drop anything we've already rendered to avoid React key collisions.
+        const seen = new Set(prev.map((u) => u.user_id));
+        const fresh = rows.filter((r) => !seen.has(r.user_id));
+        return [...prev, ...fresh];
+      });
       setUsersHasMore(
         rows.length === PAGE_SIZE && users.length + rows.length < (overview?.user_count ?? 0),
       );
@@ -216,7 +223,11 @@ export function useCityOverview(
       );
       if (rpcError) throw rpcError;
       const rows = (data ?? []) as unknown as CityPlan[];
-      setPlans((prev) => [...prev, ...rows]);
+      setPlans((prev) => {
+        const seen = new Set(prev.map((p) => p.event_id));
+        const fresh = rows.filter((r) => !seen.has(r.event_id));
+        return [...prev, ...fresh];
+      });
       setPlansHasMore(
         rows.length === PAGE_SIZE && plans.length + rows.length < (overview?.plan_count ?? 0),
       );

@@ -2,7 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_DWELL_MS = 200;
-const DEFAULT_MAX_PER_SESSION = 3;
+// Single fire per session. Apple has historically rejected apps that show a
+// paywall multiple times in one session — and from a UX standpoint, once the
+// user has dismissed it they've made a decision, nagging twice more is rude.
+// If a fundraising flow ever needs the old 3-per-session "nag-on-scroll"
+// behaviour, raise this — the per-index dwell logic supports it cleanly.
+const DEFAULT_MAX_PER_SESSION = 1;
 
 interface Options {
   /** Milliseconds a qualifying card must stay in view before the modal fires. */

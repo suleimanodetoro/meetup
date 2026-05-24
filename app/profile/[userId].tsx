@@ -14,7 +14,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { INTERESTS } from '~/utils/constants';
+import { INTERESTS, LANGUAGES } from '~/utils/constants';
+
+const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
+  LANGUAGES.map((l) => [l.code, l]),
+);
+function formatLanguages(codes: readonly string[] | undefined): string {
+  if (!codes || codes.length === 0) return '';
+  return codes
+    .map((c) => LANGUAGE_BY_CODE.get(c)?.name ?? c)
+    .join(', ');
+}
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -503,7 +513,7 @@ export default function UserProfileScreen() {
             <View style={styles.languagesPill}>
               <Text style={styles.languagesIcon}>aA</Text>
               <Text style={styles.languagesText}>
-                {profile.languages.join(', ')}
+                {formatLanguages(profile.languages)}
               </Text>
             </View>
           </View>
