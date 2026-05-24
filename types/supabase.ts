@@ -694,36 +694,36 @@ export type Database = {
       user_subscriptions: {
         Row: {
           created_at: string | null
+          entitlement_id: string | null
           expires_at: string | null
           id: number
-          is_active: boolean | null
+          original_transaction_id: string | null
+          provider: string | null
           started_at: string | null
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
           subscription_type: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
+          entitlement_id?: string | null
           expires_at?: string | null
           id?: number
-          is_active?: boolean | null
+          original_transaction_id?: string | null
+          provider?: string | null
           started_at?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           subscription_type?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
+          entitlement_id?: string | null
           expires_at?: string | null
           id?: number
-          is_active?: boolean | null
+          original_transaction_id?: string | null
+          provider?: string | null
           started_at?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           subscription_type?: string | null
           updated_at?: string | null
           user_id?: string | null

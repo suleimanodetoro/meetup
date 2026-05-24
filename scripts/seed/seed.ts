@@ -357,14 +357,20 @@ async function createDMs(personas: Persona[]) {
 // ────────────────────────────────────────────────────────────────────────────
 
 async function createSentinels(personas: Persona[]) {
-  // Sentinel #1: pro-tier user (write to user_subscriptions as service role)
-  const proUser = personas[0];
+  // Sentinel #1: premium-tier user. The row already exists (auto-created on
+  // profile insert as 'free'); we just flip it to the paid shape that
+  // RevenueCat's webhook would write.
+  const premiumUser = personas[0];
   const { error: subErr } = await admin
     .from('user_subscriptions')
-    .update({ subscription_type: 'pro', is_active: true })
-    .eq('user_id', proUser.id);
-  if (subErr) throw new Error(`pro subscription: ${subErr.message}`);
-  console.log(`  → ${proUser.name} marked as pro`);
+    .update({
+      subscription_type: 'premium',
+      entitlement_id: 'premium',
+      provider: 'promotional',
+    })
+    .eq('user_id', premiumUser.id);
+  if (subErr) throw new Error(`premium subscription: ${subErr.message}`);
+  console.log(`  → ${premiumUser.name} marked as premium`);
 
   // Sentinel #2: a high-volume DM thread for scroll-perf testing
   const a = personas[1];
