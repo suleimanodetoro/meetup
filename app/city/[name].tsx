@@ -174,14 +174,7 @@ export default function CityDetailScreen() {
         plansLoadingMore={plansLoadingMore}
       />
 
-      <UpsellModal
-        visible={upsellVisible}
-        onDismiss={dismissUpsell}
-        onSubscribe={() => {
-          dismissUpsell();
-          router.push('/settings' as never);
-        }}
-      />
+      <UpsellModal visible={upsellVisible} onDismiss={dismissUpsell} />
     </View>
   );
 }
