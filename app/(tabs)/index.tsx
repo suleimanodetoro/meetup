@@ -17,9 +17,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { useSubscription } from '~/hooks/useSubscription';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
 import type { Event, Profile } from '~/types/db';
+import { PremiumBadge } from '~/components/PremiumBadge';
 
 // Import components
 import VisitCard from '~/components/VisitCard';
@@ -81,6 +83,7 @@ const categories = [
 
 export default function HomeScreen() {
   const { session } = useAuth();
+  const { hasSubscription } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('for you');
@@ -215,23 +218,33 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => router.push('/(tabs)/profile')}
               hitSlop={8}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                overflow: 'hidden',
-                backgroundColor: '#E0E0E0',
-              }}>
-              {userProfile?.avatar_url ? (
-                <Image
-                  source={{ uri: userProfile.avatar_url }}
-                  style={{ width: '100%', height: '100%' }}
-                  onError={() => {}}
+              style={{ position: 'relative' }}
+            >
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  overflow: 'hidden',
+                  backgroundColor: '#E0E0E0',
+                }}>
+                {userProfile?.avatar_url ? (
+                  <Image
+                    source={{ uri: userProfile.avatar_url }}
+                    style={{ width: '100%', height: '100%' }}
+                    onError={() => {}}
+                  />
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="person" size={20} color="#999" />
+                  </View>
+                )}
+              </View>
+              {hasSubscription && (
+                <PremiumBadge
+                  size={14}
+                  style={{ position: 'absolute', bottom: -3, right: -3 }}
                 />
-              ) : (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="person" size={20} color="#999" />
-                </View>
               )}
             </Pressable>
           </View>

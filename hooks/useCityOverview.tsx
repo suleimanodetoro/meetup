@@ -11,6 +11,7 @@ export interface CityUser {
   visit_start: string;
   visit_end: string;
   match_score: number;
+  is_premium: boolean;
 }
 
 export interface CityPlan {

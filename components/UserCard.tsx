@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { PremiumBadge } from './PremiumBadge';
 
 interface UserCardProps {
   user: {
@@ -13,6 +14,7 @@ interface UserCardProps {
     is_verified: boolean;
     visit_start: string;
     visit_end: string;
+    is_premium?: boolean;
   };
 }
 
@@ -45,10 +47,13 @@ export default function UserCard({ user }: UserCardProps) {
               </Text>
             </View>
           )}
-          {user.is_verified && (
+          {user.is_verified && !user.is_premium && (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
             </View>
+          )}
+          {user.is_premium && (
+            <PremiumBadge size={18} style={styles.premiumBadgePosition} />
           )}
         </View>
 
@@ -116,6 +121,11 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: 'white',
     borderRadius: 10,
+  },
+  premiumBadgePosition: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
   },
   info: {
     flex: 1,

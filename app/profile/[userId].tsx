@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
+import { PremiumBadge } from '~/components/PremiumBadge';
 
 const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
   LANGUAGES.map((l) => [l.code, l]),
@@ -55,6 +56,7 @@ export default function UserProfileScreen() {
   const { session } = useAuth();
   
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>(null);
   const [isRequester, setIsRequester] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -94,6 +96,14 @@ export default function UserProfileScreen() {
       }
 
       setProfile(profileData as unknown as UserProfile);
+
+      // Fire-and-forget premium check — the page renders fine without it,
+      // and a stale `false` is preferable to blocking the profile on a
+      // secondary RPC. Defaults to false on any failure. The cast bypasses
+      // the generated Database types until they're regenerated against the
+      // 20260524150000_add_is_premium_to_user_rpcs.sql migration.
+      void (supabase.rpc as any)('is_user_premium', { uid: userId })
+        .then(({ data }: { data: boolean | null }) => setIsPremium(!!data));
 
       // Fetch travel stats
       const { data: visits } = await supabase
@@ -335,12 +345,16 @@ export default function UserProfileScreen() {
         {/* Header Image - Scrollable */}
         <View style={styles.headerImageContainer}>
           <Image
-            source={{ 
-              uri: profile.avatar_url || 'https://via.placeholder.com/400' 
+            source={{
+              uri: profile.avatar_url || 'https://via.placeholder.com/400'
             }}
             style={styles.headerImage}
           />
-          
+
+          {isPremium && (
+            <PremiumBadge size={28} style={styles.premiumBadgeHeader} />
+          )}
+
           {/* Name and Location Overlay */}
           <View style={styles.profileInfoOverlay}>
             <Text style={styles.profileName}>
@@ -592,6 +606,11 @@ const styles = StyleSheet.create({
   headerImage: {
     width: '100%',
     height: '100%',
+  },
+  premiumBadgeHeader: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
   },
   profileInfoOverlay: {
     position: 'absolute',

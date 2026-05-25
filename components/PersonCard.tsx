@@ -10,6 +10,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryFlag } from '~/utils/countryFlags';
+import { PremiumBadge } from './PremiumBadge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -22,6 +23,7 @@ interface PersonCardProps {
     nationality_code?: string;
     location?: string;
     is_online?: boolean; // TODO: Implement presence
+    is_premium?: boolean;
   };
 }
 
@@ -126,6 +128,13 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
           />
         )}
         */}
+
+        {person.is_premium && (
+          <PremiumBadge
+            size={18}
+            style={{ position: 'absolute', bottom: 8, right: 8 }}
+          />
+        )}
       </View>
 
       <Text

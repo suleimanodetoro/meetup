@@ -18,9 +18,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { useSubscription } from '~/hooks/useSubscription';
 import { Visit, Profile } from '~/types/db';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
+import { PremiumBadge } from '~/components/PremiumBadge';
 
 import VisitCard from '~/components/VisitCard';
 import PlanCardHome from '~/components/PlanCardHome';
@@ -40,6 +42,7 @@ const C = {
 
 export default function ProfileScreen() {
   const { session } = useAuth();
+  const { hasSubscription } = useSubscription();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [upcomingVisits, setUpcomingVisits] = useState<any[]>([]);
@@ -228,25 +231,33 @@ export default function ProfileScreen() {
             }}>
             {/* Profile Info */}
             <View style={{ flexDirection: 'row', gap: 14, flex: 1 }}>
-              <View
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
-                  backgroundColor: C.soft,
-                  overflow: 'hidden',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                {profile?.avatar_url ? (
-                  <Image
-                    source={{ uri: profile.avatar_url }}
-                    style={{ width: '100%', height: '100%' }}
+              <View style={{ position: 'relative' }}>
+                <View
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: C.soft,
+                    overflow: 'hidden',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                  {profile?.avatar_url ? (
+                    <Image
+                      source={{ uri: profile.avatar_url }}
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 28, fontWeight: '600', color: C.sub }}>
+                      {(profile?.full_name?.[0] || 'T').toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                {hasSubscription && (
+                  <PremiumBadge
+                    size={22}
+                    style={{ position: 'absolute', bottom: -2, right: -2 }}
                   />
-                ) : (
-                  <Text style={{ fontSize: 28, fontWeight: '600', color: C.sub }}>
-                    {(profile?.full_name?.[0] || 'T').toUpperCase()}
-                  </Text>
                 )}
               </View>
 
