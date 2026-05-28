@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { router } from 'expo-router';
 import { supabase } from '~/utils/supabase';
 
 export default function SignInScreen() {
@@ -55,18 +56,37 @@ export default function SignInScreen() {
 
   async function signUpWithEmail() {
     if (!isMounted.current) return;
+    const trimmed = email.trim();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: trimmed,
       password,
+      options: {
+        // Deep link the verification email back into the app. The
+        // confirm-email screen exchanges the PKCE code for a session and
+        // then hands off to NavigationController.
+        emailRedirectTo: 'waypoint://confirm-email',
+      },
     });
 
-    if (error && isMounted.current) {
+    if (!isMounted.current) return;
+    setLoading(false);
+
+    if (error) {
       Alert.alert('Error', error.message);
+      return;
     }
-    // Don't navigate - let the NavigationController handle it
-    if (isMounted.current) {
-      setLoading(false);
+
+    // When email confirmation is enabled in the Supabase project, signUp
+    // returns a user row but no session — we route to the "check your
+    // email" screen so the user knows to look in their inbox. When
+    // confirmation is disabled, a session comes back immediately and
+    // NavigationController will route them to onboarding.
+    if (!data.session) {
+      router.replace({
+        pathname: '/check-email',
+        params: { email: trimmed },
+      });
     }
   }
 
@@ -462,6 +482,15 @@ export default function SignInScreen() {
                       </Text>
                     </Pressable>
                   </View>
+
+                  <Pressable
+                    onPress={() => router.push('/forgot-password')}
+                    style={{ alignItems: 'center', marginTop: 4 }}
+                    hitSlop={8}>
+                    <Text style={{ color: '#007AFF', fontSize: 14, fontWeight: '500' }}>
+                      Forgot password?
+                    </Text>
+                  </Pressable>
                 </View>
               </>
             )}

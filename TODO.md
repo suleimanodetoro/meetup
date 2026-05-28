@@ -120,6 +120,81 @@ verification is done.
 
 ---
 
+## Wire email confirmation + password reset (Supabase Dashboard)
+
+The app-side flow is shipped:
+
+- [app/(auth)/forgot-password.tsx](app/(auth)/forgot-password.tsx) requests a
+  reset email
+- [app/(auth)/reset-password.tsx](app/(auth)/reset-password.tsx) handles
+  `waypoint://reset-password?code=...`
+- [app/(auth)/check-email.tsx](app/(auth)/check-email.tsx) is shown after
+  sign-up
+- [app/(auth)/confirm-email.tsx](app/(auth)/confirm-email.tsx) handles
+  `waypoint://confirm-email?code=...`
+- [utils/supabase.ts](utils/supabase.ts) is set to `flowType: 'pkce'` so
+  Supabase ships a one-time `?code=` instead of a fragment
+
+Three Dashboard things still need flipping before any of it works in
+production:
+
+### 1. Redirect URL allowlist
+
+Dashboard → **Authentication → URL Configuration → Redirect URLs**. Add
+these patterns (Supabase blocks any `redirectTo` value not on this list):
+
+```
+waypoint://reset-password
+waypoint://confirm-email
+waypoint://**
+```
+
+The `**` wildcard is the easiest "all-of-our-scheme" guard, but if you
+want to be strict, the two specific URLs above are sufficient.
+
+### 2. Toggle email confirmation on (optional but recommended)
+
+Dashboard → **Authentication → Sign In / Up → Confirm email** → **Enable**.
+
+With this off, `signUp()` returns a session immediately and the user
+walks straight into onboarding — fine for testing, weak signal of email
+ownership in prod. With this on, `signUp()` returns a user but no
+session, our code routes to `/check-email`, and the user must tap the
+emailed link before they can sign in.
+
+`supabase/config.toml` controls this for local Supabase only — line 157
+(`[auth.email] enable_confirmations`). Flip it there if you want the same
+behaviour against `supabase start`.
+
+### 3. Customize the two email templates
+
+Dashboard → **Authentication → Email Templates**.
+
+- **Confirm signup** — body should contain `{{ .ConfirmationURL }}`; PKCE
+  appends the `?code=` automatically. Default template works; just
+  branding/copy.
+- **Reset password** — same: keep `{{ .ConfirmationURL }}`. Subject line
+  defaults to "Reset your password".
+
+If you're using a custom SMTP, also confirm the **From** name + address
+under **Authentication → SMTP Settings** so reset emails don't land in
+spam.
+
+### 4. Smoke-test on a real device
+
+Email auth deep links require the `waypoint://` scheme handler to be
+registered, which only happens in a real build (Expo Go cannot register
+custom schemes). The current EAS dev build already has it. To verify:
+
+1. Sign up with a real email → confirm `/check-email` shows
+2. Tap link in email → app should open at `/confirm-email`, exchange code,
+   route to `/onboarding/basic`
+3. From `/signin`, tap **Forgot password?** → enter the same email →
+   tap the link → app should open at `/reset-password`, accept new
+   password, route to `/(tabs)`
+
+---
+
 ## Verify production parity with local
 
 A lot of this branch's work is local-only at the time of writing. Before

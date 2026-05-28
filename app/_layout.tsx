@@ -35,6 +35,16 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     // First visible segment (folder name) — used for allow-listing deep links
     const currentRoute = first;
 
+    // Auth screens that *establish* the session via PKCE deep links and
+    // must remain in control of the next navigation step. Without this
+    // exception, the "kick out of (auth) when authenticated" rule below
+    // fires the instant exchangeCodeForSession resolves and unmounts the
+    // screen before it can show success or let the user pick a new
+    // password.
+    const innerAuthSegment = inAuthGroup ? segments[1] : undefined;
+    const isTransientAuthFlow =
+      innerAuthSegment === 'reset-password' || innerAuthSegment === 'confirm-email';
+
     // Dynamic (parameterized) top-level folders
     const dynamicRoutes = ['event', 'chat', 'city', 'profile'];
 
@@ -63,13 +73,19 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     if (!hasCompletedOnboarding) {
       const onOnboarding =
         inAuthGroup && segments[1] === 'onboarding';
-      if (!onOnboarding) router.replace('/onboarding/basic'); // lives in (auth)/onboarding/[step]
+      // Transient auth flows handle their own next-step navigation once
+      // they've finished, so don't yank the user mid-exchange.
+      if (!onOnboarding && !isTransientAuthFlow) {
+        router.replace('/onboarding/basic'); // lives in (auth)/onboarding/[step]
+      }
       return;
     }
 
     // ----- Authenticated + onboarded -----
-    // If we're still on any (auth) screen (e.g., /signin), leave immediately.
-    if (inAuthGroup) {
+    // If we're still on any (auth) screen (e.g., /signin), leave immediately —
+    // except for transient flows that just established the session via a
+    // deep link and need to remain visible to finish their work.
+    if (inAuthGroup && !isTransientAuthFlow) {
       router.replace('/(tabs)');
       return;
     }
