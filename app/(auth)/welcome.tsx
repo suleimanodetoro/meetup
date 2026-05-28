@@ -2,7 +2,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
@@ -10,7 +10,7 @@ import AuthScreen from '~/components/auth/AuthScreen';
 import OAuthButton from '~/components/auth/OAuthButton';
 import ErrorBanner from '~/components/ErrorBanner';
 import { supabase } from '~/utils/supabase';
-import { authColors, authHitSlop, authRadius, authSpace, authType } from '~/utils/authTheme';
+import { authColors, authSpace, authType } from '~/utils/authTheme';
 
 type PendingProvider = 'apple' | 'google' | 'email' | null;
 
@@ -187,84 +187,81 @@ export default function WelcomeScreen() {
 
   return (
     <AuthScreen scrollable={false}>
+      {/* Top-down layout. No space-between, no flex:1 stretch on children.
+          The buttons land in the middle-lower part of the screen with
+          intentional whitespace below them, matching the Tripadvisor inspo. */}
       <View style={styles.container}>
-        <View style={styles.top}>
-          <View
-            style={styles.brandRow}
-            accessibilityRole="header"
-            accessibilityLabel="Waypoint"
-          >
-            <View style={styles.logoTile}>
-              <Image
-                source={require('~/assets/ios-light.png')}
-                style={styles.logoImage}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
-            </View>
-            <Text style={styles.wordmark}>Waypoint</Text>
+        <View
+          style={styles.brandRow}
+          accessibilityRole="header"
+          accessibilityLabel="Waypoint"
+        >
+          <View style={styles.logoTile}>
+            <Image
+              source={require('~/assets/ios-light.png')}
+              style={styles.logoImage}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
           </View>
-
-          <Text style={styles.headline} accessibilityRole="header">
-            Find your people in every city you visit.
-          </Text>
-
-          <Text style={styles.disclaimer}>
-            By proceeding, you agree to our{' '}
-            <Pressable
-              onPress={() => Linking.openURL(TERMS_URL)}
-              hitSlop={authHitSlop}
-              accessibilityRole="link"
-              accessibilityLabel="Terms of Use"
-            >
-              <Text style={styles.disclaimerLink}>Terms of Use</Text>
-            </Pressable>{' '}
-            and confirm you have read our{' '}
-            <Pressable
-              onPress={() => Linking.openURL(PRIVACY_URL)}
-              hitSlop={authHitSlop}
-              accessibilityRole="link"
-              accessibilityLabel="Privacy and Cookie Statement"
-            >
-              <Text style={styles.disclaimerLink}>Privacy and Cookie Statement</Text>
-            </Pressable>
-            .
-          </Text>
+          <Text style={styles.wordmark}>Waypoint</Text>
         </View>
 
-        <View style={styles.bottom}>
-          {error ? (
-            <View style={styles.errorWrap}>
-              <ErrorBanner message={error} />
-            </View>
-          ) : null}
+        <Text style={styles.headline} accessibilityRole="header">
+          Find your people in every city you visit.
+        </Text>
 
-          <View style={styles.buttonStack}>
-            {showAppleButton && (
-              <OAuthButton
-                provider="apple"
-                label="Continue with Apple"
-                onPress={signInWithApple}
-                loading={pending === 'apple'}
-                disabled={isBusy && pending !== 'apple'}
-              />
-            )}
-            <OAuthButton
-              provider="google"
-              label="Continue with Google"
-              onPress={signInWithGoogle}
-              loading={pending === 'google'}
-              disabled={isBusy && pending !== 'google'}
-            />
-            <OAuthButton
-              provider="email"
-              label="Continue with email"
-              onPress={continueWithEmail}
-              disabled={isBusy}
-            />
+        <Text style={styles.disclaimer}>
+          By proceeding, you agree to our{' '}
+          <Text
+            style={styles.disclaimerLink}
+            onPress={() => Linking.openURL(TERMS_URL)}
+            accessibilityRole="link"
+            accessibilityLabel="Terms of Use"
+          >
+            Terms of Use
+          </Text>
+          {' '}and confirm you have read our{' '}
+          <Text
+            style={styles.disclaimerLink}
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy and Cookie Statement"
+          >
+            Privacy and Cookie Statement
+          </Text>
+          .
+        </Text>
+
+        {error ? (
+          <View style={styles.errorWrap}>
+            <ErrorBanner message={error} />
           </View>
+        ) : null}
 
-          <View style={styles.safeAreaSpacer} />
+        <View style={styles.buttonStack}>
+          {showAppleButton && (
+            <OAuthButton
+              provider="apple"
+              label="Continue with Apple"
+              onPress={signInWithApple}
+              loading={pending === 'apple'}
+              disabled={isBusy && pending !== 'apple'}
+            />
+          )}
+          <OAuthButton
+            provider="google"
+            label="Continue with Google"
+            onPress={signInWithGoogle}
+            loading={pending === 'google'}
+            disabled={isBusy && pending !== 'google'}
+          />
+          <OAuthButton
+            provider="email"
+            label="Continue with email"
+            onPress={continueWithEmail}
+            disabled={isBusy}
+          />
         </View>
       </View>
     </AuthScreen>
@@ -274,16 +271,15 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
-  },
-  top: {
-    paddingTop: authSpace.xl,
+    // Intentionally NO justifyContent — content stacks from the top.
+    // Whitespace below the buttons is the empty remainder of the column.
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: authSpace.md,
-    marginBottom: authSpace.xxl,
+    marginTop: authSpace.lg,
+    marginBottom: authSpace.xxxl,
   },
   logoTile: {
     width: 50,
@@ -310,13 +306,14 @@ const styles = StyleSheet.create({
     fontWeight: authType.headline.fontWeight,
     color: authColors.textPrimary,
     textAlign: 'left',
-    marginBottom: authSpace.lg + authSpace.xs, // 20
+    marginBottom: authSpace.lg,
   },
   disclaimer: {
     fontSize: authType.disclaimer.fontSize,
     lineHeight: authType.disclaimer.lineHeight,
     fontWeight: authType.disclaimer.fontWeight,
     color: authColors.textDisclaimer,
+    marginBottom: authSpace.xxl,
   },
   disclaimerLink: {
     fontSize: authType.disclaimer.fontSize,
@@ -325,17 +322,11 @@ const styles = StyleSheet.create({
     color: authColors.textPrimary,
     textDecorationLine: 'underline',
   },
-  bottom: {
-    width: '100%',
-  },
   errorWrap: {
     marginBottom: authSpace.md,
   },
   buttonStack: {
     gap: authSpace.md,
     width: '100%',
-  },
-  safeAreaSpacer: {
-    height: authSpace.lg,
   },
 });
