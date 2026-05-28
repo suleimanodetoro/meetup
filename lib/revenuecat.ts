@@ -42,7 +42,11 @@ export function configureRevenueCat(): void {
     }
     return;
   }
-  if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.WARN);
+  // RC's WARN tier in dev spams every customerInfo read with
+  // "Entitlement is no longer active (expired ...)" and "appUserID is
+  // already cached" — both expected, neither actionable, both bury real
+  // problems. ERROR keeps the genuine ones surfaced.
+  if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.ERROR);
   Purchases.configure({ apiKey });
   configured = true;
 }

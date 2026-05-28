@@ -46,6 +46,13 @@ export function useSubscription() {
   // entire window even though the user just paid.
   const [rcEntitled, setRcEntitled] = useState(false);
 
+  // Stable per-instance suffix for the realtime channel name. Multiple
+  // components mount this hook (TabLayout, ProfileScreen, PaywallCard, …),
+  // and Supabase rejects two `.subscribe()` calls against the same channel
+  // name with "tried to subscribe multiple times". Per-instance suffix lets
+  // each consumer have its own channel.
+  const [instanceId] = useState(() => Math.random().toString(36).slice(2, 10));
+
   const fetchSubscription = useCallback(async () => {
     if (!userId) {
       setSubscription(null);
@@ -77,10 +84,11 @@ export function useSubscription() {
     void fetchSubscription();
     if (!userId) return;
 
-    // Per-user channel so multiple hook instances and multiple users don't
-    // collide on one hardcoded channel name.
+    // Per-user channel so different users don't collide, plus the
+    // instanceId suffix so multiple hook instances for the same user don't
+    // double-subscribe to the same channel name.
     const channel = supabase
-      .channel(`subscription_changes_${userId}`)
+      .channel(`subscription_changes_${userId}_${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -96,7 +104,7 @@ export function useSubscription() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, fetchSubscription]);
+  }, [userId, instanceId, fetchSubscription]);
 
   // Hook RC's customerInfo so the moment a purchase clears (or a restore
   // succeeds, or the app foregrounds and RC re-syncs), we flip rcEntitled
