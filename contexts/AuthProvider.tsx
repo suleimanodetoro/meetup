@@ -4,6 +4,7 @@ import React, {
   useState,
   useContext,
   useEffect,
+  useRef,
   ReactNode,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
@@ -35,6 +36,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Tracks whether we currently have an RC user identified, so that on
+  // sign-out we only call Purchases.logOut() if we previously called
+  // logIn(). Without this, the very first onAuthStateChange fire on cold
+  // start (which arrives with session=null before any sign-in has
+  // happened) would call signOutOfRevenueCat() against an anonymous RC
+  // user and spam the console with "LogOut was called but the current
+  // user is anonymous".
+  const rcUserIdentifiedRef = useRef(false);
 
   // Function to check onboarding status
   const checkOnboardingStatus = async (userId: string) => {
@@ -109,6 +119,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user?.id) {
         void identifyRevenueCatUser(session.user.id);
+        rcUserIdentifiedRef.current = true;
         checkOnboardingStatus(session.user.id).finally(() => {
           setIsLoading(false);
         });
@@ -125,9 +136,17 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user?.id) {
         void identifyRevenueCatUser(session.user.id);
+        rcUserIdentifiedRef.current = true;
         checkOnboardingStatus(session.user.id);
       } else {
-        void signOutOfRevenueCat();
+        // Only tell RC to log out if we previously told it to log in.
+        // The initial onAuthStateChange callback always fires with no
+        // session before any real sign-in has happened — calling logOut
+        // on RC there would throw "user is anonymous".
+        if (rcUserIdentifiedRef.current) {
+          void signOutOfRevenueCat();
+          rcUserIdentifiedRef.current = false;
+        }
         setHasCompletedOnboarding(false);
       }
     });
