@@ -1,86 +1,341 @@
 // app/(auth)/welcome.tsx
-import React from 'react';
-import { View, Text, Pressable, SafeAreaView, StyleSheet, Image } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+
+import AuthScreen from '~/components/auth/AuthScreen';
+import OAuthButton from '~/components/auth/OAuthButton';
+import ErrorBanner from '~/components/ErrorBanner';
+import { supabase } from '~/utils/supabase';
+import { authColors, authHitSlop, authRadius, authSpace, authType } from '~/utils/authTheme';
+
+type PendingProvider = 'apple' | 'google' | 'email' | null;
+
+const TERMS_URL = 'https://usewaypoint.app/terms';
+const PRIVACY_URL = 'https://usewaypoint.app/privacy';
 
 export default function WelcomeScreen() {
-// Video by Taryn Elliott from Pexels: https://www.pexels.com/video/1966695/
-  const source = require('../../assets/welcome-background.mp4');
-  const player = useVideoPlayer(source, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
+  const [pending, setPending] = useState<PendingProvider>(null);
+  const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      iosClientId: '545991292691-7qfgijc8l5j7de4no0ukkd4mdurcmni8.apps.googleusercontent.com',
+      webClientId: '545991292691-qoos66lpbiro4jdjcl662cdpnosqonp5.apps.googleusercontent.com',
+    });
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  async function signInWithApple() {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Not available', 'Apple sign-in is unavailable on this device.');
+      return;
+    }
+
+    if (!isMounted.current) return;
+
+    setError(null);
+    setPending('apple');
+
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!isMounted.current) return;
+
+      const { error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken!,
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      if (!isMounted.current) return;
+
+      // Apple only provides the user's name on the first sign-in
+      if (credential.fullName) {
+        const fullName = [
+          credential.fullName.givenName,
+          credential.fullName.middleName,
+          credential.fullName.familyName,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName,
+            given_name: credential.fullName.givenName,
+            family_name: credential.fullName.familyName,
+          },
+        });
+      }
+    } catch (err: any) {
+      const errorCode = err?.code || err?.type || '';
+
+      // User cancellation is silent
+      if (
+        errorCode === 'ERR_REQUEST_CANCELED' ||
+        errorCode === 'ERR_CANCELED' ||
+        errorCode === 1001 ||
+        err?.message?.includes('cancel')
+      ) {
+        return;
+      }
+
+      console.error('Apple Sign In error:', err);
+
+      if (isMounted.current) {
+        setError(err?.message || 'Failed to sign in with Apple. Please try again.');
+      }
+    } finally {
+      if (isMounted.current) {
+        setPending(null);
+      }
+    }
+  }
+
+  async function signInWithGoogle() {
+    if (!isMounted.current) return;
+
+    setError(null);
+    setPending('google');
+
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+
+      // User cancellation is silent
+      if (response.type === 'cancelled') {
+        return;
+      }
+
+      if (!isMounted.current) return;
+
+      const { idToken } = response.data;
+
+      if (!idToken) {
+        throw new Error('No ID token received from Google');
+      }
+
+      const { error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      if (!isMounted.current) return;
+
+      if (response.data.user) {
+        const { name, givenName, familyName, photo } = response.data.user;
+
+        await supabase.auth.updateUser({
+          data: {
+            full_name: name || '',
+            given_name: givenName || '',
+            family_name: familyName || '',
+            avatar_url: photo || '',
+          },
+        });
+      }
+    } catch (err: any) {
+      // User cancellation is silent
+      if (err?.code === statusCodes.SIGN_IN_CANCELLED || err?.code === statusCodes.IN_PROGRESS) {
+        return;
+      }
+
+      if (err?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Not available', 'Google Play Services are unavailable on this device.');
+        return;
+      }
+
+      console.error('Google Sign In error:', err);
+
+      if (isMounted.current) {
+        setError(err?.message || 'Failed to sign in with Google. Please try again.');
+      }
+    } finally {
+      if (isMounted.current) {
+        setPending(null);
+      }
+    }
+  }
+
+  function continueWithEmail() {
+    setError(null);
+    router.push('/signin');
+  }
+
+  const isBusy = pending !== null;
+  const showAppleButton = Platform.OS === 'ios';
 
   return (
-    <View style={{ flex: 1 }}>
-      <VideoView
-        style={StyleSheet.absoluteFillObject}
-        player={player}
-        contentFit="cover"
-        nativeControls={false}
-      />
-
-      <LinearGradient
-        colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)']}
-        style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'space-between' }}>
-          <View style={{ alignItems: 'center', marginTop: 60 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 15,
-                  backgroundColor: '#87CEEB',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  overflow: 'hidden',
-                }}>
-                <Image
-                  source={require('../../assets/ios-light.png')}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-              </View>
-              <Text style={{ fontSize: 32, fontWeight: 'bold', color: 'white' }}>Waypoint</Text>
+    <AuthScreen scrollable={false}>
+      <View style={styles.container}>
+        <View style={styles.top}>
+          <View
+            style={styles.brandRow}
+            accessibilityRole="header"
+            accessibilityLabel="Waypoint"
+          >
+            <View style={styles.logoTile}>
+              <Image
+                source={require('~/assets/ios-light.png')}
+                style={styles.logoImage}
+                resizeMode="cover"
+                accessibilityIgnoresInvertColors
+              />
             </View>
+            <Text style={styles.wordmark}>Waypoint</Text>
           </View>
 
-          <View style={{ paddingHorizontal: 30, paddingBottom: 40 }}>
-            <Text
-              style={{
-                fontSize: 48,
-                fontWeight: 'bold',
-                color: 'white',
-                marginBottom: 16,
-                lineHeight: 52,
-                textTransform: 'lowercase',
-              }}>
-              welcome to waypoint
-            </Text>
-            <Text style={{ fontSize: 20, color: 'white', marginBottom: 40, opacity: 0.9 }}>
-              explore. connect. make friends.
-            </Text>
+          <Text style={styles.headline} accessibilityRole="header">
+            Find your people in every city you visit.
+          </Text>
+
+          <Text style={styles.disclaimer}>
+            By proceeding, you agree to our{' '}
             <Pressable
-              onPress={() => router.push('/signin')}
-              style={{
-                backgroundColor: '#007AFF',
-                paddingVertical: 18,
-                borderRadius: 30,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 8,
-              }}>
-              <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Get Started</Text>
-              <Text style={{ fontSize: 20 }}>🎉</Text>
+              onPress={() => Linking.openURL(TERMS_URL)}
+              hitSlop={authHitSlop}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of Use"
+            >
+              <Text style={styles.disclaimerLink}>Terms of Use</Text>
+            </Pressable>{' '}
+            and confirm you have read our{' '}
+            <Pressable
+              onPress={() => Linking.openURL(PRIVACY_URL)}
+              hitSlop={authHitSlop}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy and Cookie Statement"
+            >
+              <Text style={styles.disclaimerLink}>Privacy and Cookie Statement</Text>
             </Pressable>
+            .
+          </Text>
+        </View>
+
+        <View style={styles.bottom}>
+          {error ? (
+            <View style={styles.errorWrap}>
+              <ErrorBanner message={error} />
+            </View>
+          ) : null}
+
+          <View style={styles.buttonStack}>
+            {showAppleButton && (
+              <OAuthButton
+                provider="apple"
+                label="Continue with Apple"
+                onPress={signInWithApple}
+                loading={pending === 'apple'}
+                disabled={isBusy && pending !== 'apple'}
+              />
+            )}
+            <OAuthButton
+              provider="google"
+              label="Continue with Google"
+              onPress={signInWithGoogle}
+              loading={pending === 'google'}
+              disabled={isBusy && pending !== 'google'}
+            />
+            <OAuthButton
+              provider="email"
+              label="Continue with email"
+              onPress={continueWithEmail}
+              disabled={isBusy}
+            />
           </View>
-        </SafeAreaView>
-      </LinearGradient>
-    </View>
+
+          <View style={styles.safeAreaSpacer} />
+        </View>
+      </View>
+    </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  top: {
+    paddingTop: authSpace.xl,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: authSpace.md,
+    marginBottom: authSpace.xxl,
+  },
+  logoTile: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: '#87CEEB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  wordmark: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: authColors.textPrimary,
+  },
+  headline: {
+    fontSize: authType.headline.fontSize,
+    lineHeight: authType.headline.lineHeight,
+    letterSpacing: authType.headline.letterSpacing,
+    fontWeight: authType.headline.fontWeight,
+    color: authColors.textPrimary,
+    textAlign: 'left',
+    marginBottom: authSpace.lg + authSpace.xs, // 20
+  },
+  disclaimer: {
+    fontSize: authType.disclaimer.fontSize,
+    lineHeight: authType.disclaimer.lineHeight,
+    fontWeight: authType.disclaimer.fontWeight,
+    color: authColors.textDisclaimer,
+  },
+  disclaimerLink: {
+    fontSize: authType.disclaimer.fontSize,
+    lineHeight: authType.disclaimer.lineHeight,
+    fontWeight: authType.disclaimer.fontWeight,
+    color: authColors.textPrimary,
+    textDecorationLine: 'underline',
+  },
+  bottom: {
+    width: '100%',
+  },
+  errorWrap: {
+    marginBottom: authSpace.md,
+  },
+  buttonStack: {
+    gap: authSpace.md,
+    width: '100%',
+  },
+  safeAreaSpacer: {
+    height: authSpace.lg,
+  },
+});

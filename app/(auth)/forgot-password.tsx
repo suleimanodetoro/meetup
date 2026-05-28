@@ -1,126 +1,148 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Alert,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+// app/(auth)/forgot-password.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+
+import AuthHeader from '../../components/auth/AuthHeader';
+import AuthInput from '../../components/auth/AuthInput';
+import AuthScreen from '../../components/auth/AuthScreen';
+import IconHero from '../../components/auth/IconHero';
+import PrimaryButton from '../../components/auth/PrimaryButton';
+import SecondaryButton from '../../components/auth/SecondaryButton';
+import ErrorBanner from '../../components/ErrorBanner';
+import { authColors, authSpace } from '../../utils/authTheme';
 import { supabase } from '~/utils/supabase';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RESEND_COOLDOWN_MS = 30_000;
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sentEmail, setSentEmail] = useState('');
+  const [lastSentAt, setLastSentAt] = useState<number | null>(null);
+  const [now, setNow] = useState<number>(Date.now());
+
+  // Tick once a second while the resend cooldown is active so the
+  // countdown label re-renders. Interval is cleared as soon as we
+  // leave the cooldown window (or unmount).
+  useEffect(() => {
+    if (lastSentAt == null) return;
+    const elapsed = Date.now() - lastSentAt;
+    if (elapsed >= RESEND_COOLDOWN_MS) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [lastSentAt, now]);
+
+  const remainingMs = lastSentAt == null ? 0 : Math.max(0, RESEND_COOLDOWN_MS - (now - lastSentAt));
+  const remainingSec = Math.ceil(remainingMs / 1000);
+  const cooling = remainingMs > 0;
 
   async function handleReset() {
     const trimmed = email.trim();
     if (!trimmed) {
-      Alert.alert('Email required', 'Please enter your email address.');
+      setError('Please enter your email address.');
       return;
     }
+    if (!EMAIL_RE.test(trimmed)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed, {
       redirectTo: 'waypoint://reset-password',
     });
     setLoading(false);
-    if (error) {
-      Alert.alert('Error', error.message);
+    if (resetError) {
+      setError(resetError.message);
       return;
     }
+    setSentEmail(trimmed);
     setSent(true);
+    setLastSentAt(Date.now());
+    setNow(Date.now());
+  }
+
+  async function handleResend() {
+    if (cooling || loading) return;
+    setError(null);
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(sentEmail, {
+      redirectTo: 'waypoint://reset-password',
+    });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setLastSentAt(Date.now());
+    setNow(Date.now());
   }
 
   return (
-    <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <Pressable
-            onPress={() => router.back()}
-            style={{ padding: 16, alignSelf: 'flex-start' }}
-            hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </Pressable>
-
-          <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 30 }}>
-            <Ionicons
-              name="lock-closed"
-              size={56}
-              color="#007AFF"
-              style={{ alignSelf: 'center', marginBottom: 16 }}
+    <AuthScreen>
+      <AuthHeader />
+      {sent ? (
+        <View style={styles.content}>
+          <IconHero
+            icon={<Ionicons name="checkmark-circle" size={64} color={authColors.success} />}
+            title="Check your inbox"
+            subtitle={`We sent a reset link to ${sentEmail}. Tap it to set a new password.`}
+          />
+          <View style={styles.actions}>
+            <ErrorBanner message={error} />
+            <SecondaryButton
+              label={cooling ? `Resend in ${remainingSec}s…` : 'Resend link'}
+              onPress={handleResend}
+              loading={loading}
+              disabled={cooling}
             />
-            <Text
-              style={{
-                fontSize: 26,
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: 12,
-              }}>
-              Reset your password
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                color: '#666',
-                textAlign: 'center',
-                marginBottom: 28,
-                lineHeight: 22,
-              }}>
-              {sent
-                ? `We sent a reset link to ${email}. Open it from this device to set a new password.`
-                : "Enter your account email and we'll send you a link to set a new password."}
-            </Text>
-
-            {!sent ? (
-              <>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="Email"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={{
-                    backgroundColor: 'white',
-                    padding: 16,
-                    borderRadius: 12,
-                    fontSize: 16,
-                    marginBottom: 16,
-                  }}
-                />
-                <Pressable
-                  onPress={handleReset}
-                  disabled={loading}
-                  style={{
-                    backgroundColor: loading ? '#ccc' : '#007AFF',
-                    paddingVertical: 16,
-                    borderRadius: 30,
-                    alignItems: 'center',
-                  }}>
-                  <Text style={{ color: 'white', fontSize: 17, fontWeight: '600' }}>
-                    {loading ? 'Sending…' : 'Send reset link'}
-                  </Text>
-                </Pressable>
-              </>
-            ) : (
-              <Pressable
-                onPress={() => router.replace('/signin')}
-                style={{ alignItems: 'center', padding: 12 }}>
-                <Text style={{ color: '#007AFF', fontSize: 15 }}>Back to sign in</Text>
-              </Pressable>
-            )}
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+        </View>
+      ) : (
+        <View style={styles.content}>
+          <IconHero
+            icon={<Ionicons name="mail-outline" size={64} color={authColors.textPrimary} />}
+            title="Forgot your password?"
+            subtitle="Enter your email and we'll send you a link to reset it."
+          />
+          <View style={styles.form}>
+            <ErrorBanner message={error} />
+            <AuthInput
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              type="email"
+              placeholder="you@example.com"
+              autoFocus
+              returnKeyType="go"
+              onSubmitEditing={handleReset}
+            />
+            <PrimaryButton
+              label="Send reset link"
+              onPress={handleReset}
+              loading={loading}
+            />
+          </View>
+        </View>
+      )}
+    </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+  },
+  form: {
+    marginTop: authSpace.xxl,
+    gap: authSpace.lg,
+  },
+  actions: {
+    marginTop: authSpace.xxl,
+    gap: authSpace.lg,
+  },
+});

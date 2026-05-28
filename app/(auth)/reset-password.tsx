@@ -1,18 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Alert,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+
+import ErrorBanner from '~/components/ErrorBanner';
+import AuthHeader from '~/components/auth/AuthHeader';
+import AuthInput from '~/components/auth/AuthInput';
+import AuthScreen from '~/components/auth/AuthScreen';
+import IconHero from '~/components/auth/IconHero';
+import PrimaryButton from '~/components/auth/PrimaryButton';
+import { authColors, authSpace } from '~/utils/authTheme';
 import { supabase } from '~/utils/supabase';
 
 /**
@@ -32,6 +29,8 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [exchanging, setExchanging] = useState(true);
   const [exchangeError, setExchangeError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     if (!code) {
@@ -51,165 +50,154 @@ export default function ResetPasswordScreen() {
   }, [code]);
 
   async function handleUpdate() {
+    setFormError(null);
+    if (!password || !confirmPassword) {
+      setFormError('Please fill in both password fields.');
+      return;
+    }
     if (password.length < 6) {
-      Alert.alert('Password too short', 'Use at least 6 characters.');
+      setFormError('Password must be at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Passwords don't match", 'Please re-enter both.');
+      setFormError("Passwords don't match. Please re-enter both.");
       return;
     }
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) {
-      Alert.alert('Error', error.message);
+      setFormError(error.message);
       return;
     }
-    Alert.alert('Password updated', "You're now signed in.", [
-      { text: 'OK', onPress: () => router.replace('/(tabs)') },
-    ]);
+    setDone(true);
   }
 
+  // (1) Verifying
   if (exchanging) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: '#E3F2FD',
-        }}>
-        <ActivityIndicator />
-      </View>
+      <AuthScreen scrollable={false}>
+        <View style={styles.verifyingWrap}>
+          <ActivityIndicator />
+          <Text style={styles.verifyingText}>Verifying link…</Text>
+        </View>
+      </AuthScreen>
     );
   }
 
+  // (3) Error
   if (exchangeError) {
     return (
-      <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'center', padding: 30 }}>
-          <Ionicons
-            name="alert-circle"
-            size={56}
-            color="#FF3B30"
-            style={{ alignSelf: 'center', marginBottom: 16 }}
+      <AuthScreen>
+        <AuthHeader />
+        <View style={styles.contentWrap}>
+          <IconHero
+            icon={<Ionicons name="alert-circle" size={64} color="#FF3B30" />}
+            title="Link expired"
+            subtitle={
+              exchangeError ||
+              'This reset link has expired or already been used.'
+            }
           />
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              marginBottom: 12,
-            }}>
-            Recovery link invalid
-          </Text>
-          <Text
-            style={{
-              fontSize: 15,
-              color: '#666',
-              textAlign: 'center',
-              marginBottom: 24,
-            }}>
-            {exchangeError}
-          </Text>
-          <Pressable
-            onPress={() => router.replace('/forgot-password')}
-            style={{
-              backgroundColor: '#007AFF',
-              paddingVertical: 16,
-              borderRadius: 30,
-              alignItems: 'center',
-            }}>
-            <Text style={{ color: 'white', fontSize: 17, fontWeight: '600' }}>
-              Request a new link
-            </Text>
-          </Pressable>
-        </SafeAreaView>
-      </LinearGradient>
+          <View style={styles.ctaWrap}>
+            <PrimaryButton
+              label="Request a new link"
+              onPress={() => router.replace('/forgot-password')}
+            />
+          </View>
+        </View>
+      </AuthScreen>
     );
   }
 
-  return (
-    <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 30 }}>
-            <Ionicons
-              name="key"
-              size={56}
-              color="#007AFF"
-              style={{ alignSelf: 'center', marginBottom: 16 }}
+  // (4) Success
+  if (done) {
+    return (
+      <AuthScreen>
+        <View style={styles.contentWrap}>
+          <IconHero
+            icon={<Ionicons name="checkmark-circle" size={64} color="#34C759" />}
+            title="Password updated"
+            subtitle="You can now sign in with your new password."
+          />
+          <View style={styles.ctaWrap}>
+            <PrimaryButton
+              label="Go to app"
+              onPress={() => router.replace('/(tabs)')}
             />
-            <Text
-              style={{
-                fontSize: 26,
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: 12,
-              }}>
-              Choose a new password
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                color: '#666',
-                textAlign: 'center',
-                marginBottom: 28,
-              }}>
-              At least 6 characters.
-            </Text>
-
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="New password"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={{
-                backgroundColor: 'white',
-                padding: 16,
-                borderRadius: 12,
-                fontSize: 16,
-                marginBottom: 12,
-              }}
-            />
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm new password"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={{
-                backgroundColor: 'white',
-                padding: 16,
-                borderRadius: 12,
-                fontSize: 16,
-                marginBottom: 16,
-              }}
-            />
-            <Pressable
-              onPress={handleUpdate}
-              disabled={loading}
-              style={{
-                backgroundColor: loading ? '#ccc' : '#007AFF',
-                paddingVertical: 16,
-                borderRadius: 30,
-                alignItems: 'center',
-              }}>
-              <Text style={{ color: 'white', fontSize: 17, fontWeight: '600' }}>
-                {loading ? 'Saving…' : 'Save new password'}
-              </Text>
-            </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+        </View>
+      </AuthScreen>
+    );
+  }
+
+  // (2) Form
+  return (
+    <AuthScreen>
+      <AuthHeader />
+      <Text style={styles.headline}>Set a new password.</Text>
+      <View style={styles.fieldGroup}>
+        <AuthInput
+          label="New password"
+          value={password}
+          onChangeText={setPassword}
+          type="password"
+          autoFocus
+        />
+      </View>
+      <View style={styles.fieldGroup}>
+        <AuthInput
+          label="Confirm new password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          type="password"
+        />
+      </View>
+      {formError ? (
+        <View style={styles.bannerWrap}>
+          <ErrorBanner message={formError} />
+        </View>
+      ) : null}
+      <View style={styles.ctaWrap}>
+        <PrimaryButton
+          label="Update password"
+          onPress={handleUpdate}
+          loading={loading}
+        />
+      </View>
+    </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  verifyingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyingText: {
+    marginTop: authSpace.md,
+    fontSize: 16,
+    color: '#4A4A4A',
+  },
+  contentWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headline: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: authColors.textPrimary,
+    textAlign: 'left',
+    marginBottom: authSpace.xl,
+  },
+  fieldGroup: {
+    marginBottom: authSpace.lg,
+  },
+  bannerWrap: {
+    marginBottom: authSpace.lg,
+  },
+  ctaWrap: {
+    marginTop: authSpace.lg,
+  },
+});

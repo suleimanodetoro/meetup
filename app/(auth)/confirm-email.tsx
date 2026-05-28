@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, SafeAreaView, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+// app/(auth)/confirm-email.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+
+import AuthHeader from '../../components/auth/AuthHeader';
+import AuthScreen from '../../components/auth/AuthScreen';
+import IconHero from '../../components/auth/IconHero';
+import PrimaryButton from '../../components/auth/PrimaryButton';
+import { authColors, authSpace } from '../../utils/authTheme';
 import { supabase } from '~/utils/supabase';
 
 /**
@@ -13,6 +19,11 @@ import { supabase } from '~/utils/supabase';
  * Exchange the code for a session, then hand off to NavigationController —
  * a verified, signed-in user will be routed to onboarding (if they haven't
  * completed it) or to the tabs.
+ *
+ * State machine:
+ *   1. Verifying — running exchangeCodeForSession
+ *   2. Success   — session established; NavigationController takes over
+ *   3. Error     — bad/expired/missing code
  */
 export default function ConfirmEmailScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
@@ -31,76 +42,88 @@ export default function ConfirmEmailScreen() {
         return;
       }
       setDone(true);
-      // NavigationController will pick up the new authenticated session and
-      // route to onboarding or /(tabs). We give it a tick to react.
-      setTimeout(() => router.replace('/(tabs)'), 150);
     })();
   }, [code]);
 
+  // (3) Error
   if (error) {
     return (
-      <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'center', padding: 30 }}>
-          <Ionicons
-            name="alert-circle"
-            size={56}
-            color="#FF3B30"
-            style={{ alignSelf: 'center', marginBottom: 16 }}
+      <AuthScreen scrollable={false}>
+        <AuthHeader onBack={() => router.replace('/signin')} />
+
+        <View style={styles.body}>
+          <IconHero
+            icon={<Ionicons name="alert-circle" size={64} color={authColors.error} />}
+            title="Confirmation failed"
+            subtitle={error || 'This confirmation link is invalid or has expired.'}
           />
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              marginBottom: 12,
-            }}>
-            Couldn't verify
-          </Text>
-          <Text
-            style={{
-              fontSize: 15,
-              color: '#666',
-              textAlign: 'center',
-              marginBottom: 24,
-            }}>
-            {error}
-          </Text>
-          <Pressable
-            onPress={() => router.replace('/signin')}
-            style={{
-              backgroundColor: '#007AFF',
-              paddingVertical: 16,
-              borderRadius: 30,
-              alignItems: 'center',
-            }}>
-            <Text style={{ color: 'white', fontSize: 17, fontWeight: '600' }}>
-              Back to sign in
-            </Text>
-          </Pressable>
-        </SafeAreaView>
-      </LinearGradient>
+
+          <View style={styles.actions}>
+            <PrimaryButton label="Try again" onPress={() => router.replace('/signin')} />
+          </View>
+        </View>
+      </AuthScreen>
     );
   }
 
+  // (2) Success
+  if (done) {
+    return (
+      <AuthScreen scrollable={false}>
+        <View style={styles.body}>
+          <IconHero
+            icon={<Ionicons name="checkmark-circle" size={64} color={authColors.success} />}
+            title="Email confirmed"
+            subtitle="Welcome to Waypoint."
+          />
+
+          <View style={styles.actions}>
+            <PrimaryButton
+              label="Continue"
+              onPress={() => {
+                // AuthProvider's listener should have already set
+                // isAuthenticated=true and NavigationController will route
+                // into onboarding automatically. As a fallback, jump there
+                // ourselves.
+                router.replace('/(auth)/onboarding/basic');
+              }}
+            />
+          </View>
+        </View>
+      </AuthScreen>
+    );
+  }
+
+  // (1) Verifying
   return (
-    <LinearGradient colors={['#E3F2FD', '#BBDEFB', '#90CAF9']} style={{ flex: 1 }}>
-      <SafeAreaView
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 }}>
-        {done ? (
-          <>
-            <Ionicons name="checkmark-circle" size={64} color="#34C759" />
-            <Text style={{ marginTop: 16, fontSize: 20, fontWeight: '600' }}>
-              Email verified
-            </Text>
-            <Text style={{ marginTop: 8, color: '#666' }}>Signing you in…</Text>
-          </>
-        ) : (
-          <>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={{ marginTop: 16, color: '#666' }}>Verifying your email…</Text>
-          </>
-        )}
-      </SafeAreaView>
-    </LinearGradient>
+    <AuthScreen scrollable={false}>
+      <View style={styles.verifying}>
+        <ActivityIndicator size="large" color={authColors.textPrimary} />
+        <Text style={styles.verifyingText}>Confirming your email…</Text>
+      </View>
+    </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  actions: {
+    marginTop: authSpace.xxl,
+    alignItems: 'center',
+    width: '100%',
+  },
+  verifying: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyingText: {
+    marginTop: authSpace.lg,
+    fontSize: 16,
+    color: authColors.textSecondary,
+    textAlign: 'center',
+  },
+});
