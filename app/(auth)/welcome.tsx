@@ -233,6 +233,9 @@ export default function WelcomeScreen() {
           .
         </Text>
 
+        {/* Push the buttons down into the lower half of the screen. */}
+        <View style={styles.spacer} />
+
         {error ? (
           <View style={styles.errorWrap}>
             <ErrorBanner message={error} />
@@ -328,5 +331,9 @@ const styles = StyleSheet.create({
   buttonStack: {
     gap: authSpace.md,
     width: '100%',
+    marginBottom: authSpace.xl,
+  },
+  spacer: {
+    flex: 1,
   },
 });
