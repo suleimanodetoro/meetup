@@ -1,5 +1,5 @@
 // components/auth/SecondaryButton.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,6 +18,9 @@ interface SecondaryButtonProps {
   leftIcon?: React.ReactNode;
 }
 
+// Inner-View pattern — see PrimaryButton.tsx for the why. Function-form
+// `style={({pressed}) => [...]}` on Pressable is stripped by NativeWind's
+// runtime, which leaves the border/bg invisible.
 export default function SecondaryButton({
   label,
   onPress,
@@ -25,34 +28,45 @@ export default function SecondaryButton({
   disabled = false,
   leftIcon,
 }: SecondaryButtonProps) {
+  const [pressed, setPressed] = useState(false);
   const isInactive = loading || disabled;
 
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       disabled={isInactive}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isInactive, busy: loading }}
-      style={({ pressed }) => [
-        styles.button,
-        isInactive && styles.disabled,
-        pressed && !isInactive && styles.pressed,
-      ]}
+      style={styles.pressable}
     >
-      {loading ? (
-        <ActivityIndicator color={authColors.ctaSecondaryText} />
-      ) : (
-        <View style={styles.row}>
-          {leftIcon ? <View style={styles.icon}>{leftIcon}</View> : null}
-          <Text style={styles.label}>{label}</Text>
-        </View>
-      )}
+      <View
+        accessibilityIgnoresInvertColors
+        style={[
+          styles.button,
+          isInactive ? styles.disabled : null,
+          pressed && !isInactive ? styles.pressed : null,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={authColors.ctaSecondaryText} />
+        ) : (
+          <View style={styles.row}>
+            {leftIcon ? <View style={styles.icon}>{leftIcon}</View> : null}
+            <Text style={styles.label}>{label}</Text>
+          </View>
+        )}
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  pressable: {
+    width: '100%',
+  },
   button: {
     backgroundColor: authColors.ctaSecondaryBg,
     borderRadius: authRadius.pill,

@@ -98,10 +98,9 @@ export function OnboardingFrame({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel="Skip"
-          style={({ pressed }) => [
+          style={[
             styles.skipButton,
-            pressed && !busy && styles.skipPressed,
-            busy && styles.skipDisabled,
+            busy ? styles.skipDisabled : null,
           ]}
         >
           <Text style={styles.skipText}>Skip</Text>

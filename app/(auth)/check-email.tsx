@@ -120,10 +120,9 @@ export default function CheckEmailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Wrong email? Sign up again"
             accessibilityState={{ disabled: loading }}
-            style={({ pressed }) => [
+            style={[
               styles.wrongEmail,
-              pressed && styles.wrongEmailPressed,
-              loading && styles.wrongEmailDisabled,
+              loading ? styles.wrongEmailDisabled : null,
             ]}
           >
             <Text style={styles.wrongEmailText}>Wrong email? Sign up again</Text>

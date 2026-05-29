@@ -1,5 +1,5 @@
 // modules/onboarding/fields/GenderField.tsx
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
@@ -59,7 +59,7 @@ export function GenderField({ value, setValue }: StepBodyProps<string>) {
           onPress={() => setExpanded(true)}
           accessibilityRole="button"
           accessibilityLabel="More gender options"
-          style={({ pressed }) => [styles.moreLink, pressed && styles.morePressed]}
+          style={styles.moreLink}
         >
           <Text style={styles.moreText}>+ More options</Text>
         </Pressable>
@@ -77,21 +77,31 @@ function Chip({
   selected: boolean;
   onPress: () => void;
 }) {
+  const [pressed, setPressed] = useState(false);
+  const handleIn = useCallback(() => setPressed(true), []);
+  const handleOut = useCallback(() => setPressed(false), []);
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={handleIn}
+      onPressOut={handleOut}
       accessibilityRole="radio"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      style={({ pressed }) => [
-        styles.chip,
-        selected && styles.chipSelected,
-        pressed && styles.chipPressed,
-      ]}
+      style={styles.chipPressable}
     >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-        {label}
-      </Text>
+      <View
+        accessibilityIgnoresInvertColors
+        style={[
+          styles.chip,
+          selected ? styles.chipSelected : null,
+          pressed ? styles.chipPressed : null,
+        ]}
+      >
+        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -113,6 +123,10 @@ const styles = StyleSheet.create({
   },
   rowExtra: {
     marginTop: authSpace.md,
+  },
+  chipPressable: {
+    // Layout-only; visual styling lives on the inner View so NativeWind
+    // can't strip the border/backgroundColor (see PrimaryButton.tsx).
   },
   chip: {
     paddingVertical: authSpace.md,
