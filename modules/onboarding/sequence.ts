@@ -1,21 +1,23 @@
 import { decode } from 'base64-arraybuffer';
 import * as Notifications from 'expo-notifications';
+import { Alert } from 'react-native';
 import { supabase } from '~/utils/supabase';
 import type { InterestId } from '~/utils/constants';
-import { BasicField, type BasicValue } from './fields/BasicField';
 import { BioField } from './fields/BioField';
+import { BirthdayField, calculateAge } from './fields/BirthdayField';
 import { GenderField } from './fields/GenderField';
 import { GenderPreferenceField } from './fields/GenderPreferenceField';
 import { InterestsField } from './fields/InterestsField';
 import { LanguagesField } from './fields/LanguagesField';
 import { LocationField, type LocationValue } from './fields/LocationField';
+import { NameField } from './fields/NameField';
 import { NationalityField, type NationalityValue } from './fields/NationalityField';
 import { NotificationsBody } from './fields/NotificationsBody';
 import { PauseBody } from './fields/PauseBody';
 import { PictureField, type PictureValue } from './fields/PictureField';
 import { PreferencesField } from './fields/PreferencesField';
 import { TripsCustom } from './fields/TripsCustom';
-import type { StepDef } from './types';
+import { StepCancelled, type StepDef } from './types';
 
 async function uploadAvatar(
   userId: string,
@@ -36,28 +38,59 @@ async function uploadAvatar(
 }
 
 /**
- * The 13-step onboarding flow, in order. Reordering this array reorders
+ * Prompts the user to confirm their age before persisting the birthday.
+ * Resolves true on confirm, false on cancel. Inspired by Swarm's
+ * "Are you X years old?" sheet.
+ */
+function confirmAge(birthDateISO: string): Promise<boolean> {
+  const age = calculateAge(new Date(birthDateISO));
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      `Are you ${age} years old?`,
+      'Please confirm your correct birthday — we require it to allow use of Waypoint.',
+      [
+        {
+          text: 'No, I entered the wrong birthday',
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        { text: 'Yes, I confirm', onPress: () => resolve(true) },
+      ],
+      { cancelable: false },
+    );
+  });
+}
+
+/**
+ * The 14-step onboarding flow, in order. Reordering this array reorders
  * the flow. The slug is the URL segment under /onboarding/.
  */
 export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
-    slug: 'basic',
-    title: 'basic info',
-    subtitle: "let's get started with your profile 🤝",
-    Body: BasicField,
-    read: (p): BasicValue | undefined => {
-      if (!p.full_name && !p.birth_date) return undefined;
-      return {
-        full_name: p.full_name ?? '',
-        birth_date: p.birth_date ?? '',
-      };
-    },
-    isValid: (v: BasicValue | undefined) =>
-      !!v?.full_name?.trim() && !!v.birth_date,
-    commit: async (v: BasicValue | undefined) => ({
-      full_name: v?.full_name.trim() ?? null,
-      birth_date: v?.birth_date ?? null,
+    slug: 'name',
+    title: "What should we call you?",
+    Body: NameField,
+    hideCta: true,
+    read: (p): string | undefined => p.full_name ?? undefined,
+    isValid: (v: string | undefined) => !!v?.trim(),
+    commit: async (v: string | undefined) => ({
+      full_name: v?.trim() ?? null,
     }),
+  },
+  {
+    slug: 'birthday',
+    title: "When's your birthday?",
+    subtitle:
+      "We require your birthday to keep Waypoint a safe place :)",
+    Body: BirthdayField,
+    read: (p): string | undefined => p.birth_date ?? undefined,
+    isValid: (v: string | undefined) => !!v,
+    commit: async (v: string | undefined) => {
+      if (!v) throw new StepCancelled('No birthday set');
+      const ok = await confirmAge(v);
+      if (!ok) throw new StepCancelled('User declined age confirmation');
+      return { birth_date: v };
+    },
   },
   {
     slug: 'nationality',
@@ -76,8 +109,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'gender',
-    title: "what's your gender?",
-    subtitle: 'helps us connect you with the right people 🤝',
+    title: 'Tell us who you are',
     Body: GenderField,
     read: (p) => p.gender ?? undefined,
     isValid: (v: string | undefined) => !!v,

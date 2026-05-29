@@ -9,7 +9,7 @@ import {
   STEP_INDEX,
 } from './sequence';
 import { commitStep, loadProfile } from './persist';
-import { isCustomStep, type ProfileRow } from './types';
+import { isCustomStep, StepCancelled, type ProfileRow } from './types';
 
 /**
  * The dynamic-route screen rendered at /(auth)/onboarding/[step]. Reads
@@ -98,6 +98,11 @@ export function OnboardingStep() {
         router.push(`/onboarding/${nextSlug}` as never);
       }
     } catch (err) {
+      // StepCancelled is a benign abort (e.g. user said No to age confirm).
+      // Don't log it, don't show an alert — just don't advance.
+      if (err instanceof StepCancelled) {
+        return;
+      }
       console.error('Step commit failed:', err);
       const msg =
         err instanceof Error ? err.message : 'Something went wrong. Try again.';
@@ -200,7 +205,7 @@ export function OnboardingStep() {
       subtitle={step.subtitle}
       onBack={handleBack}
       onSkip={step.skippable ? handleSkip : undefined}
-      onContinue={handleContinue}
+      onContinue={step.hideCta ? undefined : handleContinue}
       canContinue={canContinue}
       busy={busy}
       continueLabel={continueLabel}
@@ -209,6 +214,9 @@ export function OnboardingStep() {
         value={slotValue}
         setValue={(next: unknown) => setSlotValue(next)}
         draft={profile}
+        onContinue={handleContinue}
+        canContinue={canContinue}
+        busy={busy}
       />
     </OnboardingFrame>
   );

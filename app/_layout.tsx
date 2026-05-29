@@ -76,7 +76,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       // Transient auth flows handle their own next-step navigation once
       // they've finished, so don't yank the user mid-exchange.
       if (!onOnboarding && !isTransientAuthFlow) {
-        router.replace('/onboarding/basic'); // lives in (auth)/onboarding/[step]
+        router.replace('/onboarding/name'); // lives in (auth)/onboarding/[step]
       }
       return;
     }

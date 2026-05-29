@@ -85,7 +85,7 @@ export default function ConfirmEmailScreen() {
                 // isAuthenticated=true and NavigationController will route
                 // into onboarding automatically. As a fallback, jump there
                 // ourselves.
-                router.replace('/(auth)/onboarding/basic');
+                router.replace('/(auth)/onboarding/name');
               }}
             />
           </View>

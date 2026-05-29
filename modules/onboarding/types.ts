@@ -14,6 +14,17 @@ export interface StepBodyProps<V> {
    * write only via `setValue` and let `commit` persist on Continue.
    */
   draft: Readonly<Partial<ProfileRow>>;
+  /**
+   * Imperative continue trigger — same callback the frame's bottom CTA uses.
+   * Bodies that render their own CTA (e.g. an inline arrow button below an
+   * input) call this to advance. Combine with `hideCta: true` on the step
+   * def to suppress the frame's default CTA.
+   */
+  onContinue?: () => void;
+  /** Mirror of the frame's canContinue gate; bodies disable their CTA when false. */
+  canContinue?: boolean;
+  /** True while the frame is committing/advancing. */
+  busy?: boolean;
 }
 
 /** Context handed to a step's `commit` function. */
@@ -44,6 +55,12 @@ export interface StepDef<V = unknown> {
   subtitle?: string;
   /** When true, the header shows Skip alongside Back. */
   skippable?: boolean;
+  /**
+   * When true, the frame does not render its own bottom CTA. Use when the
+   * body component renders its own Continue trigger inline (e.g. NameField
+   * renders an arrow button under the input itself).
+   */
+  hideCta?: boolean;
 
   /** The body slot. Ignored when `custom` is provided. */
   Body?: ComponentType<StepBodyProps<V>>;
@@ -71,6 +88,18 @@ export interface StepDef<V = unknown> {
 
 /** What `commit` may return. `null` is treated as `{}`. */
 export type CommitReturn = ProfilePatch | void | null;
+
+/**
+ * Thrown from a step's `commit` to silently abort advancement (e.g. when the
+ * user cancels an age-confirmation modal). OnboardingStep catches this
+ * specific error and does NOT surface a "Couldn't save" alert.
+ */
+export class StepCancelled extends Error {
+  constructor(reason: string = 'Cancelled by user') {
+    super(reason);
+    this.name = 'StepCancelled';
+  }
+}
 
 /** Convenience type guard used by the runner. */
 export function isCustomStep(step: StepDef): step is StepDef & {
