@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { authColors, authRadius, authType } from '../../utils/authTheme';
+import { authColors, authRadius, authSpace, authType } from '../../utils/authTheme';
 
 type OAuthProvider = 'apple' | 'google' | 'email';
 
@@ -21,18 +21,14 @@ interface OAuthButtonProps {
   disabled?: boolean;
 }
 
-// Icon slot width — used for both the icon wrapper AND the empty right spacer,
-// so the centered label is not visually shifted by the icon on the left.
-const ICON_SLOT = 24;
-
 function ProviderIcon({ provider }: { provider: OAuthProvider }) {
   if (provider === 'apple') {
-    return <Ionicons name="logo-apple" size={20} color={authColors.textPrimary} />;
+    return <Ionicons name="logo-apple" size={22} color={authColors.textPrimary} />;
   }
   if (provider === 'google') {
-    return <Ionicons name="logo-google" size={20} color={authColors.googleBlue} />;
+    return <Ionicons name="logo-google" size={22} color={authColors.googleBlue} />;
   }
-  return <Ionicons name="mail-outline" size={20} color={authColors.textPrimary} />;
+  return <Ionicons name="mail-outline" size={22} color={authColors.textPrimary} />;
 }
 
 export default function OAuthButton({
@@ -51,52 +47,71 @@ export default function OAuthButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isInactive, busy: loading }}
-      style={({ pressed }) => [
-        styles.button,
-        isInactive && styles.disabled,
-        pressed && !isInactive && styles.pressed,
-      ]}
+      style={styles.pressable}
     >
-      {loading ? (
-        <ActivityIndicator color={authColors.ctaSecondaryText} />
-      ) : (
-        <>
-          <View style={styles.iconSlot}>
-            <ProviderIcon provider={provider} />
-          </View>
-          <Text style={styles.label} numberOfLines={1}>
-            {label}
-          </Text>
-          <View style={styles.iconSlot} />
-        </>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.button,
+            isInactive && styles.disabled,
+            pressed && !isInactive && styles.pressed,
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator color={authColors.ctaSecondaryText} />
+          ) : (
+            <>
+              <View style={styles.iconAbs} pointerEvents="none">
+                <ProviderIcon provider={provider} />
+              </View>
+              <Text style={styles.label} numberOfLines={1}>
+                {label}
+              </Text>
+            </>
+          )}
+        </View>
       )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  pressable: {
+    width: '100%',
+  },
   button: {
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: '100%',
+    minHeight: 60,
     backgroundColor: authColors.ctaSecondaryBg,
     borderRadius: authRadius.pill,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: authColors.ctaBorder,
     paddingVertical: 18,
-    paddingHorizontal: 24,
-  },
-  iconSlot: {
-    width: ICON_SLOT,
+    paddingHorizontal: authSpace.xxl,
     alignItems: 'center',
+    justifyContent: 'center',
+    // iOS won't show <View> borders alone when wrapped in Pressable for some
+    // style combinations; the shadow guarantees the pill is visually
+    // distinguishable from the white background even if the border doesn't
+    // paint. Android uses elevation.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  iconAbs: {
+    position: 'absolute',
+    left: authSpace.xl,
+    top: 0,
+    bottom: 0,
     justifyContent: 'center',
   },
   label: {
-    flex: 1,
-    textAlign: 'center',
     color: authColors.ctaSecondaryText,
     fontSize: authType.button.fontSize,
     fontWeight: authType.button.fontWeight,
+    textAlign: 'center',
   },
   disabled: {
     opacity: 0.5,
