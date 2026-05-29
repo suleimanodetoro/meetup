@@ -1,4 +1,4 @@
-// app/contexts/AuthProvider.tsx
+// contexts/AuthProvider.tsx
 import React, {
   createContext,
   useState,
@@ -95,13 +95,21 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sign out function
+  // Sign out function. Clears RC explicitly here rather than relying on
+  // the onAuthStateChange null-session branch — if supabase.auth.signOut()
+  // throws after the local session has already been cleared, the listener
+  // path can race and leave RC still identified as the previous user.
   const signOut = async () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
+      if (rcUserIdentifiedRef.current) {
+        void signOutOfRevenueCat();
+        rcUserIdentifiedRef.current = false;
+      }
+
       // Clear local state
       setSession(null);
       setHasCompletedOnboarding(false);
@@ -137,7 +145,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user?.id) {
         void identifyRevenueCatUser(session.user.id);
         rcUserIdentifiedRef.current = true;
-        checkOnboardingStatus(session.user.id);
+        // Gate isLoading=true while the profile fetch is in flight so
+        // NavigationController doesn't mis-route on the stale default
+        // hasCompletedOnboarding=false during a token refresh.
+        setIsLoading(true);
+        checkOnboardingStatus(session.user.id).finally(() => setIsLoading(false));
       } else {
         // Only tell RC to log out if we previously told it to log in.
         // The initial onAuthStateChange callback always fires with no

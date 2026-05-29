@@ -19,7 +19,13 @@ export default function AuthHeader({ onBack, right }: AuthHeaderProps) {
     }
     if (router.canGoBack()) {
       router.back();
+      return;
     }
+    // Last-resort fallback. The chevron is always visible, so silently
+    // no-op'ing on screens reached via deep-link (no stack history) looks
+    // broken to users. Send them to /welcome — unauthenticated routing
+    // takes over from there.
+    router.replace('/welcome');
   };
 
   return (

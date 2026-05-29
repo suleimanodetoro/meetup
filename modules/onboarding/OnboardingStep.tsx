@@ -24,7 +24,7 @@ import { isCustomStep, StepCancelled, type ProfileRow } from './types';
  */
 export function OnboardingStep() {
   const { step: slug } = useLocalSearchParams<{ step: string }>();
-  const { session, refreshOnboardingStatus } = useAuth();
+  const { session, refreshOnboardingStatus, signOut } = useAuth();
   const userId = session?.user?.id;
 
   const [profile, setProfile] = useState<Partial<ProfileRow> | null>(null);
@@ -135,6 +135,23 @@ export function OnboardingStep() {
     if (router.canGoBack()) router.back();
   }, []);
 
+  const handleSignOut = useCallback(() => {
+    Alert.alert(
+      'Sign out?',
+      "You can finish setting up your profile next time you sign in.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: () => {
+            void signOut();
+          },
+        },
+      ],
+    );
+  }, [signOut]);
+
   // ----- Render guards -----
 
   if (!step || stepIndex === undefined) {
@@ -202,9 +219,14 @@ export function OnboardingStep() {
   return (
     <OnboardingFrame
       title={step.title}
+      // Hide the back chevron on the very first step: the stack has no
+      // history there (we got here via router.replace), so router.back()
+      // would silently no-op. Replace it conceptually with the Sign Out
+      // affordance in the top-right slot, giving the user a real escape.
       subtitle={step.subtitle}
-      onBack={handleBack}
+      onBack={stepIndex > 0 ? handleBack : undefined}
       onSkip={step.skippable ? handleSkip : undefined}
+      onSignOut={stepIndex === 0 ? handleSignOut : undefined}
       onContinue={step.hideCta ? undefined : handleContinue}
       canContinue={canContinue}
       busy={busy}

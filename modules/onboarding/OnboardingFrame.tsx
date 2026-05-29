@@ -25,6 +25,13 @@ export interface OnboardingFrameProps {
   subtitle?: string;
   onBack?: () => void;
   onSkip?: () => void;
+  /**
+   * Sign-out trigger rendered in the header's top-right slot when no Skip
+   * is configured. Used on the very first onboarding step so users with an
+   * unfinished signup can bail out to /welcome instead of being trapped.
+   * Mutually exclusive with `onSkip` — Skip wins if both are set.
+   */
+  onSignOut?: () => void;
   onContinue?: () => void;
   /** When `onContinue` is set: gates the Continue button. */
   canContinue?: boolean;
@@ -61,6 +68,7 @@ export function OnboardingFrame({
   subtitle,
   onBack,
   onSkip,
+  onSignOut,
   onContinue,
   canContinue = true,
   busy = false,
@@ -104,6 +112,20 @@ export function OnboardingFrame({
           ]}
         >
           <Text style={styles.skipText}>Skip</Text>
+        </Pressable>
+      ) : onSignOut ? (
+        <Pressable
+          onPress={onSignOut}
+          hitSlop={authHitSlop}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          style={[
+            styles.skipButton,
+            busy ? styles.skipDisabled : null,
+          ]}
+        >
+          <Text style={styles.skipText}>Sign out</Text>
         </Pressable>
       ) : (
         <View style={styles.skipButton} />
