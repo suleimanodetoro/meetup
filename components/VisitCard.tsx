@@ -1,13 +1,6 @@
 // components/VisitCard.tsx
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Image,
-  Dimensions,
-  type ColorValue,
-} from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, type ColorValue } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,11 +19,11 @@ interface VisitCardProps {
     end_date: string;
     user_count?: number;
     image_url?: string;
-    recent_users?: Array<{
+    recent_users?: {
       id: string;
       full_name?: string;
       avatar_url?: string;
-    }>;
+    }[];
   };
 }
 
@@ -64,6 +57,16 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
     return getPlaceholderImageUrl(visit.city);
   }, [visit.city]);
 
+  const recentUsers = useMemo(() => {
+    const seen = new Set<string>();
+    return (visit.recent_users || []).filter((user, index) => {
+      const identity = user?.id || `anonymous-${index}`;
+      if (seen.has(identity)) return false;
+      seen.add(identity);
+      return true;
+    });
+  }, [visit.recent_users]);
+
   // Safe date formatting
   const dateRange = useMemo(() => {
     try {
@@ -95,8 +98,7 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
         marginRight: 16,
         borderRadius: 20,
         overflow: 'hidden',
-      }}
-    >
+      }}>
       {/* Base gradient background (fallback) */}
       <LinearGradient
         colors={gradientColors}
@@ -136,45 +138,47 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
           bottom: 20,
           left: 20,
           right: 20,
-        }}
-      >
+        }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ 
-            fontSize: 24, 
-            marginRight: 8,
-            textShadowColor: 'rgba(0, 0, 0, 0.75)',
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 3,
-          }}>
+          <Text
+            style={{
+              fontSize: 24,
+              marginRight: 8,
+              textShadowColor: 'rgba(0, 0, 0, 0.75)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 3,
+            }}>
             {visit.country_code ? getCountryFlag(visit.country_code) : '🌍'}
           </Text>
-          <Text style={{ 
-            color: 'white', 
-            fontSize: 22, 
-            fontWeight: 'bold',
-            textShadowColor: 'rgba(0, 0, 0, 0.75)',
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 3,
-          }}>
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 22,
+              fontWeight: 'bold',
+              textShadowColor: 'rgba(0, 0, 0, 0.75)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 3,
+            }}>
             {visit.city}
           </Text>
         </View>
 
-        <Text style={{ 
-          color: 'white', 
-          fontSize: 14, 
-          opacity: 0.95,
-          textShadowColor: 'rgba(0, 0, 0, 0.75)',
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 3,
-        }}>
+        <Text
+          style={{
+            color: 'white',
+            fontSize: 14,
+            opacity: 0.95,
+            textShadowColor: 'rgba(0, 0, 0, 0.75)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 3,
+          }}>
           {dateRange}
         </Text>
 
         {/* Recent users + count */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
           <View style={{ flexDirection: 'row' }}>
-            {(visit.recent_users || []).slice(0, 4).map((user, i) => (
+            {recentUsers.slice(0, 4).map((user, i) => (
               <View
                 key={`${visit.id}-user-${user?.id || i}`}
                 style={{
@@ -186,8 +190,7 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
                   borderColor: 'white',
                   marginLeft: i === 0 ? 0 : -12,
                   overflow: 'hidden',
-                }}
-              >
+                }}>
                 {user?.avatar_url ? (
                   <Image
                     source={{ uri: user.avatar_url }}
@@ -199,8 +202,7 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
                       flex: 1,
                       justifyContent: 'center',
                       alignItems: 'center',
-                    }}
-                  >
+                    }}>
                     <Ionicons name="person" size={16} color="#999" />
                   </View>
                 )}
@@ -208,16 +210,16 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
             ))}
           </View>
 
-          <Text style={{ 
-            color: 'white', 
-            fontSize: 13, 
-            marginLeft: 8, 
-            fontWeight: '600',
-            textShadowColor: 'rgba(0, 0, 0, 0.75)',
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 3,
-          }}>
-          </Text>
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 13,
+              marginLeft: 8,
+              fontWeight: '600',
+              textShadowColor: 'rgba(0, 0, 0, 0.75)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 3,
+            }}></Text>
         </View>
       </View>
     </Pressable>

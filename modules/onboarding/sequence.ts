@@ -1,6 +1,6 @@
 import { decode } from 'base64-arraybuffer';
-import * as Notifications from 'expo-notifications';
 import { Alert } from 'react-native';
+import { waypointNotifications } from '~/modules/notifications';
 import { supabase } from '~/utils/supabase';
 import type { InterestId } from '~/utils/constants';
 import { BioField } from './fields/BioField';
@@ -9,7 +9,7 @@ import { GenderField } from './fields/GenderField';
 import { GenderPreferenceField } from './fields/GenderPreferenceField';
 import { InterestsField } from './fields/InterestsField';
 import { LanguagesField } from './fields/LanguagesField';
-import { LocationField, type LocationValue } from './fields/LocationField';
+import { detectCurrentCity, LocationField, type LocationValue } from './fields/LocationField';
 import { NameField } from './fields/NameField';
 import { NationalityField, type NationalityValue } from './fields/NationalityField';
 import { NotificationsBody } from './fields/NotificationsBody';
@@ -19,17 +19,12 @@ import { PreferencesField } from './fields/PreferencesField';
 import { TripsCustom } from './fields/TripsCustom';
 import { StepCancelled, type StepDef } from './types';
 
-async function uploadAvatar(
-  userId: string,
-  base64: string,
-): Promise<string> {
+async function uploadAvatar(userId: string, base64: string): Promise<string> {
   const fileName = `${userId}-${Date.now()}.jpg`;
-  const { error } = await supabase.storage
-    .from('avatars')
-    .upload(fileName, decode(base64), {
-      contentType: 'image/jpeg',
-      upsert: true,
-    });
+  const { error } = await supabase.storage.from('avatars').upload(fileName, decode(base64), {
+    contentType: 'image/jpeg',
+    upsert: true,
+  });
   if (error) throw error;
   const {
     data: { publicUrl },
@@ -56,7 +51,7 @@ function confirmAge(birthDateISO: string): Promise<boolean> {
         },
         { text: 'Yes, I confirm', onPress: () => resolve(true) },
       ],
-      { cancelable: false },
+      { cancelable: false }
     );
   });
 }
@@ -68,7 +63,7 @@ function confirmAge(birthDateISO: string): Promise<boolean> {
 export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'name',
-    title: "What should we call you?",
+    title: 'What should we call you?',
     Body: NameField,
     hideCta: true,
     read: (p): string | undefined => p.full_name ?? undefined,
@@ -80,8 +75,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'birthday',
     title: "When's your birthday?",
-    subtitle:
-      "We require your birthday to keep Waypoint a safe place :)",
+    subtitle: 'We require your birthday to keep Waypoint a safe place :)',
     Body: BirthdayField,
     read: (p): string | undefined => p.birth_date ?? undefined,
     isValid: (v: string | undefined) => !!v,
@@ -98,9 +92,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     subtitle: 'Helps us connect you with people around the world 👋',
     Body: NationalityField,
     read: (p): NationalityValue | undefined =>
-      p.nationality_code
-        ? { code: p.nationality_code, name: p.nationality ?? '' }
-        : undefined,
+      p.nationality_code ? { code: p.nationality_code, name: p.nationality ?? '' } : undefined,
     isValid: (v: NationalityValue | undefined) => !!v?.code,
     commit: async (v: NationalityValue | undefined) => ({
       nationality_code: v?.code ?? null,
@@ -121,8 +113,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     subtitle: 'connect with people who share your vibe 🤝',
     skippable: true,
     Body: InterestsField,
-    read: (p) =>
-      Array.isArray(p.interests) ? (p.interests as InterestId[]) : undefined,
+    read: (p) => (Array.isArray(p.interests) ? (p.interests as InterestId[]) : undefined),
     isValid: (v: InterestId[] | undefined) => Array.isArray(v) && v.length > 0,
     commit: async (v: InterestId[] | undefined, { skipped }) => ({
       interests: skipped ? [] : (v ?? []),
@@ -131,8 +122,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'pause',
     title: "you're almost\nthere!",
-    subtitle:
-      "Just a few more steps and you'll be ready to start making connections.",
+    subtitle: "Just a few more steps and you'll be ready to start making connections.",
     Body: PauseBody,
     read: () => undefined,
     isValid: () => true,
@@ -162,8 +152,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     subtitle: 'select all that apply 🌍',
     skippable: true,
     Body: LanguagesField,
-    read: (p) =>
-      Array.isArray(p.languages) ? (p.languages as string[]) : undefined,
+    read: (p) => (Array.isArray(p.languages) ? (p.languages as string[]) : undefined),
     isValid: (v: string[] | undefined) => Array.isArray(v) && v.length > 0,
     commit: async (v: string[] | undefined, { skipped }) => ({
       languages: skipped ? ['en'] : (v ?? ['en']),
@@ -176,8 +165,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     skippable: true,
     Body: BioField,
     read: (p) => p.bio ?? undefined,
-    isValid: (v: string | undefined) =>
-      typeof v === 'string' && v.trim().length > 0,
+    isValid: (v: string | undefined) => typeof v === 'string' && v.trim().length > 0,
     commit: async (v: string | undefined, { skipped }) => ({
       bio: skipped ? null : (v?.trim() ?? null),
     }),
@@ -214,9 +202,8 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'location',
-    title: 'where do you live?',
-    subtitle: 'so we can show you people and plans nearby',
-    skippable: true,
+    title: 'Enable location to\ncapture your journey',
+    noScroll: true,
     Body: LocationField,
     read: (p): LocationValue | undefined =>
       p.location
@@ -227,29 +214,42 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
           }
         : undefined,
     isValid: () => true,
-    commit: async (v: LocationValue | undefined, { skipped }) => {
-      if (skipped || !v) return {};
+    commit: async (v: LocationValue | undefined) => {
+      const location = v ?? (await detectCurrentCity());
       return {
-        location: v.city,
-        location_country: v.country,
-        location_country_code: v.country_code,
+        location: location.city,
+        location_country: location.country,
+        location_country_code: location.country_code,
         location_updated_at: new Date().toISOString(),
       };
     },
   },
   {
     slug: 'notifications',
-    title: 'enable notifications',
-    subtitle: 'stay connected with your messages and activity',
+    title: 'Turn on notifications',
     skippable: true,
+    hideHeader: true,
     Body: NotificationsBody,
     read: () => undefined,
     isValid: () => true,
-    commit: async (_value, { skipped }) => {
+    commit: async (_value, { skipped, userId }) => {
       if (skipped) return {};
-      await Notifications.requestPermissionsAsync();
-      // Outcome isn't persisted — onboarding-notifications.tsx never did
-      // either. The OS records the permission decision.
+
+      try {
+        const access = await waypointNotifications.requestAccess({
+          userId,
+          source: 'onboarding',
+        });
+        if (access.permission === 'granted' || access.permission === 'provisional') {
+          await waypointNotifications.sync({
+            userId,
+            reason: 'onboarding-accepted',
+          });
+        }
+      } catch (err) {
+        console.warn('Notification onboarding setup failed:', err);
+      }
+
       return {};
     },
   },
@@ -261,7 +261,7 @@ export const STEP_INDEX: Record<string, number> = ONBOARDING_SEQUENCE.reduce(
     acc[step.slug] = i;
     return acc;
   },
-  {} as Record<string, number>,
+  {} as Record<string, number>
 );
 
 /** Slug of the first step, used by the auth controller for redirects. */

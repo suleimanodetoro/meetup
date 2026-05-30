@@ -3,11 +3,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '~/contexts/AuthProvider';
 import { OnboardingFrame } from './OnboardingFrame';
-import {
-  FIRST_STEP_SLUG,
-  ONBOARDING_SEQUENCE,
-  STEP_INDEX,
-} from './sequence';
+import { FIRST_STEP_SLUG, ONBOARDING_SEQUENCE, STEP_INDEX } from './sequence';
 import { commitStep, loadProfile } from './persist';
 import { isCustomStep, StepCancelled, type ProfileRow } from './types';
 
@@ -53,12 +49,10 @@ export function OnboardingStep() {
 
         // Redirect-forward guard: if the URL is past where the user has
         // persisted progress, send them to the persisted position.
-        const persistedStep =
-          typeof row.onboarding_step === 'number' ? row.onboarding_step : 0;
+        const persistedStep = typeof row.onboarding_step === 'number' ? row.onboarding_step : 0;
         if (stepIndex !== undefined && stepIndex > persistedStep && !redirectedRef.current) {
           redirectedRef.current = true;
-          const targetSlug =
-            ONBOARDING_SEQUENCE[persistedStep]?.slug ?? FIRST_STEP_SLUG;
+          const targetSlug = ONBOARDING_SEQUENCE[persistedStep]?.slug ?? FIRST_STEP_SLUG;
           if (targetSlug !== slug) {
             router.replace(`/onboarding/${targetSlug}` as never);
             return;
@@ -104,8 +98,7 @@ export function OnboardingStep() {
         return;
       }
       console.error('Step commit failed:', err);
-      const msg =
-        err instanceof Error ? err.message : 'Something went wrong. Try again.';
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Try again.';
       Alert.alert("Couldn't save", msg);
     } finally {
       setBusy(false);
@@ -136,20 +129,16 @@ export function OnboardingStep() {
   }, []);
 
   const handleSignOut = useCallback(() => {
-    Alert.alert(
-      'Sign out?',
-      "You can finish setting up your profile next time you sign in.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign out',
-          style: 'destructive',
-          onPress: () => {
-            void signOut();
-          },
+    Alert.alert('Sign out?', 'You can finish setting up your profile next time you sign in.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: () => {
+          void signOut();
         },
-      ],
-    );
+      },
+    ]);
   }, [signOut]);
 
   // ----- Render guards -----
@@ -166,9 +155,7 @@ export function OnboardingStep() {
   if (!profile || !userId) {
     return (
       <OnboardingFrame title={step.title} subtitle={step.subtitle}>
-        <View
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-        >
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           {loadError ? null : <ActivityIndicator size="large" color="#007AFF" />}
         </View>
       </OnboardingFrame>
@@ -185,12 +172,7 @@ export function OnboardingStep() {
         userId={userId}
         advance={async (patch) => {
           try {
-            await commitStep(
-              userId,
-              stepIndex,
-              ONBOARDING_SEQUENCE.length,
-              patch ?? {},
-            );
+            await commitStep(userId, stepIndex, ONBOARDING_SEQUENCE.length, patch ?? {});
             if (stepIndex === ONBOARDING_SEQUENCE.length - 1) {
               await refreshOnboardingStatus();
             } else {
@@ -199,10 +181,7 @@ export function OnboardingStep() {
             }
           } catch (err) {
             console.error('Custom step advance failed:', err);
-            const msg =
-              err instanceof Error
-                ? err.message
-                : 'Something went wrong. Try again.';
+            const msg = err instanceof Error ? err.message : 'Something went wrong. Try again.';
             Alert.alert("Couldn't save", msg);
           }
         }}
@@ -231,7 +210,8 @@ export function OnboardingStep() {
       canContinue={canContinue}
       busy={busy}
       continueLabel={continueLabel}
-    >
+      hideHeader={step.hideHeader}
+      noScroll={step.noScroll}>
       <Body
         value={slotValue}
         setValue={(next: unknown) => setSlotValue(next)}
