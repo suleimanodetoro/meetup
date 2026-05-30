@@ -9,7 +9,10 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureRevenueCat } from '~/lib/revenuecat';
 import { waypointNotifications } from '~/modules/notifications';
-import { ONBOARDING_SEQUENCE } from '~/modules/onboarding/sequence';
+// Slug-only import — dependency-free. Importing from ./sequence.ts here
+// would pull react-native-date-picker through BirthdayField/TripsCustom
+// into app boot and crash with a `nullthrows` at requireNativeComponent.
+import { ONBOARDING_SLUGS } from '~/modules/onboarding/slugs';
 
 // Configure the RC SDK once at module load. Idempotent; no-op when the
 // platform's API key env var isn't set, so dev environments without an
@@ -102,9 +105,9 @@ function NavigationController({ children }: { children: React.ReactNode }) {
         // bounds defensively.
         const resumeIndex = Math.max(
           0,
-          Math.min(onboardingStep, ONBOARDING_SEQUENCE.length - 1),
+          Math.min(onboardingStep, ONBOARDING_SLUGS.length - 1),
         );
-        const resumeSlug = ONBOARDING_SEQUENCE[resumeIndex].slug;
+        const resumeSlug = ONBOARDING_SLUGS[resumeIndex];
         router.replace(`/onboarding/${resumeSlug}`); // lives in (auth)/onboarding/[step]
       }
       return;
