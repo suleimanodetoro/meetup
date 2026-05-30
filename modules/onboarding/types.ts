@@ -61,6 +61,10 @@ export interface StepDef<V = unknown> {
    * renders an arrow button under the input itself).
    */
   hideCta?: boolean;
+  /** Hide the frame's title/subtitle block when the body owns the hero copy. */
+  hideHeader?: boolean;
+  /** Render the body without ScrollView wrapping when a step owns layout. */
+  noScroll?: boolean;
 
   /** The body slot. Ignored when `custom` is provided. */
   Body?: ComponentType<StepBodyProps<V>>;

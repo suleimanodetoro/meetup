@@ -1,102 +1,215 @@
-import { Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { authColors, authSpace, authType } from '~/utils/authTheme';
+
+const waypointLogo = require('~/assets/ios-light.png');
 
 /**
  * Educational body for the final notifications step. No input — the
- * Continue button (labelled "Enable Notifications") triggers the
- * permission request inside the step's `commit`. Skip writes
- * notifications_enabled: false.
+ * Continue button (labelled "Enable Notifications") triggers permission
+ * request + schedule sync inside the step's `commit`.
  */
 export function NotificationsBody() {
   return (
-    <View style={{ paddingTop: 20 }}>
-      <View style={{ alignItems: 'center', marginBottom: 30 }}>
-        <View
-          style={{
-            width: 100,
-            height: 100,
-            borderRadius: 50,
-            backgroundColor: 'white',
-            justifyContent: 'center',
-            alignItems: 'center',
-            shadowColor: '#007AFF',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 12,
-            elevation: 6,
-          }}
-        >
-          <Text style={{ fontSize: 50 }}>🔔</Text>
+    <View style={styles.container}>
+      <View style={styles.illustration}>
+        <View style={styles.phone}>
+          <View style={styles.phoneNotch} />
+          <View style={styles.feedCardLarge}>
+            <View style={styles.logoTile}>
+              <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+            </View>
+            <View style={styles.feedCopy}>
+              <View style={styles.feedLineWide} />
+              <View style={styles.feedLineShort} />
+            </View>
+          </View>
+          <View style={styles.feedCardSmall}>
+            <View style={styles.logoTileSmall}>
+              <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+            </View>
+            <View style={styles.feedCopy}>
+              <View style={styles.feedLineMedium} />
+              <View style={styles.feedLineTiny} />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.notificationCard}>
+          <View style={styles.notificationLogo}>
+            <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+          </View>
+          <View style={styles.notificationCopy}>
+            <Text style={styles.notificationTitle}>Waypoint</Text>
+            <Text style={styles.notificationText} numberOfLines={2}>
+              Bank holiday plans are starting nearby.
+            </Text>
+          </View>
         </View>
       </View>
 
-      <View style={{ gap: 12 }}>
-        <FeatureCard
-          emoji="💬"
-          title="Messages"
-          subtitle="Get notified when someone messages you"
-        />
-        <FeatureCard
-          emoji="📅"
-          title="Plan Updates"
-          subtitle="Stay informed about your upcoming plans"
-        />
-        <FeatureCard
-          emoji="🎯"
-          title="New Connections"
-          subtitle="Know when people nearby match your vibe"
-        />
-      </View>
+      <Text style={styles.title}>Turn on notifications</Text>
+      <Text style={styles.body}>
+        Get updates about places to explore, reminders to check in, and your friend activity. You
+        can manage notification settings anytime.
+      </Text>
     </View>
   );
 }
 
-function FeatureCard({
-  emoji,
-  title,
-  subtitle,
-}: {
-  emoji: string;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <View
-      style={{
-        backgroundColor: 'white',
-        padding: 16,
-        borderRadius: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          backgroundColor: '#E3F2FD',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ fontSize: 22 }}>{emoji}</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{ fontSize: 16, fontWeight: '600', marginBottom: 2, color: '#1A1A1A' }}
-        >
-          {title}
-        </Text>
-        <Text style={{ fontSize: 13, color: '#666', lineHeight: 18 }}>
-          {subtitle}
-        </Text>
-      </View>
-    </View>
-  );
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: authSpace.lg,
+  },
+  illustration: {
+    height: 310,
+    marginBottom: authSpace.xxl,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  phone: {
+    width: 260,
+    height: 230,
+    borderTopLeftRadius: 48,
+    borderTopRightRadius: 48,
+    borderWidth: 10,
+    borderBottomWidth: 0,
+    borderColor: '#65706D',
+    backgroundColor: '#F0F1F1',
+    overflow: 'hidden',
+    paddingTop: 42,
+    paddingHorizontal: authSpace.lg,
+  },
+  phoneNotch: {
+    position: 'absolute',
+    top: 18,
+    left: 82,
+    right: 82,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#CBD0CF',
+  },
+  feedCardLarge: {
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: authSpace.md,
+    marginBottom: authSpace.md,
+  },
+  feedCardSmall: {
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: authSpace.md,
+    opacity: 0.9,
+  },
+  logoTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: authSpace.md,
+    overflow: 'hidden',
+  },
+  logoTileSmall: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: authSpace.md,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  feedCopy: {
+    flex: 1,
+    gap: authSpace.sm,
+  },
+  feedLineWide: {
+    width: '86%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#CFD3D2',
+  },
+  feedLineMedium: {
+    width: '72%',
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#CFD3D2',
+  },
+  feedLineShort: {
+    width: '52%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#D9DDDC',
+  },
+  feedLineTiny: {
+    width: '38%',
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#D9DDDC',
+  },
+  notificationCard: {
+    position: 'absolute',
+    top: 70,
+    left: 16,
+    right: 16,
+    minHeight: 82,
+    borderRadius: 18,
+    backgroundColor: '#D6D8D7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: authSpace.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  notificationLogo: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: authSpace.md,
+    overflow: 'hidden',
+  },
+  notificationCopy: {
+    flex: 1,
+  },
+  notificationTitle: {
+    color: '#172321',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  notificationText: {
+    color: '#172321',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  title: {
+    color: '#172321',
+    fontSize: authType.headline.fontSize,
+    lineHeight: authType.headline.lineHeight,
+    letterSpacing: authType.headline.letterSpacing,
+    fontWeight: authType.headline.fontWeight,
+    marginBottom: authSpace.md,
+  },
+  body: {
+    color: authColors.textSecondary,
+    fontSize: authType.body.fontSize,
+    lineHeight: authType.body.lineHeight,
+  },
+});
