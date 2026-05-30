@@ -17,6 +17,12 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
+  /**
+   * Persisted onboarding cursor. NavigationController reads this on cold
+   * start to send returning-but-not-yet-onboarded users to the step they
+   * left off on, instead of always /onboarding/name.
+   */
+  onboardingStep: number;
   isLoading: boolean;
   refreshOnboardingStatus: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -27,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   hasCompletedOnboarding: false,
+  onboardingStep: 0,
   isLoading: true,
   refreshOnboardingStatus: async () => {},
   signOut: async () => {},
@@ -35,6 +42,7 @@ const AuthContext = createContext<AuthContextType>({
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Tracks whether we currently have an RC user identified, so that on
@@ -66,24 +74,30 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
               onboarding_completed: false,
               onboarding_step: 0,
             });
-          
+
           if (insertError) {
             console.error('Error creating profile:', insertError);
           }
           setHasCompletedOnboarding(false);
+          setOnboardingStep(0);
           return false;
         }
         setHasCompletedOnboarding(false);
+        setOnboardingStep(0);
         return false;
       }
 
       const isOnboarded = profile?.onboarding_completed === true;
+      const persistedStep =
+        typeof profile?.onboarding_step === 'number' ? profile.onboarding_step : 0;
       setHasCompletedOnboarding(isOnboarded);
+      setOnboardingStep(persistedStep);
       return isOnboarded;
-      
+
     } catch (err) {
       console.error('Error checking profile:', err);
       setHasCompletedOnboarding(false);
+      setOnboardingStep(0);
       return false;
     }
   };
@@ -113,6 +127,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       // Clear local state
       setSession(null);
       setHasCompletedOnboarding(false);
+      setOnboardingStep(0);
     } catch (error) {
       console.error('Error signing out:', error);
     } finally {
@@ -160,6 +175,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           rcUserIdentifiedRef.current = false;
         }
         setHasCompletedOnboarding(false);
+        setOnboardingStep(0);
       }
     });
 
@@ -183,6 +199,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         isAuthenticated: Boolean(session?.user),
         hasCompletedOnboarding,
+        onboardingStep,
         isLoading,
         refreshOnboardingStatus,
         signOut,

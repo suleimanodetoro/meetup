@@ -1,6 +1,5 @@
 // app/_layout.tsx
 import '../global.css';
-import * as SplashScreen from 'expo-splash-screen';
 
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import AuthProvider, { useAuth } from '~/contexts/AuthProvider';
@@ -9,16 +8,38 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureRevenueCat } from '~/lib/revenuecat';
+import { waypointNotifications } from '~/modules/notifications';
+import { ONBOARDING_SEQUENCE } from '~/modules/onboarding/sequence';
 
 // Configure the RC SDK once at module load. Idempotent; no-op when the
 // platform's API key env var isn't set, so dev environments without an
 // RC project don't crash the app.
 configureRevenueCat();
 
+function NotificationStartupEffect() {
+  const { session, isAuthenticated, hasCompletedOnboarding, isLoading } = useAuth();
+  const userId = session?.user.id ?? null;
 
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !hasCompletedOnboarding || !userId) {
+      return;
+    }
+
+    void waypointNotifications
+      .sync({
+        userId,
+        reason: 'app-startup',
+      })
+      .catch((err) => {
+        console.warn('Notification startup sync failed:', err);
+      });
+  }, [hasCompletedOnboarding, isAuthenticated, isLoading, userId]);
+
+  return null;
+}
 
 function NavigationController({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasCompletedOnboarding, isLoading } = useAuth();
+  const { isAuthenticated, hasCompletedOnboarding, onboardingStep, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -52,8 +73,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     const staticRoutes = [
       'edit-profile',
       'add-trip',
-      'settings',       // covers settings/privacy
-      'create-plan',    // covers create-plan/* steps
+      'settings', // covers settings/privacy
+      'create-plan', // covers create-plan/* steps
       'search-users',
       'friend-requests',
       'explore',
@@ -71,12 +92,20 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 
     // ----- Authenticated but not onboarded: send to onboarding, even from (auth) -----
     if (!hasCompletedOnboarding) {
-      const onOnboarding =
-        inAuthGroup && segments[1] === 'onboarding';
+      const onOnboarding = inAuthGroup && segments[1] === 'onboarding';
       // Transient auth flows handle their own next-step navigation once
       // they've finished, so don't yank the user mid-exchange.
       if (!onOnboarding && !isTransientAuthFlow) {
-        router.replace('/onboarding/name'); // lives in (auth)/onboarding/[step]
+        // Resume at the persisted step. commitStep writes onboarding_step on
+        // every Continue, so returning users continue where they left off
+        // instead of always landing back on /name. Clamp into the sequence
+        // bounds defensively.
+        const resumeIndex = Math.max(
+          0,
+          Math.min(onboardingStep, ONBOARDING_SEQUENCE.length - 1),
+        );
+        const resumeSlug = ONBOARDING_SEQUENCE[resumeIndex].slug;
+        router.replace(`/onboarding/${resumeSlug}`); // lives in (auth)/onboarding/[step]
       }
       return;
     }
@@ -97,6 +126,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
   }, [
     isAuthenticated,
     hasCompletedOnboarding,
+    onboardingStep,
     isLoading,
     segments,
     rootNavigationState?.key,
@@ -119,6 +149,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <CreatePlanProvider>
+          <NotificationStartupEffect />
           <NavigationController>
             <Stack screenOptions={{ headerShown: false }}>
               {/* App groups */}
