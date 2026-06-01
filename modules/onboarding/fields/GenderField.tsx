@@ -59,8 +59,7 @@ export function GenderField({ value, setValue }: StepBodyProps<string>) {
           onPress={() => setExpanded(true)}
           accessibilityRole="button"
           accessibilityLabel="More gender options"
-          style={styles.moreLink}
-        >
+          style={styles.moreLink}>
           <Text style={styles.moreText}>+ More options</Text>
         </Pressable>
       )}
@@ -88,19 +87,15 @@ function Chip({
       accessibilityRole="radio"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      style={styles.chipPressable}
-    >
+      style={styles.chipPressable}>
       <View
         accessibilityIgnoresInvertColors
         style={[
           styles.chip,
           selected ? styles.chipSelected : null,
           pressed ? styles.chipPressed : null,
-        ]}
-      >
-        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-          {label}
-        </Text>
+        ]}>
+        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
       </View>
     </Pressable>
   );
@@ -141,7 +136,7 @@ const styles = StyleSheet.create({
   chipSelected: {
     borderColor: authColors.ctaBorder,
     borderWidth: 2,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: authColors.accentSoft,
   },
   chipPressed: {
     opacity: 0.7,

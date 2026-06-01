@@ -14,6 +14,7 @@ import DatePicker from 'react-native-date-picker';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
+import { authColors } from '~/utils/authTheme';
 import { OnboardingFrame } from '../OnboardingFrame';
 import type { CustomStepProps } from '../types';
 
@@ -99,49 +100,50 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
       onContinue={onContinue}
       canContinue={canContinue}
       busy={saving}
-      continueLabel={saving ? 'Saving...' : 'Continue'}
-    >
-      <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12 }}>
+      continueLabel={saving ? 'Saving...' : 'Continue'}>
+      <Text
+        style={{
+          fontSize: 16,
+          fontWeight: '700',
+          marginBottom: 12,
+          color: authColors.textPrimary,
+        }}>
         Destination
       </Text>
       <Pressable
         onPress={() => setShowDestinationModal(true)}
         style={{
-          backgroundColor: 'white',
+          backgroundColor: authColors.surface,
           padding: 20,
           borderRadius: 16,
           marginBottom: 30,
-          borderWidth: 2,
-          borderColor: destination ? '#007AFF' : '#E0E0E0',
-        }}
-      >
+          borderWidth: 1,
+          borderColor: destination ? authColors.accent : authColors.borderSubtle,
+        }}>
         <Text
           style={{
             fontSize: 16,
-            color: destination ? '#1A1A1A' : '#9E9E9E',
-            fontWeight: destination ? '500' : '400',
-          }}
-        >
+            color: destination ? authColors.textPrimary : authColors.placeholder,
+            fontWeight: '600',
+          }}>
           {destination
             ? `${destination.flag} ${destination.city}, ${destination.country}`
             : 'Where are you going?'}
         </Text>
       </Pressable>
 
-      <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12 }}>
+      <Text
+        style={{
+          fontSize: 16,
+          fontWeight: '700',
+          marginBottom: 12,
+          color: authColors.textPrimary,
+        }}>
         Travel Dates
       </Text>
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 40 }}>
-        <DateButton
-          label="From"
-          date={startDate}
-          onPress={() => setShowStartPicker(true)}
-        />
-        <DateButton
-          label="To"
-          date={endDate}
-          onPress={() => setShowEndPicker(true)}
-        />
+        <DateButton label="From" date={startDate} onPress={() => setShowStartPicker(true)} />
+        <DateButton label="To" date={endDate} onPress={() => setShowEndPicker(true)} />
       </View>
 
       <DestinationModal
@@ -174,9 +176,7 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         open={showEndPicker}
         date={
           endDate ||
-          (startDate
-            ? new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)
-            : new Date())
+          (startDate ? new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000) : new Date())
         }
         mode="date"
         minimumDate={startDate || new Date()}
@@ -205,23 +205,21 @@ function DateButton({
       onPress={onPress}
       style={{
         flex: 1,
-        backgroundColor: 'white',
+        backgroundColor: authColors.surface,
         padding: 20,
         borderRadius: 16,
-        borderWidth: 2,
-        borderColor: date ? '#007AFF' : '#E0E0E0',
-      }}
-    >
-      <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+        borderWidth: 1,
+        borderColor: date ? authColors.accent : authColors.borderSubtle,
+      }}>
+      <Text style={{ fontSize: 12, color: authColors.textSecondary, marginBottom: 4 }}>
         {label}
       </Text>
       <Text
         style={{
           fontSize: 16,
-          color: date ? '#1A1A1A' : '#9E9E9E',
-          fontWeight: date ? '500' : '400',
-        }}
-      >
+          color: date ? authColors.textPrimary : authColors.placeholder,
+          fontWeight: '600',
+        }}>
         {date
           ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           : label === 'From'
@@ -257,15 +255,11 @@ function DestinationModal({
       }
       setSearching(true);
       try {
-        const data = await getSuggestions(
-          query,
-          accessToken || 'session-' + Date.now(),
-          { types: ['place', 'locality'] },
-        );
+        const data = await getSuggestions(query, accessToken || 'session-' + Date.now(), {
+          types: ['place', 'locality'],
+        });
         const cityResults: Suggestion[] = ((data?.suggestions ?? []) as any[])
-          .filter(
-            (s) => s.feature_type === 'place' || s.feature_type === 'locality',
-          )
+          .filter((s) => s.feature_type === 'place' || s.feature_type === 'locality')
           .map((s) => ({
             city: s.name,
             country: s.context?.country?.name || 'Unknown',
@@ -285,13 +279,8 @@ function DestinationModal({
   }, [query, accessToken]);
 
   return (
-    <Modal
-      animationType="slide"
-      transparent={false}
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+    <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: authColors.bg }}>
         <View
           style={{
             flexDirection: 'row',
@@ -300,16 +289,13 @@ function DestinationModal({
             paddingHorizontal: 20,
             paddingVertical: 15,
             borderBottomWidth: 1,
-            borderBottomColor: '#E0E0E0',
-          }}
-        >
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#1A1A1A' }}>
+            borderBottomColor: authColors.borderSubtle,
+          }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: authColors.textPrimary }}>
             Select Destination
           </Text>
           <Pressable onPress={onClose} hitSlop={8}>
-            <Text style={{ fontSize: 17, color: '#007AFF', fontWeight: '600' }}>
-              Done
-            </Text>
+            <Text style={{ fontSize: 17, color: authColors.accent, fontWeight: '700' }}>Done</Text>
           </Pressable>
         </View>
 
@@ -317,31 +303,30 @@ function DestinationModal({
           style={{
             marginHorizontal: 20,
             marginVertical: 15,
-            backgroundColor: '#F5F5F5',
+            backgroundColor: authColors.accentSoft,
             borderRadius: 12,
             paddingHorizontal: 16,
             paddingVertical: 12,
             flexDirection: 'row',
             alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+          }}>
+          <Text style={{ fontSize: 16, marginRight: 8, color: authColors.textTertiary }}>
+            Search
+          </Text>
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search any city..."
-            placeholderTextColor="#999"
+            placeholderTextColor={authColors.placeholder}
             autoFocus
-            style={{ flex: 1, fontSize: 16, color: '#1A1A1A' }}
+            style={{ flex: 1, fontSize: 16, color: authColors.textPrimary }}
           />
-          {searching ? <ActivityIndicator size="small" color="#007AFF" /> : null}
+          {searching ? <ActivityIndicator size="small" color={authColors.accent} /> : null}
         </View>
 
         <FlatList
           data={results}
-          keyExtractor={(item, index) =>
-            `${item.city}-${item.country_code}-${index}`
-          }
+          keyExtractor={(item, index) => `${item.city}-${item.country_code}-${index}`}
           contentContainerStyle={{ paddingBottom: 20 }}
           renderItem={({ item }) => (
             <Pressable
@@ -350,22 +335,20 @@ function DestinationModal({
                 paddingVertical: 16,
                 paddingHorizontal: 20,
                 borderBottomWidth: 1,
-                borderBottomColor: '#F0F0F0',
+                borderBottomColor: authColors.borderMuted,
                 backgroundColor:
-                  selected?.city === item.city &&
-                  selected?.country_code === item.country_code
-                    ? '#F0F7FF'
-                    : 'white',
+                  selected?.city === item.city && selected?.country_code === item.country_code
+                    ? authColors.accentSoft
+                    : authColors.surface,
                 flexDirection: 'row',
                 alignItems: 'center',
-              }}
-            >
+              }}>
               <Text style={{ fontSize: 24, marginRight: 12 }}>{item.flag}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 17, fontWeight: '600', color: '#1A1A1A' }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: authColors.textPrimary }}>
                   {item.city}
                 </Text>
-                <Text style={{ fontSize: 14, color: '#666', marginTop: 2 }}>
+                <Text style={{ fontSize: 14, color: authColors.textSecondary, marginTop: 2 }}>
                   {item.country}
                 </Text>
               </View>
@@ -377,17 +360,16 @@ function DestinationModal({
                 <Text
                   style={{
                     fontSize: 16,
-                    color: '#999',
+                    color: authColors.textTertiary,
                     textAlign: 'center',
                     paddingHorizontal: 40,
-                  }}
-                >
+                  }}>
                   Start typing to search for any city in the world
                 </Text>
               ) : searching ? (
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={authColors.accent} />
               ) : (
-                <Text style={{ fontSize: 16, color: '#999' }}>
+                <Text style={{ fontSize: 16, color: authColors.textTertiary }}>
                   No cities found
                 </Text>
               )}

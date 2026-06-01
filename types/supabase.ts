@@ -848,6 +848,7 @@ export type Database = {
           avatar_url: string
           bio: string
           nationality_code: string
+          location_country_code: string
           is_verified: boolean
           visit_start: string
           visit_end: string
@@ -879,6 +880,7 @@ export type Database = {
           bio: string
           location: string
           location_country: string
+          location_country_code: string
           nationality_code: string
           interests: Json
           gender: string

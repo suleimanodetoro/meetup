@@ -13,6 +13,7 @@ import { authColors, authSpace, authType } from '../../utils/authTheme';
 import { supabase } from '~/utils/supabase';
 
 const RESEND_COOLDOWN_MS = 30_000;
+const CONFIRM_EMAIL_REDIRECT = 'waypoint:///confirm-email';
 
 /**
  * Confirmation prompt shown after sign-up while we wait for the user to tap
@@ -56,9 +57,7 @@ export default function CheckEmailScreen() {
     ? `We sent a confirmation link to ${email}. Tap it to finish creating your account.`
     : 'We sent a confirmation link to your inbox.';
 
-  const resendLabel = isCoolingDown
-    ? `Resend in ${secondsRemaining}s…`
-    : 'Resend email';
+  const resendLabel = isCoolingDown ? `Resend in ${secondsRemaining}s…` : 'Resend email';
 
   async function handleResend() {
     if (!email) {
@@ -71,7 +70,7 @@ export default function CheckEmailScreen() {
     const { error: resendError } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: 'waypoint://confirm-email' },
+      options: { emailRedirectTo: CONFIRM_EMAIL_REDIRECT },
     });
     setLoading(false);
     if (resendError) {
@@ -120,11 +119,7 @@ export default function CheckEmailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Wrong email? Sign up again"
             accessibilityState={{ disabled: loading }}
-            style={[
-              styles.wrongEmail,
-              loading ? styles.wrongEmailDisabled : null,
-            ]}
-          >
+            style={[styles.wrongEmail, loading ? styles.wrongEmailDisabled : null]}>
             <Text style={styles.wrongEmailText}>Wrong email? Sign up again</Text>
           </Pressable>
         </View>

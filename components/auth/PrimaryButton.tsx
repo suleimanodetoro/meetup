@@ -1,12 +1,6 @@
 // components/auth/PrimaryButton.tsx
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authColors, authRadius, authSpace, authType } from '../../utils/authTheme';
 
@@ -16,6 +10,8 @@ interface PrimaryButtonProps {
   loading?: boolean;
   disabled?: boolean;
   leftIcon?: React.ReactNode;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 /**
@@ -30,8 +26,8 @@ interface PrimaryButtonProps {
  * runtime can't interfere with the visuals.
  *
  * `accessibilityIgnoresInvertColors` opts the rendered surface out of iOS
- * Smart Invert, so the black pill stays black even when an accessibility
- * color filter is enabled.
+ * Smart Invert, so the brand pill keeps its intended contrast even when an
+ * accessibility color filter is enabled.
  */
 export default function PrimaryButton({
   label,
@@ -39,6 +35,8 @@ export default function PrimaryButton({
   loading = false,
   disabled = false,
   leftIcon,
+  backgroundColor = authColors.ctaPrimaryBg,
+  textColor = authColors.ctaPrimaryText,
 }: PrimaryButtonProps) {
   const [pressed, setPressed] = useState(false);
   const isInactive = loading || disabled;
@@ -52,22 +50,21 @@ export default function PrimaryButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isInactive, busy: loading }}
-      style={styles.pressable}
-    >
+      style={styles.pressable}>
       <View
         accessibilityIgnoresInvertColors
         style={[
           styles.button,
+          { backgroundColor },
           isInactive ? styles.disabled : null,
           pressed && !isInactive ? styles.pressed : null,
-        ]}
-      >
+        ]}>
         {loading ? (
-          <ActivityIndicator color={authColors.ctaPrimaryText} />
+          <ActivityIndicator color={textColor} />
         ) : (
           <View style={styles.row}>
             {leftIcon ? <View style={styles.icon}>{leftIcon}</View> : null}
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, { color: textColor }]}>{label}</Text>
           </View>
         )}
       </View>
@@ -80,7 +77,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   button: {
-    backgroundColor: authColors.ctaPrimaryBg,
     borderRadius: authRadius.pill,
     paddingVertical: 18,
     paddingHorizontal: authSpace.xl,
@@ -97,7 +93,6 @@ const styles = StyleSheet.create({
     marginRight: authSpace.sm,
   },
   label: {
-    color: authColors.ctaPrimaryText,
     fontSize: authType.button.fontSize,
     fontWeight: authType.button.fontWeight,
   },

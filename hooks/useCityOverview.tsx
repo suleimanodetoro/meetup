@@ -7,6 +7,7 @@ export interface CityUser {
   avatar_url: string | null;
   bio: string | null;
   nationality_code: string | null;
+  location_country_code: string | null;
   is_verified: boolean;
   visit_start: string;
   visit_end: string;
@@ -40,7 +41,7 @@ export interface CityOverview {
 
 export interface CityWindow {
   from?: string | null; // YYYY-MM-DD
-  to?: string | null;   // YYYY-MM-DD
+  to?: string | null; // YYYY-MM-DD
 }
 
 const PAGE_SIZE = 20;
@@ -58,10 +59,7 @@ const PAGE_SIZE = 20;
  * recent-history activity in a city without bringing back all-time
  * archives.
  */
-export function useCityOverview(
-  cityName: string | undefined,
-  window: CityWindow = {},
-) {
+export function useCityOverview(cityName: string | undefined, window: CityWindow = {}) {
   const [overview, setOverview] = useState<CityOverview | null>(null);
   const [users, setUsers] = useState<CityUser[]>([]);
   const [plans, setPlans] = useState<CityPlan[]>([]);
@@ -151,8 +149,7 @@ export function useCityOverview(
       setPlansHasMore(planRows.length < planCount);
     } catch (err) {
       if (myId !== requestId.current) return;
-      const message =
-        err instanceof Error ? err.message : 'Failed to load city details';
+      const message = err instanceof Error ? err.message : 'Failed to load city details';
       console.error('useCityOverview error:', err);
       setError(message);
     } finally {
@@ -177,10 +174,7 @@ export function useCityOverview(
       };
       if (windowFrom) args.window_from = windowFrom;
       if (windowTo) args.window_to = windowTo;
-      const { data, error: rpcError } = await supabase.rpc(
-        'get_city_users_ranked',
-        args,
-      );
+      const { data, error: rpcError } = await supabase.rpc('get_city_users_ranked', args);
       if (rpcError) throw rpcError;
       const rows = (data ?? []) as unknown as CityUser[];
       setUsers((prev) => {
@@ -192,14 +186,22 @@ export function useCityOverview(
         return [...prev, ...fresh];
       });
       setUsersHasMore(
-        rows.length === PAGE_SIZE && users.length + rows.length < (overview?.user_count ?? 0),
+        rows.length === PAGE_SIZE && users.length + rows.length < (overview?.user_count ?? 0)
       );
     } catch (err) {
       console.error('loadMoreUsers error:', err);
     } finally {
       setUsersLoadingMore(false);
     }
-  }, [cityName, windowFrom, windowTo, users.length, overview?.user_count, usersLoadingMore, usersHasMore]);
+  }, [
+    cityName,
+    windowFrom,
+    windowTo,
+    users.length,
+    overview?.user_count,
+    usersLoadingMore,
+    usersHasMore,
+  ]);
 
   const loadMorePlans = useCallback(async () => {
     if (!cityName || plansLoadingMore || !plansHasMore) return;
@@ -218,10 +220,7 @@ export function useCityOverview(
       };
       if (windowFrom) args.window_from = windowFrom;
       if (windowTo) args.window_to = windowTo;
-      const { data, error: rpcError } = await supabase.rpc(
-        'get_city_plans_ranked',
-        args,
-      );
+      const { data, error: rpcError } = await supabase.rpc('get_city_plans_ranked', args);
       if (rpcError) throw rpcError;
       const rows = (data ?? []) as unknown as CityPlan[];
       setPlans((prev) => {
@@ -230,14 +229,22 @@ export function useCityOverview(
         return [...prev, ...fresh];
       });
       setPlansHasMore(
-        rows.length === PAGE_SIZE && plans.length + rows.length < (overview?.plan_count ?? 0),
+        rows.length === PAGE_SIZE && plans.length + rows.length < (overview?.plan_count ?? 0)
       );
     } catch (err) {
       console.error('loadMorePlans error:', err);
     } finally {
       setPlansLoadingMore(false);
     }
-  }, [cityName, windowFrom, windowTo, plans.length, overview?.plan_count, plansLoadingMore, plansHasMore]);
+  }, [
+    cityName,
+    windowFrom,
+    windowTo,
+    plans.length,
+    overview?.plan_count,
+    plansLoadingMore,
+    plansHasMore,
+  ]);
 
   useEffect(() => {
     loadInitial();

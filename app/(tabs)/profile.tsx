@@ -267,10 +267,10 @@ export default function ProfileScreen() {
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                   <Text style={{ fontSize: 18 }}>
-                    {getCountryFlag(profile?.nationality_code || 'US')}
+                    {getCountryFlag(profile?.location_country_code || profile?.nationality_code || 'US')}
                   </Text>
                   <Text style={{ fontSize: 13, color: C.sub }}>
-                    {profile?.nationality || 'United States'}
+                    {profile?.location || profile?.nationality || 'United States'}
                   </Text>
                 </View>
               </View>
@@ -489,7 +489,7 @@ function EmptyPlans() {
       }}>
       <Text style={{ fontSize: 48, marginBottom: 8 }}>🗓️</Text>
       <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>No Plans Yet</Text>
-      <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>You haven't joined any plans</Text>
+      <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>You have not joined any plans</Text>
     </View>
   );
 }

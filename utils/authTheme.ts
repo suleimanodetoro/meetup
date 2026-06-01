@@ -5,26 +5,32 @@
 export const authColors = {
   // Backgrounds
   bg: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F4F8FF',
 
   // Text hierarchy
-  textPrimary: '#000000',
+  textPrimary: '#050505',
   textSecondary: '#4A4A4A',
   textTertiary: '#8A8A8A',
   textDisclaimer: '#6B6B6B',
 
   // Accent (links / underlines that intentionally read as blue, e.g. "Wrong email?")
   accent: '#007AFF',
+  accentSoft: '#EEF4FF',
+  accentBorder: '#DCE9FF',
 
   // CTA / surfaces
-  ctaPrimaryBg: '#000000',
+  ctaPrimaryBg: '#007AFF',
   ctaPrimaryText: '#FFFFFF',
   ctaSecondaryBg: '#FFFFFF',
-  ctaSecondaryText: '#000000',
-  ctaBorder: '#000000',
+  ctaSecondaryText: '#007AFF',
+  ctaBorder: '#007AFF',
 
   // Input
   inputBg: '#FFFFFF',
   inputBorder: '#E5E5E5',
+  borderSubtle: '#E7EAF0',
+  borderMuted: '#F1F1F1',
   inputBorderError: '#FF3B30',
   placeholder: '#8A8A8A',
 

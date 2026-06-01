@@ -1,5 +1,7 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
+import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
 import type { StepBodyProps } from '../types';
 
 export interface PictureValue {
@@ -14,63 +16,70 @@ export function PictureField({ value, setValue }: StepBodyProps<PictureValue>) {
   };
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingTop: 20 }}>
-      <View style={{ position: 'absolute', right: 0, top: -20 }}>
-        <Text style={{ fontSize: 60 }}>📷</Text>
-      </View>
-
-      <Pressable
-        onPress={pick}
-        style={{
-          width: 280,
-          height: 280,
-          borderRadius: 20,
-          borderWidth: 3,
-          borderColor: '#007AFF',
-          borderStyle: 'dashed',
-          backgroundColor: 'white',
-          justifyContent: 'center',
-          alignItems: 'center',
-          overflow: 'hidden',
-        }}
-      >
+    <View style={styles.container}>
+      <Pressable onPress={pick} style={styles.photoCard}>
         {value?.uri ? (
-          <Image
-            source={{ uri: value.uri }}
-            style={{ width: '100%', height: '100%' }}
-          />
+          <Image source={{ uri: value.uri }} style={styles.photo} />
         ) : (
-          <View
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 30,
-              backgroundColor: '#E3F2FD',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 30, color: '#007AFF' }}>+</Text>
+          <View style={styles.placeholder}>
+            <Ionicons name="camera" size={30} color={authColors.accent} />
+            <Text style={styles.placeholderText}>Add profile photo</Text>
           </View>
         )}
       </Pressable>
 
       {value?.uri ? (
-        <Pressable
-          onPress={pick}
-          style={{
-            marginTop: 20,
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            backgroundColor: 'white',
-            borderRadius: 20,
-          }}
-        >
-          <Text style={{ color: '#007AFF', fontWeight: '600' }}>
-            Change Photo
-          </Text>
+        <Pressable onPress={pick} style={styles.changeButton}>
+          <Text style={styles.changeText}>Change photo</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: authSpace.lg,
+  },
+  photoCard: {
+    width: 280,
+    height: 280,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: authColors.accent,
+    borderStyle: 'dashed',
+    backgroundColor: authColors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholder: {
+    alignItems: 'center',
+    gap: authSpace.sm,
+  },
+  placeholderText: {
+    color: authColors.textPrimary,
+    fontSize: authType.label.fontSize,
+    fontWeight: '700',
+  },
+  changeButton: {
+    marginTop: authSpace.lg,
+    paddingVertical: authSpace.md,
+    paddingHorizontal: authSpace.xl,
+    backgroundColor: authColors.surface,
+    borderRadius: authRadius.pill,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+  },
+  changeText: {
+    color: authColors.accent,
+    fontSize: authType.label.fontSize,
+    fontWeight: '700',
+  },
+});

@@ -1,13 +1,7 @@
 // modules/onboarding/fields/NameField.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { authColors, authSpace } from '~/utils/authTheme';
 import type { StepBodyProps } from '../types';
@@ -61,24 +55,18 @@ export function NameField({
           accessibilityRole="button"
           accessibilityLabel="Continue"
           accessibilityState={{ disabled, busy }}
-          style={styles.fabPressable}
-        >
+          style={styles.fabPressable}>
           <View
             accessibilityIgnoresInvertColors
             style={[
               styles.fab,
               disabled ? styles.fabDisabled : null,
               pressed && !disabled ? styles.fabPressed : null,
-            ]}
-          >
+            ]}>
             {busy ? (
               <ActivityIndicator color={authColors.ctaPrimaryText} />
             ) : (
-              <Ionicons
-                name="arrow-forward"
-                size={30}
-                color={authColors.ctaPrimaryText}
-              />
+              <Ionicons name="arrow-forward" size={30} color={authColors.ctaPrimaryText} />
             )}
           </View>
         </Pressable>

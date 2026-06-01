@@ -60,7 +60,8 @@
     "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0",
     "uuid": "^11.1.0",
-    "expo-dev-client": "~5.2.4"
+    "expo-dev-client": "~5.2.4",
+    "expo-store-review": "~8.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

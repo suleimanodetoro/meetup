@@ -9,6 +9,7 @@ import { GenderField } from './fields/GenderField';
 import { GenderPreferenceField } from './fields/GenderPreferenceField';
 import { InterestsField } from './fields/InterestsField';
 import { LanguagesField } from './fields/LanguagesField';
+import { LocationIntroBody } from './fields/LocationIntroBody';
 import { detectCurrentCity, LocationField, type LocationValue } from './fields/LocationField';
 import { NameField } from './fields/NameField';
 import { NationalityField, type NationalityValue } from './fields/NationalityField';
@@ -16,6 +17,7 @@ import { NotificationsBody } from './fields/NotificationsBody';
 import { PauseBody } from './fields/PauseBody';
 import { PictureField, type PictureValue } from './fields/PictureField';
 import { PreferencesField } from './fields/PreferencesField';
+import { RatingBody, requestWaypointReview, TakeABowBody } from './fields/FinaleBodies';
 import { TripsCustom } from './fields/TripsCustom';
 import { StepCancelled, type StepDef } from './types';
 
@@ -88,8 +90,8 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'nationality',
-    title: 'where are you from?',
-    subtitle: 'Helps us connect you with people around the world 👋',
+    title: 'Where are you from?',
+    subtitle: 'This is about your background, not where you are right now.',
     Body: NationalityField,
     read: (p): NationalityValue | undefined =>
       p.nationality_code ? { code: p.nationality_code, name: p.nationality ?? '' } : undefined,
@@ -173,7 +175,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'preferences',
     title: 'how do you prefer to\nmeet people?',
-    subtitle: 'helps us suggest the right connections 🤝',
+    subtitle: 'helps us suggest the right kind of plans',
     Body: PreferencesField,
     read: (p) => p.meeting_preference ?? undefined,
     isValid: (v: string | undefined) => !!v,
@@ -184,7 +186,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'gender-preference',
     title: 'who do you want to\nmeet?',
-    subtitle: 'you will only receive messages from this gender 😎',
+    subtitle: 'this helps keep your suggestions relevant',
     Body: GenderPreferenceField,
     read: (p) => p.gender_preference ?? undefined,
     isValid: (v: string | undefined) => !!v,
@@ -201,8 +203,19 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     custom: TripsCustom,
   },
   {
+    slug: 'location-intro',
+    title: 'Share your world,\nmeet better',
+    hideHeader: true,
+    noScroll: true,
+    Body: LocationIntroBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => ({}),
+    continueLabel: "I'm based in...",
+  },
+  {
     slug: 'location',
-    title: 'Enable location to\ncapture your journey',
+    title: 'Find people near\nyour plans',
     noScroll: true,
     Body: LocationField,
     read: (p): LocationValue | undefined =>
@@ -252,6 +265,30 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
 
       return {};
     },
+  },
+  {
+    slug: 'rating',
+    title: 'Rate Waypoint',
+    hideHeader: true,
+    noScroll: true,
+    Body: RatingBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => {
+      await requestWaypointReview();
+      return {};
+    },
+    continueLabel: 'Rate Waypoint',
+  },
+  {
+    slug: 'take-a-bow',
+    title: 'Take a bow',
+    hideHeader: true,
+    noScroll: true,
+    Body: TakeABowBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => ({}),
   },
 ];
 

@@ -15,7 +15,7 @@ import { supabase } from '~/utils/supabase';
 /**
  * Deep-link target for the password recovery email.
  *
- * URL shape: waypoint://reset-password?code=<one-time-pkce-code>
+ * URL shape: waypoint:///reset-password?code=<one-time-pkce-code>
  *
  * We exchange the code for a recovery session, then let the user set a new
  * password. NavigationController whitelists this route specifically so the
@@ -34,9 +34,7 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     if (!code) {
-      setExchangeError(
-        'Missing recovery code. Open the link from your reset email again.',
-      );
+      setExchangeError('Missing recovery code. Open the link from your reset email again.');
       setExchanging(false);
       return;
     }
@@ -94,10 +92,7 @@ export default function ResetPasswordScreen() {
           <IconHero
             icon={<Ionicons name="alert-circle" size={64} color="#FF3B30" />}
             title="Link expired"
-            subtitle={
-              exchangeError ||
-              'This reset link has expired or already been used.'
-            }
+            subtitle={exchangeError || 'This reset link has expired or already been used.'}
           />
           <View style={styles.ctaWrap}>
             <PrimaryButton
@@ -121,10 +116,7 @@ export default function ResetPasswordScreen() {
             subtitle="You can now sign in with your new password."
           />
           <View style={styles.ctaWrap}>
-            <PrimaryButton
-              label="Go to app"
-              onPress={() => router.replace('/(tabs)')}
-            />
+            <PrimaryButton label="Go to app" onPress={() => router.replace('/(tabs)')} />
           </View>
         </View>
       </AuthScreen>
@@ -159,11 +151,7 @@ export default function ResetPasswordScreen() {
         </View>
       ) : null}
       <View style={styles.ctaWrap}>
-        <PrimaryButton
-          label="Update password"
-          onPress={handleUpdate}
-          loading={loading}
-        />
+        <PrimaryButton label="Update password" onPress={handleUpdate} loading={loading} />
       </View>
     </AuthScreen>
   );

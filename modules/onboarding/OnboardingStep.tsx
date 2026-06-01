@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '~/contexts/AuthProvider';
+import { authColors } from '~/utils/authTheme';
 import { OnboardingFrame } from './OnboardingFrame';
 import { FIRST_STEP_SLUG, ONBOARDING_SEQUENCE, STEP_INDEX } from './sequence';
 import { commitStep, loadProfile } from './persist';
@@ -20,7 +21,7 @@ import { isCustomStep, StepCancelled, type ProfileRow } from './types';
  */
 export function OnboardingStep() {
   const { step: slug } = useLocalSearchParams<{ step: string }>();
-  const { session, refreshOnboardingStatus, signOut } = useAuth();
+  const { session, refreshOnboardingStatus } = useAuth();
   const userId = session?.user?.id;
 
   const [profile, setProfile] = useState<Partial<ProfileRow> | null>(null);
@@ -128,19 +129,6 @@ export function OnboardingStep() {
     if (router.canGoBack()) router.back();
   }, []);
 
-  const handleSignOut = useCallback(() => {
-    Alert.alert('Sign out?', 'You can finish setting up your profile next time you sign in.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
-      },
-    ]);
-  }, [signOut]);
-
   // ----- Render guards -----
 
   if (!step || stepIndex === undefined) {
@@ -156,7 +144,7 @@ export function OnboardingStep() {
     return (
       <OnboardingFrame title={step.title} subtitle={step.subtitle}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          {loadError ? null : <ActivityIndicator size="large" color="#007AFF" />}
+          {loadError ? null : <ActivityIndicator size="large" color={authColors.accent} />}
         </View>
       </OnboardingFrame>
     );
@@ -192,20 +180,16 @@ export function OnboardingStep() {
 
   const Body = step.Body!;
   const continueLabel =
-    step.slug === 'notifications' && !busy ? 'Enable Notifications' : 'Continue';
+    step.continueLabel ??
+    (step.slug === 'notifications' && !busy ? 'Enable Notifications' : 'Continue');
   const canContinue = step.isValid ? step.isValid(slotValue) : true;
 
   return (
     <OnboardingFrame
       title={step.title}
-      // Hide the back chevron on the very first step: the stack has no
-      // history there (we got here via router.replace), so router.back()
-      // would silently no-op. Replace it conceptually with the Sign Out
-      // affordance in the top-right slot, giving the user a real escape.
       subtitle={step.subtitle}
       onBack={stepIndex > 0 ? handleBack : undefined}
       onSkip={step.skippable ? handleSkip : undefined}
-      onSignOut={stepIndex === 0 ? handleSignOut : undefined}
       onContinue={step.hideCta ? undefined : handleContinue}
       canContinue={canContinue}
       busy={busy}

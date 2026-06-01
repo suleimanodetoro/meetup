@@ -13,24 +13,13 @@ import {
 } from 'react-native';
 
 import PrimaryButton from '~/components/auth/PrimaryButton';
-import {
-  authColors,
-  authHitSlop,
-  authSpace,
-  authType,
-} from '~/utils/authTheme';
+import { authColors, authHitSlop, authSpace, authType } from '~/utils/authTheme';
 
 export interface OnboardingFrameProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
   onSkip?: () => void;
-  /**
-   * Sign-out trigger rendered in the header's top-right slot when no Skip
-   * is configured. Used on the very first onboarding step so users with an
-   * unfinished signup can bail out to /welcome instead of being trapped.
-   * Mutually exclusive with `onSkip` — Skip wins if both are set.
-   */
   onSignOut?: () => void;
   onContinue?: () => void;
   /** When `onContinue` is set: gates the Continue button. */
@@ -88,13 +77,8 @@ export function OnboardingFrame({
           disabled={busy}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color={authColors.textPrimary}
-          />
+          accessibilityLabel="Go back">
+          <Ionicons name="chevron-back" size={28} color={authColors.textPrimary} />
         </Pressable>
       ) : (
         <View style={styles.backButton} />
@@ -106,11 +90,7 @@ export function OnboardingFrame({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel="Skip"
-          style={[
-            styles.skipButton,
-            busy ? styles.skipDisabled : null,
-          ]}
-        >
+          style={[styles.skipButton, busy ? styles.skipDisabled : null]}>
           <Text style={styles.skipText}>Skip</Text>
         </Pressable>
       ) : onSignOut ? (
@@ -120,11 +100,7 @@ export function OnboardingFrame({
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
-          style={[
-            styles.skipButton,
-            busy ? styles.skipDisabled : null,
-          ]}
-        >
+          style={[styles.skipButton, busy ? styles.skipDisabled : null]}>
           <Text style={styles.skipText}>Sign out</Text>
         </Pressable>
       ) : (
@@ -135,10 +111,7 @@ export function OnboardingFrame({
 
   const titleBlock = hideHeader ? null : (
     <View style={styles.titleBlock}>
-      <Text
-        style={styles.title}
-        accessibilityRole="header"
-      >
+      <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -155,8 +128,7 @@ export function OnboardingFrame({
       style={styles.flex}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
+      showsVerticalScrollIndicator={false}>
       {titleBlock}
       {children}
     </ScrollView>
@@ -166,8 +138,7 @@ export function OnboardingFrame({
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.headerPad}>{header}</View>
 
         {body}
