@@ -14,6 +14,7 @@ import { supabase } from '~/utils/supabase';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TERMS_URL = 'https://usewaypoint.app/terms';
 const PRIVACY_URL = 'https://usewaypoint.app/privacy';
+const CONFIRM_EMAIL_REDIRECT = 'waypoint:///confirm-email';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -57,7 +58,7 @@ export default function SignUpScreen() {
         options: {
           // Deep link the verification email back into the app so
           // /confirm-email can exchange the PKCE code for a session.
-          emailRedirectTo: 'waypoint://confirm-email',
+          emailRedirectTo: CONFIRM_EMAIL_REDIRECT,
         },
       });
 
@@ -142,11 +143,10 @@ export default function SignUpScreen() {
             void Linking.openURL(TERMS_URL);
           }}
           accessibilityRole="link"
-          accessibilityLabel="Terms of Use"
-        >
+          accessibilityLabel="Terms of Use">
           Terms of Use
-        </Text>
-        {' '}and{' '}
+        </Text>{' '}
+        and{' '}
         <Text
           style={styles.disclaimerLink}
           onPress={() => {
@@ -154,8 +154,7 @@ export default function SignUpScreen() {
             void Linking.openURL(PRIVACY_URL);
           }}
           accessibilityRole="link"
-          accessibilityLabel="Privacy Policy"
-        >
+          accessibilityLabel="Privacy Policy">
           Privacy Policy
         </Text>
         .

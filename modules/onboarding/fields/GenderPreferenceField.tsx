@@ -2,15 +2,12 @@ import type { StepBodyProps } from '../types';
 import { RadioCardList } from './RadioCardList';
 
 const OPTIONS = [
-  { id: 'guys', label: 'Only Guys', emoji: '🧔' },
-  { id: 'girls', label: 'Only Girls', emoji: '👩' },
-  { id: 'everyone', label: 'Everyone', emoji: '👫' },
+  { id: 'guys', label: 'Men' },
+  { id: 'girls', label: 'Women' },
+  { id: 'everyone', label: 'Everyone' },
 ] as const;
 
-export function GenderPreferenceField({
-  value,
-  setValue,
-}: StepBodyProps<string>) {
+export function GenderPreferenceField({ value, setValue }: StepBodyProps<string>) {
   return (
     <RadioCardList
       options={OPTIONS}

@@ -1,12 +1,6 @@
 // components/PersonCard.tsx
 import React, { useMemo, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Image,
-  Dimensions,
-} from 'react-native';
+import { View, Text, Pressable, Image, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -22,6 +16,7 @@ interface PersonCardProps {
     birth_date?: string | Date;
     nationality_code?: string;
     location?: string;
+    location_country_code?: string | null;
     is_online?: boolean; // TODO: Implement presence
     is_premium?: boolean;
   };
@@ -29,6 +24,7 @@ interface PersonCardProps {
 
 export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
   const [imageError, setImageError] = useState(false);
+  const displayCountryCode = person.location_country_code ?? person.nationality_code;
 
   // Reset image error when avatar changes
   useEffect(() => {
@@ -62,8 +58,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
       style={{
         width: (SCREEN_WIDTH - 48) / 3,
         marginRight: 12,
-      }}
-    >
+      }}>
       <View
         style={{
           width: '100%',
@@ -72,8 +67,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
           overflow: 'hidden',
           marginBottom: 8,
           backgroundColor: '#E0E0E0',
-        }}
-      >
+        }}>
         {person.avatar_url && !imageError ? (
           <Image
             source={{ uri: person.avatar_url }}
@@ -86,14 +80,13 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
               flex: 1,
               justifyContent: 'center',
               alignItems: 'center',
-            }}
-          >
+            }}>
             <Ionicons name="person" size={40} color="#999" />
           </View>
         )}
 
         {/* Country flag overlay */}
-        {!!person.nationality_code && (
+        {!!displayCountryCode && (
           <View
             style={{
               position: 'absolute',
@@ -103,11 +96,8 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
               paddingHorizontal: 6,
               paddingVertical: 3,
               borderRadius: 12,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>
-              {getCountryFlag(person.nationality_code)}
-            </Text>
+            }}>
+            <Text style={{ fontSize: 16 }}>{getCountryFlag(displayCountryCode)}</Text>
           </View>
         )}
 
@@ -130,17 +120,11 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
         */}
 
         {person.is_premium && (
-          <PremiumBadge
-            size={18}
-            style={{ position: 'absolute', bottom: 8, right: 8 }}
-          />
+          <PremiumBadge size={18} style={{ position: 'absolute', bottom: 8, right: 8 }} />
         )}
       </View>
 
-      <Text
-        style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }}
-        numberOfLines={1}
-      >
+      <Text style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
         {person.full_name || 'User'}
       </Text>
 

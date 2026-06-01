@@ -31,6 +31,7 @@ interface User {
   bio: string | null;
   location: string;
   location_country: string;
+  location_country_code: string | null;
   nationality_code: string | null;
   interests: string[] | null;
   gender: string | null;
@@ -422,9 +423,9 @@ export default function MapScreen() {
           <Text style={styles.userName} numberOfLines={1}>
             {user.full_name}
           </Text>
-          {user.nationality_code && (
+          {(user.location_country_code || user.nationality_code) && (
             <Text style={styles.userFlag}>
-              {getCountryFlag(user.nationality_code)}
+              {getCountryFlag(user.location_country_code || user.nationality_code || '')}
             </Text>
           )}
         </View>

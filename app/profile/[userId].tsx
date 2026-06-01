@@ -43,6 +43,8 @@ interface UserProfile {
   birth_date?: string;
   nationality?: string;
   nationality_code?: string;
+  location?: string;
+  location_country_code?: string;
   languages?: string[];
   interests?: string[];
   gender?: string;
@@ -360,12 +362,14 @@ export default function UserProfileScreen() {
             <Text style={styles.profileName}>
               {profile.full_name}{age ? `, ${age}` : ''}
             </Text>
-            {profile.nationality && (
+            {(profile.location || profile.nationality) && (
               <View style={styles.locationContainer}>
                 <Text style={styles.locationFlag}>
-                  {getCountryFlag(profile.nationality_code || '')}
+                  {getCountryFlag(profile.location_country_code || profile.nationality_code || '')}
                 </Text>
-                <Text style={styles.locationText}>{profile.nationality.toUpperCase()}</Text>
+                <Text style={styles.locationText}>
+                  {(profile.location || profile.nationality || '').toUpperCase()}
+                </Text>
               </View>
             )}
           </View>

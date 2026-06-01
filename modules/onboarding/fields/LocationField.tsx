@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import type { StepBodyProps } from '../types';
-import { authSpace, authType } from '~/utils/authTheme';
+import { authColors, authSpace } from '~/utils/authTheme';
 
 export interface LocationValue {
   city: string;
@@ -13,29 +13,16 @@ export interface LocationValue {
 const LOCATION_BENEFITS = [
   {
     icon: 'checkmark' as const,
-    bg: '#F2E9FF',
-    color: '#6E2FEA',
-    text: 'Check in to record where life takes you',
+    text: 'We store your city, not your exact location.',
   },
   {
-    icon: 'notifications' as const,
-    bg: '#FCEAF6',
-    color: '#B63A9C',
-    text: 'Get timely reminders for plans near you',
-  },
-  {
-    icon: 'map' as const,
-    bg: '#E8F7F0',
-    color: '#168A63',
-    text: 'Build a personalized map of your visits',
-  },
-  {
-    icon: 'star' as const,
-    bg: '#F7F1E3',
-    color: '#9A7417',
-    text: 'Discover must-visit spots around you',
+    icon: 'lock-closed' as const,
+    text: 'Your exact location is never shown to other people.',
   },
 ];
+
+const HERO_IMAGE_URI =
+  'https://images.pexels.com/photos/466685/pexels-photo-466685.jpeg?auto=compress&cs=tinysrgb&w=900';
 
 export async function detectCurrentCity(): Promise<LocationValue> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -72,55 +59,39 @@ export async function detectCurrentCity(): Promise<LocationValue> {
 export function LocationField({ value }: StepBodyProps<LocationValue>) {
   return (
     <View style={styles.container}>
-      <View style={styles.mapHero} accessibilityIgnoresInvertColors>
-        <View style={[styles.mapCard, styles.mapCardLeft]}>
-          <View style={styles.waterBlock} />
-          <View style={[styles.parkBlock, styles.parkBlockLeft]} />
-          <View style={[styles.road, styles.roadA]} />
-          <View style={[styles.road, styles.roadB]} />
-          <View style={[styles.road, styles.roadC]} />
-          <View style={styles.mapPin}>
-            <Ionicons name="restaurant" size={20} color="#FFFFFF" />
-          </View>
-          <View style={styles.mapLabel}>
-            <Text style={styles.mapLabelTitle}>Tomi Jazz</Text>
-            <Text style={styles.mapLabelSubtitle}>nearby plan</Text>
-          </View>
+      <View style={styles.heroCard} accessibilityIgnoresInvertColors>
+        <ImageBackground
+          source={{ uri: HERO_IMAGE_URI }}
+          resizeMode="cover"
+          style={styles.heroImage}
+          imageStyle={styles.heroImageInner}
+        />
+        <View style={styles.heroScrim} />
+        <View style={styles.locationPill}>
+          <Ionicons name="navigate" size={15} color={authColors.ctaPrimaryText} />
+          <Text style={styles.locationPillText}>Current city</Text>
         </View>
-
-        <View style={[styles.mapCard, styles.mapCardRight]}>
-          <View style={[styles.waterBlock, styles.waterBlockRight]} />
-          <View style={styles.islandBlock} />
-          <View style={[styles.road, styles.roadD]} />
-          <View style={[styles.road, styles.roadE]} />
-          <View style={[styles.mapPin, styles.mapPinPurple]}>
-            <Ionicons name="person" size={18} color="#FFFFFF" />
+        <View style={styles.avatarBubble}>
+          <View style={styles.avatarPreview} />
+          <View style={styles.heartBadge}>
+            <Ionicons name="people" size={18} color={authColors.accent} />
           </View>
-          <View style={[styles.mapLabel, styles.mapLabelPurple]}>
-            <Text style={[styles.mapLabelTitle, styles.mapLabelTitlePurple]}>Liberty Island</Text>
-            <Text style={[styles.mapLabelSubtitle, styles.mapLabelSubtitlePurple]}>
-              friends checked in
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.locatorButton}>
-          <Ionicons name="navigate" size={32} color="#3C7CF3" />
         </View>
       </View>
 
-      {value ? (
-        <View style={styles.detectedPill}>
-          <Ionicons name="checkmark-circle" size={18} color="#34C759" />
-          <Text style={styles.detectedText}>{value.city} is set</Text>
-        </View>
-      ) : null}
+      <Text style={styles.title}>
+        {value ? `${value.city} is your current city` : 'Find people near your plans'}
+      </Text>
+      <Text style={styles.body}>
+        Allow location so Waypoint can introduce you to people and plans nearby. Your precise
+        location is never revealed.
+      </Text>
 
       <View style={styles.benefitsList}>
         {LOCATION_BENEFITS.map((benefit) => (
           <View key={benefit.text} style={styles.benefitRow}>
-            <View style={[styles.benefitIcon, { backgroundColor: benefit.bg }]}>
-              <Ionicons name={benefit.icon} size={17} color={benefit.color} />
+            <View style={styles.benefitIcon}>
+              <Ionicons name={benefit.icon} size={15} color={authColors.ctaPrimaryText} />
             </View>
             <Text style={styles.benefitText}>{benefit.text}</Text>
           </View>
@@ -135,214 +106,112 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
   },
-  mapHero: {
-    height: 224,
-    marginTop: authSpace.md,
+  heroCard: {
+    height: 168,
+    marginTop: authSpace.sm,
     marginBottom: authSpace.xl,
-    position: 'relative',
-  },
-  mapCard: {
-    position: 'absolute',
-    width: 178,
-    height: 150,
-    borderRadius: 26,
+    borderRadius: 28,
+    backgroundColor: authColors.accentSoft,
     overflow: 'hidden',
-    backgroundColor: '#F3F1EA',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.09,
-    shadowRadius: 22,
-    elevation: 6,
   },
-  mapCardLeft: {
-    left: 0,
-    top: 22,
-    transform: [{ rotate: '-1deg' }],
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
   },
-  mapCardRight: {
-    right: 0,
-    top: 44,
-    transform: [{ rotate: '3deg' }],
+  heroImageInner: {
+    borderRadius: 28,
   },
-  waterBlock: {
+  heroScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 35, 80, 0.20)',
+  },
+  locationPill: {
     position: 'absolute',
-    left: -30,
-    top: 0,
-    width: 96,
-    height: 170,
-    backgroundColor: '#C8E7F4',
-    transform: [{ rotate: '14deg' }],
-  },
-  waterBlockRight: {
-    left: -10,
-    width: 210,
-    backgroundColor: '#BDECF7',
-  },
-  parkBlock: {
-    position: 'absolute',
-    backgroundColor: '#BFE6B6',
-  },
-  parkBlockLeft: {
-    right: -18,
-    bottom: -16,
-    width: 118,
-    height: 78,
-    borderRadius: 38,
-  },
-  islandBlock: {
-    position: 'absolute',
-    left: 42,
-    top: 38,
-    width: 100,
-    height: 70,
-    borderRadius: 34,
-    backgroundColor: '#BFE6A8',
-    borderWidth: 3,
-    borderColor: '#E5C3E9',
-  },
-  road: {
-    position: 'absolute',
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-    opacity: 0.9,
-  },
-  roadA: {
-    left: 8,
-    right: 12,
-    top: 88,
-    transform: [{ rotate: '-8deg' }],
-  },
-  roadB: {
-    left: 52,
-    right: 18,
-    top: 44,
-    transform: [{ rotate: '18deg' }],
-  },
-  roadC: {
-    left: 86,
-    width: 4,
-    height: 120,
-    top: 20,
-    transform: [{ rotate: '8deg' }],
-  },
-  roadD: {
-    left: 36,
-    right: 28,
-    top: 72,
-    transform: [{ rotate: '-20deg' }],
-  },
-  roadE: {
-    left: 74,
-    width: 4,
-    height: 94,
-    top: 32,
-    transform: [{ rotate: '24deg' }],
-  },
-  mapPin: {
-    position: 'absolute',
-    left: 20,
-    top: 24,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF6B1A',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-  },
-  mapPinPurple: {
-    left: 92,
-    top: 22,
-    backgroundColor: '#6E2FEA',
-  },
-  mapLabel: {
-    position: 'absolute',
-    left: 62,
-    right: 10,
-    top: 23,
-  },
-  mapLabelPurple: {
-    left: 20,
-    right: 16,
-    top: 78,
-  },
-  mapLabelTitle: {
-    color: '#E85D04',
-    fontSize: 17,
-    lineHeight: 20,
-    fontWeight: '800',
-  },
-  mapLabelTitlePurple: {
-    color: '#6E2FEA',
-    fontSize: 18,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  mapLabelSubtitle: {
-    color: '#F47B20',
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: '700',
-  },
-  mapLabelSubtitlePurple: {
-    color: '#6E2FEA',
-    textAlign: 'center',
-  },
-  locatorButton: {
-    position: 'absolute',
-    left: '50%',
-    top: 122,
-    width: 72,
-    height: 72,
-    marginLeft: -36,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  detectedPill: {
+    left: authSpace.lg,
+    bottom: authSpace.lg,
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: authSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: authSpace.md,
-    paddingVertical: authSpace.sm,
-    borderRadius: 999,
-    backgroundColor: '#F0FBF4',
-    marginBottom: authSpace.lg,
+    gap: 6,
+    backgroundColor: 'rgba(0, 122, 255, 0.82)',
   },
-  detectedText: {
-    marginLeft: authSpace.sm,
-    color: '#1F7A3F',
-    fontSize: authType.disclaimer.fontSize,
-    fontWeight: '600',
+  locationPillText: {
+    color: authColors.ctaPrimaryText,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  avatarBubble: {
+    position: 'absolute',
+    right: authSpace.lg,
+    top: authSpace.lg,
+    width: 82,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: authColors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 5,
+  },
+  avatarPreview: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: authColors.accentBorder,
+    borderWidth: 2,
+    borderColor: authColors.surface,
+  },
+  heartBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: authColors.surface,
+  },
+  title: {
+    color: authColors.textPrimary,
+    fontSize: 34,
+    lineHeight: 39,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: authSpace.md,
+  },
+  body: {
+    color: authColors.textSecondary,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '500',
+    marginBottom: 'auto',
   },
   benefitsList: {
-    gap: 13,
+    gap: authSpace.md,
+    marginBottom: authSpace.md,
   },
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   benefitIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: authSpace.md,
+    marginRight: authSpace.sm,
+    backgroundColor: authColors.accent,
   },
   benefitText: {
     flex: 1,
-    color: '#26302E',
+    color: authColors.textPrimary,
     fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '500',
+    lineHeight: 20,
+    fontWeight: '700',
   },
 });

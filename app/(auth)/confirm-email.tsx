@@ -14,7 +14,7 @@ import { supabase } from '~/utils/supabase';
 /**
  * Deep-link target for the post-signup confirmation email.
  *
- * URL shape: waypoint://confirm-email?code=<one-time-pkce-code>
+ * URL shape: waypoint:///confirm-email?code=<one-time-pkce-code>
  *
  * Exchange the code for a session, then hand off to NavigationController —
  * a verified, signed-in user will be routed to onboarding (if they haven't

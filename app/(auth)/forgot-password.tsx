@@ -15,6 +15,7 @@ import { supabase } from '~/utils/supabase';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_COOLDOWN_MS = 30_000;
+const RESET_PASSWORD_REDIRECT = 'waypoint:///reset-password';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -53,7 +54,7 @@ export default function ForgotPasswordScreen() {
     setError(null);
     setLoading(true);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed, {
-      redirectTo: 'waypoint://reset-password',
+      redirectTo: RESET_PASSWORD_REDIRECT,
     });
     setLoading(false);
     if (resetError) {
@@ -71,7 +72,7 @@ export default function ForgotPasswordScreen() {
     setError(null);
     setLoading(true);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(sentEmail, {
-      redirectTo: 'waypoint://reset-password',
+      redirectTo: RESET_PASSWORD_REDIRECT,
     });
     setLoading(false);
     if (resetError) {
@@ -121,11 +122,7 @@ export default function ForgotPasswordScreen() {
               returnKeyType="go"
               onSubmitEditing={handleReset}
             />
-            <PrimaryButton
-              label="Send reset link"
-              onPress={handleReset}
-              loading={loading}
-            />
+            <PrimaryButton label="Send reset link" onPress={handleReset} loading={loading} />
           </View>
         </View>
       )}

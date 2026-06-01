@@ -65,6 +65,7 @@ export interface StepDef<V = unknown> {
   hideHeader?: boolean;
   /** Render the body without ScrollView wrapping when a step owns layout. */
   noScroll?: boolean;
+  continueLabel?: string;
 
   /** The body slot. Ignored when `custom` is provided. */
   Body?: ComponentType<StepBodyProps<V>>;

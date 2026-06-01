@@ -3,11 +3,7 @@ import type { ProfilePatch, ProfileRow } from './types';
 
 /** Read the entire profile row for the current user. */
 export async function loadProfile(userId: string): Promise<Partial<ProfileRow>> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
   if (error) {
     // PGRST116 = no row. The trigger should have inserted one already, but
@@ -27,7 +23,7 @@ export async function commitStep(
   userId: string,
   stepIndex: number,
   totalSteps: number,
-  patch: ProfilePatch,
+  patch: ProfilePatch
 ): Promise<void> {
   const isTerminal = stepIndex === totalSteps - 1;
   const fullPatch: ProfilePatch = {
@@ -37,10 +33,7 @@ export async function commitStep(
     ...(isTerminal ? { onboarding_completed: true } : {}),
   };
 
-  const { error } = await supabase
-    .from('profiles')
-    .update(fullPatch)
-    .eq('id', userId);
+  const { error } = await supabase.from('profiles').update(fullPatch).eq('id', userId);
 
   if (error) throw error;
 }
