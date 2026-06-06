@@ -119,17 +119,17 @@ export default function SettingsScreen() {
 
   const handleCommunityGuidelines = () => {
     // In production, this would open a web view or external link
-    Linking.openURL('https://usewaypoint.app/terms');
+    Linking.openURL('https://www.usewaypoint.app/terms');
   };
 
   const handleTermsAndConditions = () => {
     // In production, this would open a web view or external link
-    Linking.openURL('https://usewaypoint.app/terms');
+    Linking.openURL('https://www.usewaypoint.app/terms');
   };
 
   const handlePrivacyPolicy = () => {
     // In production, this would open a web view or external link
-    Linking.openURL('https://usewaypoint.app/privacy');
+    Linking.openURL('https://www.usewaypoint.app/privacy');
   };
 
   const SettingRow = ({

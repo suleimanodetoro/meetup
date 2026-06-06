@@ -81,10 +81,10 @@ export default function GuidelinesScreen() {
           {/* Terms Link */}
           <Pressable
             onPress={() => {
-              Linking.openURL('https://usewaypoint.app/terms');
+              Linking.openURL('https://www.usewaypoint.app/terms');
             }}
             className="mt-6 items-center">
-            <Text className="text-sm text-gray-500">
+            <Text className="text-sm text-blue-600 underline">
               View full terms and conditions on our website
             </Text>
           </Pressable>
