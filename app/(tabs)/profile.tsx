@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { FounderBadge } from '~/components/FounderBadge';
 import { PersonCard } from '~/components/PersonCard';
 import PlanCardHome from '~/components/PlanCardHome';
 import { PremiumBadge } from '~/components/PremiumBadge';
@@ -58,7 +59,7 @@ function getInterestLabel(interestId: string): string {
 
 export default function ProfileScreen() {
   const { session } = useAuth();
-  const { hasSubscription } = useSubscription();
+  const { hasSubscription, isFounder } = useSubscription();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [upcomingVisits, setUpcomingVisits] = useState<any[]>([]);
@@ -223,6 +224,7 @@ export default function ProfileScreen() {
   const locationLabel = profile?.location || profile?.nationality || 'Add your location';
   const countryCode = profile?.location_country_code || profile?.nationality_code || 'US';
   const initials = (profile?.full_name?.[0] || 'W').toUpperCase();
+  const founderYear = profile?.founder_year;
 
   if (loading) {
     return (
@@ -277,11 +279,18 @@ export default function ProfileScreen() {
               ) : (
                 <Text style={styles.avatarInitial}>{initials}</Text>
               )}
-              {hasSubscription && <PremiumBadge size={24} style={styles.heroPremiumBadge} />}
+              {isFounder ? (
+                <FounderBadge size={24} style={styles.heroPremiumBadge} />
+              ) : hasSubscription ? (
+                <PremiumBadge size={24} style={styles.heroPremiumBadge} />
+              ) : null}
             </View>
 
             <View style={styles.heroText}>
               <Text style={styles.profileName}>{profile?.full_name || 'Traveler'}</Text>
+              {isFounder ? (
+                <FounderBadge showLabel year={founderYear} style={styles.founderLabel} />
+              ) : null}
               <View style={styles.locationRow}>
                 <Text style={styles.locationFlag}>{getCountryFlag(countryCode)}</Text>
                 <Text style={styles.locationText} numberOfLines={1}>
@@ -669,6 +678,9 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     fontWeight: '800',
     letterSpacing: -0.5,
+  },
+  founderLabel: {
+    marginTop: authSpace.sm,
   },
   locationRow: {
     marginTop: authSpace.xs,

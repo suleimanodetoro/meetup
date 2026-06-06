@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Mapbox, { Camera, MapView } from '@rnmapbox/maps';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import VisitDetailsBottomSheet from '~/components/VisitDetailsBottomSheet';
 import UpsellModal from '~/components/UpsellModal';
 import { useCityOverview } from '~/hooks/useCityOverview';
+import { useSubscription } from '~/hooks/useSubscription';
 import { useUpsellTrigger } from '~/hooks/useUpsellTrigger';
 import { getCityCoordinates } from '~/utils/geographic';
 
@@ -53,10 +48,7 @@ export default function CityDetailScreen() {
   const toParam = isValidDateString(to) ? to : undefined;
   const ccHint = typeof cc === 'string' && cc.length === 2 ? cc.toUpperCase() : undefined;
   const countryHint = typeof country === 'string' ? country : undefined;
-  const window = useMemo(
-    () => ({ from: fromParam, to: toParam }),
-    [fromParam, toParam],
-  );
+  const window = useMemo(() => ({ from: fromParam, to: toParam }), [fromParam, toParam]);
 
   const insets = useSafeAreaInsets();
   const {
@@ -71,11 +63,10 @@ export default function CityDetailScreen() {
     usersLoadingMore,
     plansLoadingMore,
   } = useCityOverview(cityName, window);
+  const { hasSubscription, isLoading: subscriptionLoading } = useSubscription();
 
   const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users');
-  const [cityCoordinates, setCityCoordinates] = useState<{ lat: number; lng: number } | null>(
-    null,
-  );
+  const [cityCoordinates, setCityCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [coordsLoading, setCoordsLoading] = useState(false);
 
   const {
@@ -84,11 +75,9 @@ export default function CityDetailScreen() {
     cardLeft: onPaywallCardLeft,
     dismiss: dismissUpsell,
   } = useUpsellTrigger();
+  const shouldGateUsers = !subscriptionLoading && !hasSubscription;
 
-  const windowLabel = useMemo(
-    () => formatWindowLabel(fromParam, toParam),
-    [fromParam, toParam],
-  );
+  const windowLabel = useMemo(() => formatWindowLabel(fromParam, toParam), [fromParam, toParam]);
 
   useEffect(() => {
     if (!overview?.city) return;
@@ -152,8 +141,7 @@ export default function CityDetailScreen() {
 
       <Pressable
         onPress={() => router.back()}
-        style={[styles.backButton, { top: insets.top + 10 }]}
-      >
+        style={[styles.backButton, { top: insets.top + 10 }]}>
         <Ionicons name="arrow-back" size={24} color="#000" />
       </Pressable>
 
@@ -165,7 +153,7 @@ export default function CityDetailScreen() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onRefresh={refetch}
-        onPaywallCardEntered={onPaywallCardEntered}
+        onPaywallCardEntered={shouldGateUsers ? onPaywallCardEntered : () => {}}
         onPaywallCardLeft={onPaywallCardLeft}
         loading={loading}
         onLoadMoreUsers={loadMoreUsers}
@@ -174,7 +162,7 @@ export default function CityDetailScreen() {
         plansLoadingMore={plansLoadingMore}
       />
 
-      <UpsellModal visible={upsellVisible} onDismiss={dismissUpsell} />
+      <UpsellModal visible={shouldGateUsers && upsellVisible} onDismiss={dismissUpsell} />
     </View>
   );
 }

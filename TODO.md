@@ -1,6 +1,6 @@
 # Future Work
 
-Tracking items deferred from cleanup passes. Each entry should explain *why* it
+Tracking items deferred from cleanup passes. Each entry should explain _why_ it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
@@ -43,9 +43,46 @@ In App Store Connect → Your App → In-App Purchases:
 - Add subscriptions inside it matching the RC product IDs above
   (`app.usewaypoint.premium.monthly`, `.yearly`).
 - Set pricing, localization (title + description that show in the Apple
-  purchase sheet), and submit them for review *alongside* the first app
+  purchase sheet), and submit them for review _alongside_ the first app
   build that uses them — Apple ties IAP approval to a binary.
 - Mirror the IDs back in the RC dashboard's Products section.
+
+### Founder Supporter expansion
+
+Chosen shape:
+
+- `app.usewaypoint.founder.annual` — auto-renewing annual subscription.
+- `app.usewaypoint.founder.forever` — non-consumable lifetime purchase.
+
+RevenueCat:
+
+- Create entitlement `founder`.
+- Create offering `supporter`.
+- Attach both Founder products to `founder`.
+- Keep normal Premium products attached to `premium`.
+- The app treats `founder` as a superset of `premium`.
+
+App Store Connect:
+
+- Add `app.usewaypoint.founder.annual` as an auto-renewing subscription.
+- Add `app.usewaypoint.founder.forever` as a non-consumable.
+- Product copy must list the deliverables: profile Founder badge/tag, Premium access, and early-supporter recognition.
+- Do not describe it as a donation or tip jar.
+
+App Store Connect screenshots needed from Suleiman:
+
+- **Founder Annual → Review Information → Screenshot**
+  - Use a real app screenshot of the `Support Waypoint` / Founder paywall.
+  - The screenshot should clearly show the Founder Annual purchase option and the benefits: Premium access + Founder profile badge/tag.
+- **Founder Forever → Review Information → Screenshot**
+  - The same Founder paywall screenshot is acceptable if both Founder Annual and Founder Forever are visible.
+  - If the options are on separate states/screens, capture the state showing Founder Forever.
+- **Existing Premium subscriptions → Review Information screenshots** (if Apple still marks them missing)
+  - Use a screenshot of the normal Premium paywall showing monthly/yearly Premium options.
+- **Do not use marketing mockups**
+  - Apple wants to see where the in-app purchase appears in the app. Use an actual simulator/device screenshot of the paywall UI.
+- **Optional product image fields**
+  - These are not the same as review screenshots. Only add them if we have a polished 1024x1024 product image; otherwise prioritize the required review screenshots.
 
 ### 3. Sandbox testing
 
@@ -98,6 +135,7 @@ EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxxxxxx
 ```
 
 Set in:
+
 - `.env.local` for local dev (already gitignored)
 - EAS secrets (`eas secret:create --scope project --name EXPO_PUBLIC_REVENUECAT_IOS_API_KEY --value appl_...`) for production builds
 
@@ -124,13 +162,13 @@ verification is done.
 
 The app-side flow is shipped:
 
-- [app/(auth)/forgot-password.tsx](app/(auth)/forgot-password.tsx) requests a
+- [app/(auth)/forgot-password.tsx](<app/(auth)/forgot-password.tsx>) requests a
   reset email
-- [app/(auth)/reset-password.tsx](app/(auth)/reset-password.tsx) handles
+- [app/(auth)/reset-password.tsx](<app/(auth)/reset-password.tsx>) handles
   `waypoint://reset-password?code=...`
-- [app/(auth)/check-email.tsx](app/(auth)/check-email.tsx) is shown after
+- [app/(auth)/check-email.tsx](<app/(auth)/check-email.tsx>) is shown after
   sign-up
-- [app/(auth)/confirm-email.tsx](app/(auth)/confirm-email.tsx) handles
+- [app/(auth)/confirm-email.tsx](<app/(auth)/confirm-email.tsx>) handles
   `waypoint://confirm-email?code=...`
 - [utils/supabase.ts](utils/supabase.ts) is set to `flowType: 'pkce'` so
   Supabase ships a one-time `?code=` instead of a fragment
@@ -252,7 +290,7 @@ What `/explore` does today:
 - **City/title text search** — fully covered by `/search`.
 - **Trending / Popular / New filter modes** — covered by home rails.
 - **`COUNTRY_PILLS` filter** — 8 hardcoded countries (`GB, US, FR, ES, IT, JP,
-  TH, DE`). The only piece without a direct replacement on home today.
+TH, DE`). The only piece without a direct replacement on home today.
 
 Deferred because killing `/explore` removes the country-pill browse surface
 with nothing to take its place. To unblock the deletion, either:
@@ -263,7 +301,7 @@ with nothing to take its place. To unblock the deletion, either:
    city into `/search`.
 
 Then delete `app/explore.tsx`, drop the `'explore'` entry from
-[app/_layout.tsx](app/_layout.tsx) (both the dynamic-routes allow-list and the
+[app/\_layout.tsx](app/_layout.tsx) (both the dynamic-routes allow-list and the
 `Stack.Screen` registration), and grep for any deep links pointing at it.
 
 ## Wikimedia city image hydration
@@ -276,7 +314,7 @@ that looks vaguely off-brand.
 Plan:
 
 1. New `city_media` table: `(city_key text PK, image_url text, attribution text,
-   fetched_at timestamptz)`.
+fetched_at timestamptz)`.
 2. Supabase Edge Function that, given a city name, hits Wikidata's SPARQL
    endpoint (`?city wdt:P18 ?image`) for the city image, falls back to
    Wikipedia's REST `page/summary/<city>` endpoint, downloads the image,

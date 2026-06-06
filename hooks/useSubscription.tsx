@@ -5,12 +5,13 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
 
-const ENTITLEMENT_ID = 'premium';
+const PREMIUM_ENTITLEMENT_ID = 'premium';
+const FOUNDER_ENTITLEMENT_ID = 'founder';
 
 interface SubscriptionRow {
   id: number;
   user_id: string;
-  subscription_type: 'free' | 'premium';
+  subscription_type: 'free' | 'premium' | 'founder';
   entitlement_id: string | null;
   original_transaction_id: string | null;
   provider: 'app_store' | 'play_store' | 'stripe' | 'promotional' | null;
@@ -44,7 +45,10 @@ export function useSubscription() {
   // before the webhook + realtime chain delivers a fresh row from Supabase
   // (which can be 3–10 seconds). Without this, the UI stays locked for that
   // entire window even though the user just paid.
-  const [rcEntitled, setRcEntitled] = useState(false);
+  const [rcEntitlements, setRcEntitlements] = useState({
+    premium: false,
+    founder: false,
+  });
 
   // Stable per-instance suffix for the realtime channel name. Multiple
   // components mount this hook (TabLayout, ProfileScreen, PaywallCard, …),
@@ -97,7 +101,7 @@ export function useSubscription() {
           table: 'user_subscriptions',
           filter: `user_id=eq.${userId}`,
         },
-        () => void fetchSubscription(),
+        () => void fetchSubscription()
       )
       .subscribe();
 
@@ -114,14 +118,23 @@ export function useSubscription() {
     if (!isRevenueCatConfigured()) return;
     // Seed from current customerInfo without waiting for an event.
     Purchases.getCustomerInfo()
-      .then((info) => setRcEntitled(!!info.entitlements.active[ENTITLEMENT_ID]))
+      .then((info) =>
+        setRcEntitlements({
+          premium: !!info.entitlements.active[PREMIUM_ENTITLEMENT_ID],
+          founder: !!info.entitlements.active[FOUNDER_ENTITLEMENT_ID],
+        })
+      )
       .catch(() => {
         /* fail open — DB row will still gate access */
       });
 
     const listener = (info: CustomerInfo) => {
-      const entitled = !!info.entitlements.active[ENTITLEMENT_ID];
-      setRcEntitled(entitled);
+      const next = {
+        premium: !!info.entitlements.active[PREMIUM_ENTITLEMENT_ID],
+        founder: !!info.entitlements.active[FOUNDER_ENTITLEMENT_ID],
+      };
+      const entitled = next.premium || next.founder;
+      setRcEntitlements(next);
       // If RC just turned us on, the webhook is in flight — grab the row
       // when it lands.
       if (entitled) void fetchSubscription();
@@ -135,15 +148,22 @@ export function useSubscription() {
   // Either source confirming the entitlement is enough. RC's local state is
   // fast, the DB row is authoritative long-term. Both sources falling silent
   // (RC says inactive, DB row is null/expired) means no access.
-  const dbEntitled =
+  const dbActive =
     subscription !== null &&
     subscription.entitlement_id !== null &&
     (subscription.expires_at === null || new Date(subscription.expires_at) > new Date());
-  const hasSubscription = rcEntitled || dbEntitled;
+  const dbFounder = dbActive && subscription?.entitlement_id === FOUNDER_ENTITLEMENT_ID;
+  const dbPremium =
+    dbActive &&
+    (subscription?.entitlement_id === PREMIUM_ENTITLEMENT_ID ||
+      subscription?.entitlement_id === FOUNDER_ENTITLEMENT_ID);
+  const isFounder = rcEntitlements.founder || dbFounder;
+  const hasSubscription = rcEntitlements.premium || rcEntitlements.founder || dbPremium;
 
   return {
     subscription,
     hasSubscription,
+    isFounder,
     isLoading,
     refetch: fetchSubscription,
   };
