@@ -99,16 +99,16 @@ serve(async (req) => {
 
   const userId = event.app_user_id;
   const provider = mapProvider(event.store);
-  const expiresAt = event.expiration_at_ms
-    ? new Date(event.expiration_at_ms).toISOString()
-    : null;
-  const startedAt = event.purchased_at_ms
-    ? new Date(event.purchased_at_ms).toISOString()
-    : null;
-  const entitlementId =
-    event.entitlement_ids && event.entitlement_ids.length > 0
-      ? event.entitlement_ids[0]
-      : null;
+  const expiresAt = event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null;
+  const startedAt = event.purchased_at_ms ? new Date(event.purchased_at_ms).toISOString() : null;
+  const entitlementIds = event.entitlement_ids ?? [];
+  const hasFounder = entitlementIds.includes('founder');
+  const hasPremium = hasFounder || entitlementIds.includes('premium');
+  const entitlementId = hasFounder ? 'founder' : hasPremium ? 'premium' : null;
+  const subscriptionType = hasFounder ? 'founder' : hasPremium ? 'premium' : 'free';
+  const founderYear = event.purchased_at_ms
+    ? new Date(event.purchased_at_ms).getUTCFullYear()
+    : new Date().getUTCFullYear();
 
   try {
     switch (event.type) {
@@ -123,7 +123,7 @@ serve(async (req) => {
         // on_profile_created trigger; UPSERT handles both cases.
         const patch: Record<string, unknown> = {
           user_id: userId,
-          subscription_type: entitlementId ? 'premium' : 'free',
+          subscription_type: subscriptionType,
           entitlement_id: entitlementId,
           original_transaction_id: event.original_transaction_id ?? null,
           provider,
@@ -137,6 +137,18 @@ serve(async (req) => {
           .from('user_subscriptions')
           .upsert(patch, { onConflict: 'user_id' });
         if (error) throw error;
+
+        if (hasFounder) {
+          const { error: profileError } = await admin
+            .from('profiles')
+            .update({
+              is_founder: true,
+              founder_year: founderYear,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', userId);
+          if (profileError) throw profileError;
+        }
         break;
       }
 
@@ -144,6 +156,14 @@ serve(async (req) => {
         // Subscription has actually lapsed. Clear the active fields but
         // leave the row in place so we still have a record the user
         // was once a subscriber (useful for win-back campaigns).
+        const { data: previous } = await admin
+          .from('user_subscriptions')
+          .select('entitlement_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const wasFounder = previous?.entitlement_id === 'founder';
+
         const { error } = await admin
           .from('user_subscriptions')
           .update({
@@ -156,6 +176,18 @@ serve(async (req) => {
           })
           .eq('user_id', userId);
         if (error) throw error;
+
+        if (wasFounder) {
+          const { error: profileError } = await admin
+            .from('profiles')
+            .update({
+              is_founder: false,
+              founder_year: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', userId);
+          if (profileError) throw profileError;
+        }
         break;
       }
 

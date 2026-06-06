@@ -21,7 +21,7 @@ export interface Conversation {
   last_message_at?: string | null;
   last_message_preview?: string | null;
   avatar_url?: string | null;
-  
+
   // Joined data
   participants?: ConversationParticipant[];
   unread_count?: number;
@@ -37,7 +37,7 @@ export interface ConversationParticipant {
   joined_at: string;
   last_read_at?: string | null;
   is_muted: boolean;
-  
+
   // Joined data
   profile?: Profile;
 }
@@ -57,7 +57,7 @@ export interface Message {
   deleted_at?: string | null;
   message_type: MessageType;
   metadata?: MessageMetadata | null;
-  
+
   // Joined data
   user?: Profile;
   reply_to?: Message;
@@ -71,12 +71,12 @@ export interface MessageMetadata {
   image_width?: number;
   image_height?: number;
   thumbnail_url?: string;
-  
+
   // For location
   latitude?: number;
   longitude?: number;
   location_name?: string;
-  
+
   // For system messages
   system_type?: 'user_joined' | 'user_left' | 'plan_updated' | 'plan_cancelled';
   system_data?: Record<string, any>;
@@ -93,7 +93,7 @@ export interface Friendship {
   status: FriendshipStatus;
   created_at: string;
   updated_at: string;
-  
+
   // Joined data
   requester?: Profile;
   addressee?: Profile;
@@ -129,7 +129,7 @@ export interface BlockedUser {
   blocked_id: string;
   created_at: string;
   reason?: string | null;
-  
+
   // Joined data
   blocked_profile?: Profile;
 }
@@ -143,7 +143,7 @@ export interface MessageReadReceipt {
   message_id: number;
   user_id: string;
   read_at: string;
-  
+
   // Joined data
   user?: Profile;
 }
@@ -153,7 +153,7 @@ export interface TypingIndicator {
   conversation_id: number;
   user_id: string;
   started_at: string;
-  
+
   // Joined data
   user?: Profile;
 }
@@ -169,6 +169,8 @@ export interface Profile {
   avatar_url?: string | null;
   bio?: string | null;
   birth_date?: string | null;
+  is_founder?: boolean | null;
+  founder_year?: number | null;
   languages?: string[] | null;
   interests?: string[] | null;
   meeting_preference?: string | null;
@@ -176,7 +178,7 @@ export interface Profile {
   onboarding_completed?: boolean;
   created_at?: string;
   updated_at?: string;
-  
+
   // Computed fields
   age?: number;
   is_online?: boolean;
@@ -212,7 +214,7 @@ export interface Event {
   is_private: boolean;
   created_at: string;
   updated_at?: string | null;
-  
+
   // Joined data
   creator?: Profile;
   attendees?: Profile[];

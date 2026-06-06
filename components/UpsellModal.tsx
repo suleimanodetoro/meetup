@@ -12,24 +12,33 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Purchases, {
-  type PurchasesPackage,
-  PURCHASES_ERROR_CODE,
-} from 'react-native-purchases';
+import Purchases, { type PurchasesPackage, PURCHASES_ERROR_CODE } from 'react-native-purchases';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
 
 interface UpsellModalProps {
   visible: boolean;
   onDismiss: () => void;
+  mode?: 'premium' | 'founder';
+  offeringIdentifier?: string;
 }
 
-const ENTITLEMENT_ID = 'premium';
+const ENTITLEMENT_BY_MODE = {
+  premium: 'premium',
+  founder: 'founder',
+} as const;
 
-const BENEFITS = [
+const PREMIUM_BENEFITS = [
   'See every person in any city',
   'Send unlimited messages',
   'Priority visibility on your profile',
   'Access exclusive events',
+];
+
+const FOUNDER_BENEFITS = [
+  'Lifetime Founder recognition on your profile',
+  'Everything included in Premium',
+  'Early supporter status as Waypoint grows',
+  'Your support helps fund the first community',
 ];
 
 function packageLabel(pkg: PurchasesPackage): string {
@@ -53,8 +62,17 @@ function packageLabel(pkg: PurchasesPackage): string {
   }
 }
 
-export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
+export default function UpsellModal({
+  visible,
+  onDismiss,
+  mode = 'premium',
+  offeringIdentifier,
+}: UpsellModalProps) {
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const entitlementId = ENTITLEMENT_BY_MODE[mode];
+  const isFounderMode = mode === 'founder';
+  const benefits = isFounderMode ? FOUNDER_BENEFITS : PREMIUM_BENEFITS;
+
   const [loading, setLoading] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -76,10 +94,17 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
     Purchases.getOfferings()
       .then((offerings) => {
         if (cancelled) return;
-        const available = offerings.current?.availablePackages ?? [];
+        const offering = offeringIdentifier
+          ? (offerings.all[offeringIdentifier] ?? offerings.current)
+          : offerings.current;
+        const available = offering?.availablePackages ?? [];
         setPackages(available);
         if (available.length === 0) {
-          setError('No subscription options are available right now.');
+          setError(
+            isFounderMode
+              ? 'Founder options are not available right now.'
+              : 'No subscription options are available right now.'
+          );
         }
       })
       .catch((err) => {
@@ -93,7 +118,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, offeringIdentifier, isFounderMode]);
 
   const purchasePackage = useCallback(
     async (pkg: PurchasesPackage) => {
@@ -101,20 +126,19 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
       setError(null);
       try {
         const { customerInfo } = await Purchases.purchasePackage(pkg);
-        if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+        if (customerInfo.entitlements.active[entitlementId]) {
           // Success. The RC -> Supabase webhook will update
           // user_subscriptions; useSubscription's realtime listener will
           // pick it up on the next tick and the paywall will unblur.
           onDismiss();
         } else {
           setError(
-            'Purchase completed but the premium entitlement was not granted. Contact support.',
+            `Purchase completed but the ${entitlementId} entitlement was not granted. Contact support.`
           );
         }
       } catch (err: any) {
         const isCancel =
-          err?.userCancelled ||
-          err?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
+          err?.userCancelled || err?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
         if (isCancel) {
           // Silent. Covers both Apple's "Cancel" button and tap-outside /
           // backgrounding the purchase sheet, which different RC SDK
@@ -123,7 +147,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
           // Family sharing / SCA — payment is in flight but not yet approved.
           Alert.alert(
             'Payment pending',
-            'Your purchase is awaiting approval. You will get access once it is confirmed.',
+            'Your purchase is awaiting approval. You will get access once it is confirmed.'
           );
           onDismiss();
         } else {
@@ -134,7 +158,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
         setPurchasingId(null);
       }
     },
-    [onDismiss],
+    [entitlementId, onDismiss]
   );
 
   const restorePurchases = useCallback(async () => {
@@ -143,13 +167,20 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
     setError(null);
     try {
       const customerInfo = await Purchases.restorePurchases();
-      if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
-        Alert.alert('Restored', 'Your subscription has been restored.');
+      if (customerInfo.entitlements.active[entitlementId]) {
+        Alert.alert(
+          'Restored',
+          isFounderMode
+            ? 'Your Founder purchase has been restored.'
+            : 'Your subscription has been restored.'
+        );
         onDismiss();
       } else {
         Alert.alert(
           'Nothing to restore',
-          'No active subscription was found for this Apple ID.',
+          isFounderMode
+            ? 'No Founder purchase was found for this Apple ID.'
+            : 'No active subscription was found for this Apple ID.'
         );
       }
     } catch (err: any) {
@@ -158,7 +189,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
     } finally {
       setRestoring(false);
     }
-  }, [onDismiss]);
+  }, [entitlementId, isFounderMode, onDismiss]);
 
   const anyPending = purchasingId !== null || restoring;
 
@@ -167,9 +198,10 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
-      statusBarTranslucent
-    >
-      <LinearGradient colors={['#007AFF', '#667eea']} style={styles.container}>
+      statusBarTranslucent>
+      <LinearGradient
+        colors={isFounderMode ? ['#007AFF', '#6E56CF'] : ['#007AFF', '#667eea']}
+        style={styles.container}>
         <SafeAreaView style={styles.content}>
           <Pressable onPress={onDismiss} style={styles.closeButton} disabled={anyPending}>
             <Ionicons name="close" size={28} color="white" />
@@ -177,16 +209,20 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
 
           <View style={styles.main}>
             <View style={styles.iconContainer}>
-              <Ionicons name="lock-open" size={64} color="white" />
+              <Ionicons name={isFounderMode ? 'diamond' : 'lock-open'} size={64} color="white" />
             </View>
 
-            <Text style={styles.title}>Unlock All Profiles</Text>
+            <Text style={styles.title}>
+              {isFounderMode ? 'Become a Founder' : 'Unlock All Profiles'}
+            </Text>
             <Text style={styles.subtitle}>
-              Connect with unlimited people and see who's visiting your destinations
+              {isFounderMode
+                ? 'Support Waypoint early and get permanent recognition on your profile'
+                : "Connect with unlimited people and see who's visiting your destinations"}
             </Text>
 
             <View style={styles.benefits}>
-              {BENEFITS.map((benefit) => (
+              {benefits.map((benefit) => (
                 <View key={benefit} style={styles.benefit}>
                   <Ionicons name="checkmark-circle" size={22} color="#4CAF50" />
                   <Text style={styles.benefitText}>{benefit}</Text>
@@ -210,16 +246,13 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
                       key={pkg.identifier}
                       onPress={() => purchasePackage(pkg)}
                       disabled={anyPending}
-                      style={[styles.packageButton, anyPending && styles.packageButtonDisabled]}
-                    >
+                      style={[styles.packageButton, anyPending && styles.packageButtonDisabled]}>
                       {isPurchasingThis ? (
                         <ActivityIndicator color="#007AFF" />
                       ) : (
                         <>
                           <Text style={styles.packageLabel}>{packageLabel(pkg)}</Text>
-                          <Text style={styles.packagePrice}>
-                            {pkg.product.priceString}
-                          </Text>
+                          <Text style={styles.packagePrice}>{pkg.product.priceString}</Text>
                         </>
                       )}
                     </Pressable>
@@ -231,8 +264,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
             <Pressable
               onPress={restorePurchases}
               disabled={anyPending}
-              style={styles.restoreButton}
-            >
+              style={styles.restoreButton}>
               {restoring ? (
                 <ActivityIndicator color="rgba(255,255,255,0.9)" />
               ) : (
@@ -240,11 +272,7 @@ export default function UpsellModal({ visible, onDismiss }: UpsellModalProps) {
               )}
             </Pressable>
 
-            <Pressable
-              onPress={onDismiss}
-              disabled={anyPending}
-              style={styles.secondaryButton}
-            >
+            <Pressable onPress={onDismiss} disabled={anyPending} style={styles.secondaryButton}>
               <Text style={styles.secondaryText}>Maybe Later</Text>
             </Pressable>
           </View>

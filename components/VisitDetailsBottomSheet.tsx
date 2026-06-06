@@ -62,7 +62,7 @@ export default function VisitDetailsBottomSheet({
 }: Props) {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['35%', '75%', '95%'], []);
-  const { hasSubscription } = useSubscription();
+  const { hasSubscription, isLoading: subscriptionLoading } = useSubscription();
   const [refreshing, setRefreshing] = useState(false);
 
   // FlatList rejects any change to viewabilityConfigCallbackPairs after
@@ -71,11 +71,21 @@ export default function VisitDetailsBottomSheet({
   // call time inside a callback whose identity is stable for the
   // FlatList's lifetime.
   const hasSubscriptionRef = useRef(hasSubscription);
+  const subscriptionLoadingRef = useRef(subscriptionLoading);
   const onEnteredRef = useRef(onPaywallCardEntered);
   const onLeftRef = useRef(onPaywallCardLeft);
-  useEffect(() => { hasSubscriptionRef.current = hasSubscription; }, [hasSubscription]);
-  useEffect(() => { onEnteredRef.current = onPaywallCardEntered; }, [onPaywallCardEntered]);
-  useEffect(() => { onLeftRef.current = onPaywallCardLeft; }, [onPaywallCardLeft]);
+  useEffect(() => {
+    hasSubscriptionRef.current = hasSubscription;
+  }, [hasSubscription]);
+  useEffect(() => {
+    subscriptionLoadingRef.current = subscriptionLoading;
+  }, [subscriptionLoading]);
+  useEffect(() => {
+    onEnteredRef.current = onPaywallCardEntered;
+  }, [onPaywallCardEntered]);
+  useEffect(() => {
+    onLeftRef.current = onPaywallCardLeft;
+  }, [onPaywallCardLeft]);
 
   // Track which paywall-eligible indices are currently in view. Each
   // viewability event computes the set difference vs the previous set
@@ -95,6 +105,7 @@ export default function VisitDetailsBottomSheet({
         itemVisiblePercentThreshold: 50,
       },
       onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        if (subscriptionLoadingRef.current) return;
         if (hasSubscriptionRef.current) return;
 
         const next = new Set<number>();
@@ -126,13 +137,12 @@ export default function VisitDetailsBottomSheet({
 
   const renderUserItem = useCallback(
     ({ item, index }: { item: any; index: number }) => {
-      const isBlurred = !hasSubscription && index >= BLUR_START_INDEX;
+      const isBlurred = !subscriptionLoading && !hasSubscription && index >= BLUR_START_INDEX;
       return (
         <Pressable
           style={styles.cardWrapper}
           onPress={() => !isBlurred && router.push(`/profile/${item.user_id}`)}
-          disabled={isBlurred}
-        >
+          disabled={isBlurred}>
           <UserCard user={item} />
           {isBlurred && (
             <>
@@ -145,19 +155,16 @@ export default function VisitDetailsBottomSheet({
         </Pressable>
       );
     },
-    [hasSubscription],
+    [hasSubscription, subscriptionLoading]
   );
 
   const renderPlanItem = useCallback(
     ({ item }: { item: any }) => (
-      <Pressable
-        style={styles.cardWrapper}
-        onPress={() => router.push(`/event/${item.event_id}`)}
-      >
+      <Pressable style={styles.cardWrapper} onPress={() => router.push(`/event/${item.event_id}`)}>
         <PlanCard plan={item} />
       </Pressable>
     ),
-    [],
+    []
   );
 
   const renderHeader = () => (
@@ -181,21 +188,15 @@ export default function VisitDetailsBottomSheet({
       <View style={styles.tabs}>
         <Pressable
           style={[styles.tab, activeTab === 'users' && styles.activeTab]}
-          onPress={() => onTabChange('users')}
-        >
+          onPress={() => onTabChange('users')}>
           <Ionicons name="people" size={20} color={activeTab === 'users' ? '#007AFF' : '#999'} />
-          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
-            Users
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>Users</Text>
         </Pressable>
         <Pressable
           style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
-          onPress={() => onTabChange('plans')}
-        >
+          onPress={() => onTabChange('plans')}>
           <Ionicons name="calendar" size={20} color={activeTab === 'plans' ? '#007AFF' : '#999'} />
-          <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>
-            Plans
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'plans' && styles.activeTabText]}>Plans</Text>
         </Pressable>
       </View>
 
@@ -240,8 +241,7 @@ export default function VisitDetailsBottomSheet({
       backgroundStyle={styles.sheetBackground}
       handleIndicatorStyle={styles.handle}
       enablePanDownToClose={false}
-      enableOverDrag={true}
-    >
+      enableOverDrag={true}>
       {loading ? (
         <>
           {renderHeader()}

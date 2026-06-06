@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import UpsellModal from '~/components/UpsellModal';
 
 export default function SettingsScreen() {
   const { signOut } = useAuth();
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const [hideActiveStatus, setHideActiveStatus] = useState(false);
   const [unitOfMeasurement, setUnitOfMeasurement] = useState('km');
   const [showUnitPicker, setShowUnitPicker] = useState(false);
+  const [showFounderModal, setShowFounderModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = () => {
@@ -86,12 +88,12 @@ export default function SettingsScreen() {
     try {
       // Call Supabase function to delete user account
       const { error } = await supabase.rpc('delete_user_account');
-      
+
       if (error) throw error;
-      
+
       // Sign out after deletion
       await signOut();
-      
+
       Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
     } catch (error: any) {
       console.error('Error deleting account:', error);
@@ -130,15 +132,15 @@ export default function SettingsScreen() {
     Linking.openURL('https://usewaypoint.app/privacy');
   };
 
-  const SettingRow = ({ 
-    label, 
-    onPress, 
-    rightElement, 
+  const SettingRow = ({
+    label,
+    onPress,
+    rightElement,
     textColor = '#000',
-    showBorder = true 
-  }: { 
-    label: string; 
-    onPress?: () => void; 
+    showBorder = true,
+  }: {
+    label: string;
+    onPress?: () => void;
     rightElement?: React.ReactNode;
     textColor?: string;
     showBorder?: boolean;
@@ -149,17 +151,18 @@ export default function SettingsScreen() {
         paddingVertical: 20,
         borderBottomWidth: showBorder ? 1 : 0,
         borderBottomColor: '#F0F0F0',
-      }}
-    >
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
       }}>
-        <Text style={{
-          fontSize: 18,
-          color: textColor,
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}>
+        <Text
+          style={{
+            fontSize: 18,
+            color: textColor,
+          }}>
           {label}
         </Text>
         {rightElement}
@@ -170,30 +173,29 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
       {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-      }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: '#F0F0F0',
+        }}>
         <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={28} color="#000" />
         </Pressable>
-        <Text style={{
-          fontSize: 24,
-          fontWeight: '700',
-          marginLeft: 20,
-        }}>
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: '700',
+            marginLeft: 20,
+          }}>
           Settings
         </Text>
       </View>
 
-      <ScrollView 
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={{ paddingHorizontal: 20 }}>
           {/* Unit of measurement */}
           <SettingRow
@@ -225,12 +227,13 @@ export default function SettingsScreen() {
             label="Hide active status"
             rightElement={
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{
-                  backgroundColor: '#E3F2FD',
-                  paddingHorizontal: 12,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                }}>
+                <View
+                  style={{
+                    backgroundColor: '#E3F2FD',
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                  }}>
                   <Text style={{ fontSize: 14, color: '#007AFF', fontWeight: '600' }}>
                     Pro Feature
                   </Text>
@@ -249,24 +252,13 @@ export default function SettingsScreen() {
           {/* Spacer */}
           <View style={{ height: 20 }} />
           {/* Privacy Settings */}
-<SettingRow
-  label="Privacy Settings"
-  onPress={() => router.push('/settings/privacy')}
-/>
+          <SettingRow label="Privacy Settings" onPress={() => router.push('/settings/privacy')} />
 
           {/* Report an issue */}
-          <SettingRow
-            label="Report an issue"
-            onPress={handleReportIssue}
-            showBorder={false}
-          />
+          <SettingRow label="Report an issue" onPress={handleReportIssue} showBorder={false} />
 
           {/* Leave a review */}
-          <SettingRow
-            label="Leave a review"
-            onPress={handleLeaveReview}
-            showBorder={false}
-          />
+          <SettingRow label="Leave a review" onPress={handleLeaveReview} showBorder={false} />
 
           {/* Spacer */}
           <View style={{ height: 20 }} />
@@ -275,6 +267,18 @@ export default function SettingsScreen() {
           <SettingRow
             label="Restore Purchases"
             onPress={handleRestorePurchases}
+            showBorder={false}
+          />
+
+          <SettingRow
+            label="Support Waypoint"
+            onPress={() => setShowFounderModal(true)}
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 14, color: '#007AFF', fontWeight: '700' }}>Founder</Text>
+                <Ionicons name="diamond" size={18} color="#007AFF" />
+              </View>
+            }
             showBorder={false}
           />
 
@@ -296,21 +300,13 @@ export default function SettingsScreen() {
           />
 
           {/* Privacy Policy */}
-          <SettingRow
-            label="Privacy Policy"
-            onPress={handlePrivacyPolicy}
-            showBorder={false}
-          />
+          <SettingRow label="Privacy Policy" onPress={handlePrivacyPolicy} showBorder={false} />
 
           {/* Spacer */}
           <View style={{ height: 30 }} />
 
           {/* Logout */}
-          <SettingRow
-            label="Logout"
-            onPress={handleLogout}
-            showBorder={false}
-          />
+          <SettingRow label="Logout" onPress={handleLogout} showBorder={false} />
 
           {/* Spacer */}
           <View style={{ height: 20 }} />
@@ -326,36 +322,33 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {/* Unit Picker Modal */}
-      <Modal
-        visible={showUnitPicker}
-        transparent
-        animationType="fade"
-      >
-        <Pressable 
+      <Modal visible={showUnitPicker} transparent animationType="fade">
+        <Pressable
           style={{
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.5)',
             justifyContent: 'center',
             alignItems: 'center',
           }}
-          onPress={() => setShowUnitPicker(false)}
-        >
-          <View style={{
-            backgroundColor: 'white',
-            borderRadius: 16,
-            padding: 20,
-            width: '80%',
-            maxWidth: 300,
-          }}>
-            <Text style={{
-              fontSize: 18,
-              fontWeight: '600',
-              marginBottom: 20,
-              textAlign: 'center',
+          onPress={() => setShowUnitPicker(false)}>
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 16,
+              padding: 20,
+              width: '80%',
+              maxWidth: 300,
             }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '600',
+                marginBottom: 20,
+                textAlign: 'center',
+              }}>
               Select Unit
             </Text>
-            
+
             {['km', 'mi'].map((unit) => (
               <Pressable
                 key={unit}
@@ -371,14 +364,14 @@ export default function SettingsScreen() {
                   marginBottom: 10,
                   borderWidth: 1,
                   borderColor: unitOfMeasurement === unit ? '#007AFF' : '#E0E0E0',
-                }}
-              >
-                <Text style={{
-                  fontSize: 16,
-                  color: unitOfMeasurement === unit ? '#007AFF' : '#000',
-                  fontWeight: unitOfMeasurement === unit ? '600' : '400',
-                  textAlign: 'center',
                 }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    color: unitOfMeasurement === unit ? '#007AFF' : '#000',
+                    fontWeight: unitOfMeasurement === unit ? '600' : '400',
+                    textAlign: 'center',
+                  }}>
                   {unit === 'km' ? 'Kilometers (km)' : 'Miles (mi)'}
                 </Text>
               </Pressable>
@@ -389,33 +382,42 @@ export default function SettingsScreen() {
 
       {/* Loading overlay for account deletion */}
       {isDeleting && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <View style={{
-            backgroundColor: 'white',
-            borderRadius: 16,
-            padding: 30,
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
             alignItems: 'center',
           }}>
-            <ActivityIndicator size="large" color="#FF3B30" />
-            <Text style={{
-              marginTop: 16,
-              fontSize: 16,
-              color: '#333',
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 16,
+              padding: 30,
+              alignItems: 'center',
             }}>
+            <ActivityIndicator size="large" color="#FF3B30" />
+            <Text
+              style={{
+                marginTop: 16,
+                fontSize: 16,
+                color: '#333',
+              }}>
               Deleting account...
             </Text>
           </View>
         </View>
       )}
+      <UpsellModal
+        visible={showFounderModal}
+        onDismiss={() => setShowFounderModal(false)}
+        mode="founder"
+        offeringIdentifier="supporter"
+      />
     </SafeAreaView>
   );
 }

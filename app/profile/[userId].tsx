@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
+import { FounderBadge } from '~/components/FounderBadge';
 import { PremiumBadge } from '~/components/PremiumBadge';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
@@ -51,6 +52,8 @@ interface UserProfile {
   instagram_url?: string;
   tiktok_url?: string;
   youtube_url?: string;
+  is_founder?: boolean | null;
+  founder_year?: number | null;
 }
 
 export default function UserProfileScreen() {
@@ -358,7 +361,11 @@ export default function UserProfileScreen() {
             style={styles.headerScrim}
           />
 
-          {isPremium && <PremiumBadge size={28} style={styles.premiumBadgeHeader} />}
+          {profile.is_founder ? (
+            <FounderBadge size={28} style={styles.premiumBadgeHeader} />
+          ) : isPremium ? (
+            <PremiumBadge size={28} style={styles.premiumBadgeHeader} />
+          ) : null}
 
           {/* Name and Location Overlay */}
           <View style={styles.profileInfoOverlay}>
@@ -366,6 +373,13 @@ export default function UserProfileScreen() {
               {profile.full_name}
               {age ? `, ${age}` : ''}
             </Text>
+            {profile.is_founder ? (
+              <FounderBadge
+                showLabel
+                year={profile.founder_year}
+                style={styles.founderOverlayLabel}
+              />
+            ) : null}
             {(profile.location || profile.nationality) && (
               <View style={styles.locationContainer}>
                 <Text style={styles.locationFlag}>
@@ -636,6 +650,9 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  founderOverlayLabel: {
+    marginTop: authSpace.sm,
   },
   locationContainer: {
     flexDirection: 'row',
