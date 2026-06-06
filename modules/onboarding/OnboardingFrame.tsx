@@ -11,9 +11,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeInUp, FadeOut } from 'react-native-reanimated';
 
 import PrimaryButton from '~/components/auth/PrimaryButton';
 import { authColors, authHitSlop, authSpace, authType } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 
 export interface OnboardingFrameProps {
   title: string;
@@ -41,6 +43,8 @@ export interface OnboardingFrameProps {
   hideHeader?: boolean;
   /** Body of the step. */
   children: ReactNode;
+  /** Changes when a new step is rendered, so shared content can animate in. */
+  animationKey?: string;
 }
 
 /**
@@ -65,14 +69,39 @@ export function OnboardingFrame({
   noScroll = false,
   hideHeader = false,
   children,
+  animationKey,
 }: OnboardingFrameProps) {
   const continueDisabled = busy || !canContinue;
+  const handleBackPress = onBack
+    ? () => {
+        triggerLightHaptic();
+        onBack();
+      }
+    : undefined;
+  const handleSkipPress = onSkip
+    ? () => {
+        triggerLightHaptic();
+        onSkip();
+      }
+    : undefined;
+  const handleSignOutPress = onSignOut
+    ? () => {
+        triggerLightHaptic();
+        onSignOut();
+      }
+    : undefined;
+  const handleContinuePress = onContinue
+    ? () => {
+        triggerLightHaptic();
+        onContinue();
+      }
+    : undefined;
 
   const header = (
     <View style={styles.headerRow}>
       {onBack ? (
         <Pressable
-          onPress={onBack}
+          onPress={handleBackPress}
           hitSlop={authHitSlop}
           disabled={busy}
           style={styles.backButton}
@@ -85,7 +114,7 @@ export function OnboardingFrame({
       )}
       {onSkip ? (
         <Pressable
-          onPress={onSkip}
+          onPress={handleSkipPress}
           hitSlop={authHitSlop}
           disabled={busy}
           accessibilityRole="button"
@@ -95,7 +124,7 @@ export function OnboardingFrame({
         </Pressable>
       ) : onSignOut ? (
         <Pressable
-          onPress={onSignOut}
+          onPress={handleSignOutPress}
           hitSlop={authHitSlop}
           disabled={busy}
           accessibilityRole="button"
@@ -118,19 +147,26 @@ export function OnboardingFrame({
     </View>
   );
 
-  const body = noScroll ? (
-    <View style={styles.bodyStatic}>
+  const animatedContent = (
+    <Animated.View
+      key={animationKey}
+      entering={FadeInUp.duration(220).springify().damping(18)}
+      exiting={FadeOut.duration(120)}
+      style={noScroll ? styles.flex : undefined}>
       {titleBlock}
-      <View style={styles.flex}>{children}</View>
-    </View>
+      {children}
+    </Animated.View>
+  );
+
+  const body = noScroll ? (
+    <View style={styles.bodyStatic}>{animatedContent}</View>
   ) : (
     <ScrollView
       style={styles.flex}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}>
-      {titleBlock}
-      {children}
+      {animatedContent}
     </ScrollView>
   );
 
@@ -147,7 +183,7 @@ export function OnboardingFrame({
           <View style={styles.ctaWrap}>
             <PrimaryButton
               label={continueLabel}
-              onPress={onContinue}
+              onPress={handleContinuePress}
               loading={busy}
               disabled={continueDisabled && !busy}
             />

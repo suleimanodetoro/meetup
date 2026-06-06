@@ -142,7 +142,7 @@ export function OnboardingStep() {
 
   if (!profile || !userId) {
     return (
-      <OnboardingFrame title={step.title} subtitle={step.subtitle}>
+      <OnboardingFrame title={step.title} subtitle={step.subtitle} animationKey={step.slug}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           {loadError ? null : <ActivityIndicator size="large" color={authColors.accent} />}
         </View>
@@ -195,7 +195,8 @@ export function OnboardingStep() {
       busy={busy}
       continueLabel={continueLabel}
       hideHeader={step.hideHeader}
-      noScroll={step.noScroll}>
+      noScroll={step.noScroll}
+      animationKey={step.slug}>
       <Body
         value={slotValue}
         setValue={(next: unknown) => setSlotValue(next)}

@@ -1,9 +1,3 @@
-// app/search-users.tsx
-/*TO DO LATER:
-
-FIX DUPLICATE KEY ERROR WHEN The same user appears in both recentSearches and suggestedUsers arrays, causing duplicate keys when React renders the list.
-// */ 
-
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -32,6 +26,19 @@ interface SearchResult extends Profile {
   mutual_plans_count?: number;
 }
 
+type BrowseListItem =
+  | { kind: 'header'; title: string; key: string }
+  | (SearchResult & { kind: 'user'; source: 'recent' | 'suggested' });
+
+function dedupeUsers(users: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>();
+  return users.filter((user) => {
+    if (!user.id || seen.has(user.id)) return false;
+    seen.add(user.id);
+    return true;
+  });
+}
+
 export default function SearchUsersScreen() {
   const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,14 +57,13 @@ export default function SearchUsersScreen() {
 
     try {
       // Get users with mutual connections
-      const { data } = await supabase
-        .rpc('search_users_for_friends', {
-          searcher_id: session.user.id,
-          search_term: '',
-          limit_count: 10
-        });
+      const { data } = await supabase.rpc('search_users_for_friends', {
+        searcher_id: session.user.id,
+        search_term: '',
+        limit_count: 10,
+      });
 
-      setSuggestedUsers((data || []) as unknown as SearchResult[]);
+      setSuggestedUsers(dedupeUsers((data || []) as unknown as SearchResult[]));
     } catch (error) {
       console.error('Error fetching suggested users:', error);
     }
@@ -77,15 +83,14 @@ export default function SearchUsersScreen() {
 
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .rpc('search_users_for_friends', {
-            searcher_id: session.user.id,
-            search_term: query,
-            limit_count: 20
-          });
+        const { data, error } = await supabase.rpc('search_users_for_friends', {
+          searcher_id: session.user.id,
+          search_term: query,
+          limit_count: 20,
+        });
 
         if (error) throw error;
-        setSearchResults((data || []) as unknown as SearchResult[]);
+        setSearchResults(dedupeUsers((data || []) as unknown as SearchResult[]));
       } catch (error) {
         console.error('Error searching users:', error);
       } finally {
@@ -102,8 +107,8 @@ export default function SearchUsersScreen() {
 
   const handleUserPress = (user: SearchResult) => {
     // Save to recent searches
-    setRecentSearches(prev => [user, ...prev.filter(u => u.id !== user.id)].slice(0, 5));
-    
+    setRecentSearches((prev) => dedupeUsers([user, ...prev]).slice(0, 5));
+
     // Navigate to profile
     router.push(`/profile/${user.id}`);
   };
@@ -112,23 +117,21 @@ export default function SearchUsersScreen() {
     if (!session?.user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from('friendships')
-        .insert({
-          requester_id: session.user.id,
-          addressee_id: userId,
-          status: 'pending'
-        });
+      const { error } = await supabase.from('friendships').insert({
+        requester_id: session.user.id,
+        addressee_id: userId,
+        status: 'pending',
+      });
 
       if (!error) {
         // Update local state
-        setSearchResults(prev =>
-          prev.map(user =>
+        setSearchResults((prev) =>
+          prev.map((user) =>
             user.id === userId ? { ...user, friendship_status: 'pending' } : user
           )
         );
-        setSuggestedUsers(prev =>
-          prev.map(user =>
+        setSuggestedUsers((prev) =>
+          prev.map((user) =>
             user.id === userId ? { ...user, friendship_status: 'pending' } : user
           )
         );
@@ -139,49 +142,46 @@ export default function SearchUsersScreen() {
   };
 
   const renderUser = ({ item }: { item: SearchResult }) => {
-    const hasMutualConnections = 
-      (item.mutual_friends_count || 0) > 0 || 
-      (item.mutual_plans_count || 0) > 0;
+    const hasMutualConnections =
+      (item.mutual_friends_count || 0) > 0 || (item.mutual_plans_count || 0) > 0;
 
     return (
-      <Pressable 
-        style={styles.userCard}
-        onPress={() => handleUserPress(item)}
-      >
+      <Pressable style={styles.userCard} onPress={() => handleUserPress(item)}>
         <Image
           source={{ uri: item.avatar_url || 'https://via.placeholder.com/50' }}
           style={styles.avatar}
         />
-        
+
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>
             {item.full_name || item.username || 'Unknown'}
           </Text>
-          
+
           {item.bio && (
             <Text style={styles.userBio} numberOfLines={1}>
               {item.bio}
             </Text>
           )}
-          
-          {hasMutualConnections && (() => {
-            const friendCount = item.mutual_friends_count ?? 0;
-            const planCount = item.mutual_plans_count ?? 0;
-            return (
-              <View style={styles.mutualInfo}>
-                {friendCount > 0 && (
-                  <Text style={styles.mutualText}>
-                    {friendCount} mutual friend{friendCount > 1 ? 's' : ''}
-                  </Text>
-                )}
-                {planCount > 0 && (
-                  <Text style={styles.mutualText}>
-                    {planCount} mutual plan{planCount > 1 ? 's' : ''}
-                  </Text>
-                )}
-              </View>
-            );
-          })()}
+
+          {hasMutualConnections &&
+            (() => {
+              const friendCount = item.mutual_friends_count ?? 0;
+              const planCount = item.mutual_plans_count ?? 0;
+              return (
+                <View style={styles.mutualInfo}>
+                  {friendCount > 0 && (
+                    <Text style={styles.mutualText}>
+                      {friendCount} mutual friend{friendCount > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                  {planCount > 0 && (
+                    <Text style={styles.mutualText}>
+                      {planCount} mutual plan{planCount > 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
         </View>
 
         {/* Friend button */}
@@ -199,8 +199,7 @@ export default function SearchUsersScreen() {
             onPress={(e) => {
               e.stopPropagation();
               sendFriendRequest(item.id);
-            }}
-          >
+            }}>
             <Ionicons name="person-add" size={18} color="#007AFF" />
           </Pressable>
         )}
@@ -218,9 +217,7 @@ export default function SearchUsersScreen() {
     <View style={styles.emptyState}>
       <Ionicons name="search" size={48} color="#ccc" />
       <Text style={styles.emptyTitle}>Find people to connect with</Text>
-      <Text style={styles.emptySubtitle}>
-        Search by name or username to find friends
-      </Text>
+      <Text style={styles.emptySubtitle}>Search by name or username to find friends</Text>
     </View>
   );
 
@@ -228,18 +225,36 @@ export default function SearchUsersScreen() {
     <View style={styles.emptyState}>
       <Ionicons name="person-outline" size={48} color="#ccc" />
       <Text style={styles.emptyTitle}>No users found</Text>
-      <Text style={styles.emptySubtitle}>
-        Try searching with a different name or username
-      </Text>
+      <Text style={styles.emptySubtitle}>Try searching with a different name or username</Text>
     </View>
   );
 
+  const recentIds = new Set(recentSearches.map((user) => user.id));
+  const visibleSuggestedUsers = suggestedUsers.filter((user) => !recentIds.has(user.id));
+  const browseData: BrowseListItem[] = [
+    ...(recentSearches.length > 0
+      ? [{ kind: 'header' as const, title: 'Recent', key: 'recent' }]
+      : []),
+    ...recentSearches.map((user) => ({
+      ...user,
+      kind: 'user' as const,
+      source: 'recent' as const,
+    })),
+    ...(visibleSuggestedUsers.length > 0
+      ? [{ kind: 'header' as const, title: 'Suggested for You', key: 'suggested' }]
+      : []),
+    ...visibleSuggestedUsers.map((user) => ({
+      ...user,
+      kind: 'user' as const,
+      source: 'suggested' as const,
+    })),
+  ];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -262,10 +277,11 @@ export default function SearchUsersScreen() {
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={() => {
-              setSearchQuery('');
-              setSearchResults([]);
-            }}>
+            <Pressable
+              onPress={() => {
+                setSearchQuery('');
+                setSearchResults([]);
+              }}>
               <Ionicons name="close-circle" size={20} color="#666" />
             </Pressable>
           )}
@@ -285,30 +301,16 @@ export default function SearchUsersScreen() {
             ListEmptyComponent={<NoResults />}
           />
         ) : (
-          <FlatList<
-            | { kind: 'header'; title: string }
-            | (SearchResult & { kind: 'user' })
-          >
-            data={[
-              ...(recentSearches.length > 0
-                ? [{ kind: 'header' as const, title: 'Recent' }]
-                : []),
-              ...recentSearches.map((u) => ({ ...u, kind: 'user' as const })),
-              ...(suggestedUsers.length > 0
-                ? [{ kind: 'header' as const, title: 'Suggested for You' }]
-                : []),
-              ...suggestedUsers.map((u) => ({ ...u, kind: 'user' as const })),
-            ]}
+          <FlatList<BrowseListItem>
+            data={browseData}
             renderItem={({ item }) => {
               if (item.kind === 'header') return renderSectionHeader(item.title);
               return renderUser({ item });
             }}
             keyExtractor={(item, index) =>
-              item.kind === 'header' ? `header-${index}` : item.id
+              item.kind === 'header' ? `header-${item.key}` : `${item.source}-${item.id}-${index}`
             }
-            contentContainerStyle={
-              recentSearches.length === 0 && suggestedUsers.length === 0 && styles.emptyContainer
-            }
+            contentContainerStyle={browseData.length === 0 && styles.emptyContainer}
             ListEmptyComponent={<EmptyState />}
           />
         )}

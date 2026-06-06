@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { PremiumBadge } from './PremiumBadge';
+import { authColors } from '~/utils/authTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -66,7 +67,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
           borderRadius: 16,
           overflow: 'hidden',
           marginBottom: 8,
-          backgroundColor: '#E0E0E0',
+          backgroundColor: authColors.borderMuted,
         }}>
         {person.avatar_url && !imageError ? (
           <Image
@@ -81,7 +82,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-            <Ionicons name="person" size={40} color="#999" />
+            <Ionicons name="person" size={40} color={authColors.textTertiary} />
           </View>
         )}
 
@@ -92,7 +93,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
               position: 'absolute',
               top: 8,
               left: 8,
-              backgroundColor: 'white',
+              backgroundColor: authColors.surface,
               paddingHorizontal: 6,
               paddingVertical: 3,
               borderRadius: 12,
@@ -124,16 +125,23 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
         )}
       </View>
 
-      <Text style={{ fontSize: 15, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: '700',
+          marginBottom: 2,
+          color: authColors.textPrimary,
+        }}
+        numberOfLines={1}>
         {person.full_name || 'User'}
       </Text>
 
       {typeof age === 'number' && (
-        <Text style={{ fontSize: 13, color: '#666' }}>{age} years old</Text>
+        <Text style={{ fontSize: 13, color: authColors.textSecondary }}>{age} years old</Text>
       )}
 
       {!!person.location && (
-        <Text style={{ fontSize: 12, color: '#999' }} numberOfLines={1}>
+        <Text style={{ fontSize: 12, color: authColors.textTertiary }} numberOfLines={1}>
           {person.location}
         </Text>
       )}

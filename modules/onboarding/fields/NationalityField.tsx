@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COUNTRIES } from '~/utils/countryFlags';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 type Country = (typeof COUNTRIES)[number];
@@ -48,6 +49,7 @@ export function NationalityField({ value, setValue }: StepBodyProps<NationalityV
       : featuredCountries;
 
   const choose = (country: Country) => {
+    triggerLightHaptic();
     setValue({ code: country.code, name: country.name });
     setModalOpen(false);
     setQuery('');
@@ -67,7 +69,10 @@ export function NationalityField({ value, setValue }: StepBodyProps<NationalityV
       </View>
 
       <Pressable
-        onPress={() => setModalOpen(true)}
+        onPress={() => {
+          triggerLightHaptic();
+          setModalOpen(true);
+        }}
         accessibilityRole="button"
         accessibilityLabel="Browse all countries"
         style={styles.browseButton}>
@@ -83,7 +88,12 @@ export function NationalityField({ value, setValue }: StepBodyProps<NationalityV
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select your country</Text>
-            <Pressable onPress={() => setModalOpen(false)} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                triggerLightHaptic();
+                setModalOpen(false);
+              }}
+              hitSlop={8}>
               <Text style={styles.doneText}>Done</Text>
             </Pressable>
           </View>

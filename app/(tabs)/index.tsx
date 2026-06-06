@@ -9,84 +9,31 @@ import {
   FlatList,
   Pressable,
   Image,
-  Dimensions,
   Alert,
   RefreshControl,
+  StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { useSubscription } from '~/hooks/useSubscription';
-import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
-import type { Event, Profile } from '~/types/db';
+import type { Event } from '~/types/db';
 import { PremiumBadge } from '~/components/PremiumBadge';
+import PrimaryButton from '~/components/auth/PrimaryButton';
+import { authColors, authHitSlop, authRadius, authSpace, authType } from '~/utils/authTheme';
 
 // Import components
-import VisitCard from '~/components/VisitCard';
+import { VisitCard } from '~/components/VisitCard';
 import PlanCardHome from '~/components/PlanCardHome';
-import PersonCard from '~/components/PersonCard';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Category Pill component (kept but commented out in render)
-const CategoryPill = React.memo(
-  ({
-    label,
-    icon,
-    isActive,
-    onPress,
-  }: {
-    label: string;
-    icon?: string | null;
-    isActive: boolean;
-    onPress: () => void;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Select category ${label}`}
-      hitSlop={8}
-      style={{
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 25,
-        backgroundColor: isActive ? '#007AFF' : 'white',
-        borderWidth: 1,
-        borderColor: isActive ? '#007AFF' : '#E0E0E0',
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 12,
-      }}>
-      {icon ? <Text style={{ fontSize: 20, marginRight: 8 }}>{icon}</Text> : null}
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: '500',
-          color: isActive ? 'white' : '#333',
-        }}>
-        {label}
-      </Text>
-    </Pressable>
-  )
-);
-
-const categories = [
-  { id: 'for you', label: 'For you', icon: null },
-  { id: 'tropical', label: 'Tropical', icon: '🏝️' },
-  { id: 'hiking', label: 'Hiking', icon: '⛰️' },
-  { id: 'backpacking', label: 'Backpacking', icon: '🎒' },
-  { id: 'adventure', label: 'Adventure', icon: '🚀' },
-  { id: 'culture', label: 'Culture', icon: '🏛️' },
-];
+import { PersonCard } from '~/components/PersonCard';
 
 export default function HomeScreen() {
   const { session } = useAuth();
   const { hasSubscription } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('for you');
 
   // Data states
   const [trendingVisits, setTrendingVisits] = useState<any[]>([]);
@@ -159,9 +106,11 @@ export default function HomeScreen() {
     fetchHomeData();
   }, [fetchHomeData]);
 
-  const handleCategoryPress = useCallback((categoryId: string) => {
-    setActiveCategory(categoryId);
-  }, []);
+  const hasFeedContent =
+    trendingVisits.length > 0 ||
+    popularPlans.length > 0 ||
+    newPlans.length > 0 ||
+    suggestedPeople.length > 0;
 
   const getVisitKey = useCallback((visit: any) => {
     const c = visit.city ?? 'city';
@@ -172,168 +121,95 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#007AFF" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={authColors.accent} />
+          <Text style={styles.loadingTitle}>Finding your next waypoint</Text>
+          <Text style={styles.loadingText}>Trips, plans, and people are loading.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
-          {/* Top Row with Logo and Profile */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  backgroundColor: '#87CEEB',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 10,
-                  overflow: 'hidden',
-                }}>
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <View style={styles.topRow}>
+            <View style={styles.brandRow}>
+              <View style={styles.logoWrap}>
                 <Image
                   source={require('../../assets/ios-light.png')}
-                  style={{ width: '100%', height: '100%' }}
+                  style={styles.logo}
                   resizeMode="cover"
                 />
               </View>
-              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827' }}>Waypoint</Text>
+              <Text style={styles.brandTitle}>Waypoint</Text>
             </View>
             <Pressable
               onPress={() => router.push('/(tabs)/profile')}
-              hitSlop={8}
-              style={{ position: 'relative' }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  overflow: 'hidden',
-                  backgroundColor: '#E0E0E0',
-                }}>
+              hitSlop={authHitSlop}
+              style={styles.avatarButton}>
+              <View style={styles.avatar}>
                 {userProfile?.avatar_url ? (
                   <Image
                     source={{ uri: userProfile.avatar_url }}
-                    style={{ width: '100%', height: '100%' }}
+                    style={styles.avatarImage}
                     onError={() => {}}
                   />
                 ) : (
-                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <Ionicons name="person" size={20} color="#999" />
+                  <View style={styles.avatarFallback}>
+                    <Ionicons name="person" size={20} color={authColors.textTertiary} />
                   </View>
                 )}
               </View>
               {hasSubscription && (
-                <PremiumBadge
-                  size={14}
-                  style={{ position: 'absolute', bottom: -3, right: -3 }}
-                />
+                <PremiumBadge size={14} style={{ position: 'absolute', bottom: -3, right: -3 }} />
               )}
             </Pressable>
           </View>
+
           <Pressable
             onPress={() => router.push('/search')}
             accessibilityRole="button"
-            hitSlop={8}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: '#F5F5F5',
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}>
-            <Ionicons name="search" size={20} color="#999" />
-            <Text style={{ fontSize: 16, color: '#999', marginLeft: 8 }}>
-              Search a city or date range
-            </Text>
+            hitSlop={authHitSlop}
+            style={styles.searchBox}>
+            <Ionicons name="search" size={20} color={authColors.textTertiary} />
+            <Text style={styles.searchText}>Search a city or date range</Text>
           </Pressable>
         </View>
 
-        {/* Categories Carousel - COMMENTED OUT */}
-        {/* <View style={{ backgroundColor: 'white', paddingVertical: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-            {categories.map((category) => (
-              <CategoryPill
-                key={category.id}
-                label={category.label}
-                icon={category.icon}
-                isActive={activeCategory === category.id}
-                onPress={() => handleCategoryPress(category.id)}
-              />
-            ))}
-          </ScrollView>
-        </View> */}
-
-        {/* Trending Visits */}
         {trendingVisits.length > 0 && (
-          <View style={{ marginTop: 24 }}>
-            <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>
-                Trending Trips
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>
-                  popular among users
-                </Text>
-                <Text style={{ fontSize: 16 }}>📈</Text>
-              </View>
-            </View>
+          <View style={styles.section}>
+            <SectionHeader title="Trending trips" subtitle="Popular among users" />
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
               data={trendingVisits}
               keyExtractor={getVisitKey}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
+              contentContainerStyle={styles.carouselContent}
               renderItem={({ item }) => <VisitCard visit={item} />}
             />
           </View>
         )}
 
-        {/* Popular Plans with See More */}
         {popularPlans.length > 0 && (
-          <View style={{ marginTop: 32 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: 20,
-                marginBottom: 16,
-              }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>Popular Plans</Text>
-              <Pressable
-                onPress={() => router.push('/explore?filter=popular')}
-                accessibilityRole="button"
-                hitSlop={8}>
-                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>
-                  See more ›
-                </Text>
-              </Pressable>
-            </View>
+          <View style={styles.section}>
+            <SectionHeader
+              title="Popular plans"
+              subtitle="High-signal meetups with other travelers"
+              actionLabel="See more"
+              onAction={() => router.push('/explore?filter=popular')}
+            />
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
               data={popularPlans}
               keyExtractor={(item) => `popular-${item.id}`}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
+              contentContainerStyle={styles.carouselContent}
               renderItem={({ item }) => (
                 <PlanCardHome
                   plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }}
@@ -343,41 +219,20 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* New Plans with See More */}
         {newPlans.length > 0 && (
-          <View style={{ marginTop: 32 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                paddingHorizontal: 20,
-                marginBottom: 16,
-              }}>
-              <View>
-                <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>New Plans</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Text style={{ color: '#666', fontSize: 14, marginRight: 6 }}>
-                    be one of the first to join
-                  </Text>
-                  <Text style={{ fontSize: 16 }}>✨</Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={() => router.push('/explore?filter=new')}
-                accessibilityRole="button"
-                hitSlop={8}
-                style={{ justifyContent: 'center' }}>
-                <Text style={{ color: '#007AFF', fontSize: 15, fontWeight: '600' }}>
-                  See more ›
-                </Text>
-              </Pressable>
-            </View>
+          <View style={styles.section}>
+            <SectionHeader
+              title="Fresh plans"
+              subtitle="Be one of the first to join"
+              actionLabel="See more"
+              onAction={() => router.push('/explore?filter=new')}
+            />
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
               data={newPlans}
               keyExtractor={(item) => `new-${item.id}`}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
+              contentContainerStyle={styles.carouselContent}
               renderItem={({ item }) => (
                 <PlanCardHome
                   plan={item as Event & { attendee_count?: number; recent_attendees?: any[] }}
@@ -387,58 +242,266 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* People You May Like - Showing multiple users */}
         {suggestedPeople.length > 0 && (
-          <View style={{ marginTop: 32, marginBottom: 40 }}>
-            <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>
-                People you may like
-              </Text>
-            </View>
-            <ScrollView
+          <View style={styles.section}>
+            <SectionHeader
+              title="People you may like"
+              subtitle="Travelers with overlapping plans and interests"
+              actionLabel="Find more"
+              onAction={() => router.push('/search-users')}
+            />
+            <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20 }}>
-              {suggestedPeople.map((person) => (
-                <PersonCard key={`person-${person.id}`} person={person} />
-              ))}
-            </ScrollView>
+              data={suggestedPeople}
+              keyExtractor={(person) => `person-${person.id}`}
+              contentContainerStyle={styles.carouselContent}
+              renderItem={({ item }) => <PersonCard person={item} />}
+            />
           </View>
         )}
 
-        {/* Empty State */}
-        {trendingVisits.length === 0 && popularPlans.length === 0 && newPlans.length === 0 && (
-          <View style={{ padding: 20, alignItems: 'center', marginTop: 50 }}>
-            <Ionicons name="compass-outline" size={64} color="#CCC" />
-            <Text
-              style={{
-                fontSize: 18,
-                color: '#666',
-                textAlign: 'center',
-                marginTop: 16,
-                marginBottom: 8,
-              }}>
-              No trips or plans available yet
+        {!hasFeedContent && (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="compass-outline" size={30} color={authColors.accent} />
+            </View>
+            <Text style={styles.emptyTitle}>No trips or plans yet</Text>
+            <Text style={styles.emptyText}>
+              Start the feed by creating a plan or adding the trip you already have coming up.
             </Text>
-            <Text style={{ fontSize: 14, color: '#999', textAlign: 'center' }}>
-              Start creating your first plan or add an upcoming trip!
-            </Text>
-            <Pressable
-              onPress={() => router.push('/create-plan/name')}
-              accessibilityRole="button"
-              hitSlop={8}
-              style={{
-                marginTop: 24,
-                backgroundColor: '#007AFF',
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                borderRadius: 25,
-              }}>
-              <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Create a Plan</Text>
-            </Pressable>
+            <View style={styles.emptyActions}>
+              <PrimaryButton
+                label="Create a plan"
+                onPress={() => router.push('/create-plan/name')}
+                leftIcon={<Ionicons name="add" size={20} color={authColors.ctaPrimaryText} />}
+              />
+              <Pressable
+                onPress={() => router.push('/add-trip')}
+                accessibilityRole="button"
+                hitSlop={authHitSlop}
+                style={styles.secondaryTextButton}>
+                <Text style={styles.secondaryTextButtonLabel}>Add an upcoming trip</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+function SectionHeader({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderText}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {actionLabel && onAction ? (
+        <Pressable
+          onPress={onAction}
+          accessibilityRole="button"
+          hitSlop={authHitSlop}
+          style={styles.sectionAction}>
+          <Text style={styles.sectionActionText}>{actionLabel}</Text>
+          <Ionicons name="chevron-forward" size={15} color={authColors.accent} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: authColors.bg,
+  },
+  scrollContent: {
+    paddingBottom: authSpace.xxxl,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: authSpace.xl,
+  },
+  loadingTitle: {
+    marginTop: authSpace.lg,
+    color: authColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  loadingText: {
+    marginTop: authSpace.xs,
+    color: authColors.textSecondary,
+    fontSize: authType.disclaimer.fontSize,
+    lineHeight: authType.disclaimer.lineHeight,
+    textAlign: 'center',
+  },
+  header: {
+    paddingHorizontal: authSpace.xl,
+    paddingTop: authSpace.lg,
+    paddingBottom: authSpace.sm,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: authSpace.lg,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  logoWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: authColors.accentSoft,
+    marginRight: authSpace.md,
+    overflow: 'hidden',
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+  },
+  brandTitle: {
+    color: authColors.textPrimary,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  avatarButton: {
+    position: 'relative',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: authColors.borderMuted,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBox: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: authRadius.input,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchText: {
+    marginLeft: authSpace.sm,
+    color: authColors.textTertiary,
+    fontSize: 15,
+    flex: 1,
+  },
+  section: {
+    marginTop: authSpace.xxl,
+  },
+  sectionHeader: {
+    paddingHorizontal: authSpace.xl,
+    marginBottom: authSpace.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: authSpace.md,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
+  sectionTitle: {
+    color: authColors.textPrimary,
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: '800',
+    letterSpacing: -0.35,
+  },
+  sectionSubtitle: {
+    marginTop: authSpace.xs,
+    color: authColors.textSecondary,
+    fontSize: authType.disclaimer.fontSize,
+    lineHeight: authType.disclaimer.lineHeight,
+  },
+  sectionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 2,
+  },
+  sectionActionText: {
+    color: authColors.accent,
+    fontSize: authType.link.fontSize,
+    fontWeight: '600',
+  },
+  carouselContent: {
+    paddingHorizontal: authSpace.xl,
+  },
+  emptyCard: {
+    marginHorizontal: authSpace.xl,
+    marginTop: authSpace.xxl,
+    padding: authSpace.xl,
+    alignItems: 'center',
+    backgroundColor: authColors.surface,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+    borderRadius: 24,
+  },
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: authColors.accentSoft,
+    marginBottom: authSpace.lg,
+  },
+  emptyTitle: {
+    color: authColors.textPrimary,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptyText: {
+    marginTop: authSpace.sm,
+    color: authColors.textSecondary,
+    fontSize: authType.body.fontSize,
+    lineHeight: authType.body.lineHeight,
+    textAlign: 'center',
+  },
+  emptyActions: {
+    marginTop: authSpace.xl,
+    width: '100%',
+    gap: authSpace.md,
+  },
+  secondaryTextButton: {
+    alignItems: 'center',
+    paddingVertical: authSpace.sm,
+  },
+  secondaryTextButtonLabel: {
+    color: authColors.accent,
+    fontSize: authType.link.fontSize,
+    fontWeight: '700',
+  },
+});

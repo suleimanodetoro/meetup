@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 type GenderId = 'male' | 'female' | 'non-binary' | 'other' | 'prefer-not-to-say';
@@ -38,7 +39,10 @@ export function GenderField({ value, setValue }: StepBodyProps<string>) {
             key={opt.id}
             label={opt.label}
             selected={value === opt.id}
-            onPress={() => setValue(opt.id)}
+            onPress={() => {
+              triggerLightHaptic();
+              setValue(opt.id);
+            }}
           />
         ))}
       </View>
@@ -50,13 +54,19 @@ export function GenderField({ value, setValue }: StepBodyProps<string>) {
               key={opt.id}
               label={opt.label}
               selected={value === opt.id}
-              onPress={() => setValue(opt.id)}
+              onPress={() => {
+                triggerLightHaptic();
+                setValue(opt.id);
+              }}
             />
           ))}
         </View>
       ) : (
         <Pressable
-          onPress={() => setExpanded(true)}
+          onPress={() => {
+            triggerLightHaptic();
+            setExpanded(true);
+          }}
           accessibilityRole="button"
           accessibilityLabel="More gender options"
           style={styles.moreLink}>

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Event } from '~/types/db';
+import { authColors } from '~/utils/authTheme';
 
 interface ExtendedEvent extends Event {
   attendee_count?: number;
@@ -19,9 +20,22 @@ interface PlanCardHomeProps {
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$',
-  CHF: 'CHF', CNY: '¥', SEK: 'kr', NOK: 'kr', DKK: 'kr',
-  INR: '₹', NGN: '₦', ZAR: 'R', BRL: 'R$', MXN: 'MX$',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AUD: 'A$',
+  CAD: 'C$',
+  CHF: 'CHF',
+  CNY: '¥',
+  SEK: 'kr',
+  NOK: 'kr',
+  DKK: 'kr',
+  INR: '₹',
+  NGN: '₦',
+  ZAR: 'R',
+  BRL: 'R$',
+  MXN: 'MX$',
 };
 
 function formatPrice(cost: number, currency: string | null | undefined): string {
@@ -58,18 +72,12 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
   const hasCost = plan.cost !== null && plan.cost !== undefined;
 
   return (
-    <Pressable
-      onPress={() => router.push(`/event/${plan.id}` as never)}
-      style={styles.container}
-    >
+    <Pressable onPress={() => router.push(`/event/${plan.id}` as never)} style={styles.container}>
       <View style={styles.imageContainer}>
         {plan.image_uri ? (
           <Image source={{ uri: plan.image_uri }} style={styles.image} />
         ) : (
-          <LinearGradient
-            colors={['#667eea', '#764ba2']}
-            style={styles.imagePlaceholder}
-          >
+          <LinearGradient colors={['#667eea', '#764ba2']} style={styles.imagePlaceholder}>
             <Ionicons name="calendar" size={32} color="white" />
           </LinearGradient>
         )}
@@ -83,7 +91,7 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
         {dateLabel ? (
           <View style={styles.infoRow}>
             <View style={styles.dateContainer}>
-              <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+              <Ionicons name="calendar-outline" size={14} color={authColors.textSecondary} />
               <Text style={styles.dateText} numberOfLines={1}>
                 {dateLabel}
               </Text>
@@ -93,7 +101,7 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
 
         {plan.location_name || plan.city ? (
           <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Ionicons name="location-outline" size={14} color={authColors.textSecondary} />
             <Text style={styles.locationText} numberOfLines={1}>
               {plan.location_name || plan.city}
             </Text>
@@ -112,15 +120,9 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
           <View style={styles.attendeesContainer}>
             <View style={styles.avatarStack}>
               {displayAttendees.map((user, index) => (
-                <View
-                  key={user.id}
-                  style={[styles.avatar, index > 0 && { marginLeft: -8 }]}
-                >
+                <View key={user.id} style={[styles.avatar, index > 0 && { marginLeft: -8 }]}>
                   {user?.avatar_url ? (
-                    <Image
-                      source={{ uri: user.avatar_url }}
-                      style={styles.avatarImage}
-                    />
+                    <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
                   ) : (
                     <View style={styles.avatarPlaceholder}>
                       <Ionicons name="person" size={12} color="#999" />
@@ -143,12 +145,14 @@ PlanCardHome.displayName = 'PlanCardHome';
 const styles = StyleSheet.create({
   container: {
     width: 280,
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: authColors.surface,
+    borderRadius: 18,
     marginRight: 16,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 3,
   },
@@ -171,19 +175,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#111827',
+    color: authColors.textPrimary,
     marginBottom: 8,
     letterSpacing: -0.3,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   dateContainer: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  dateText: { fontSize: 14, color: '#6B7280', marginLeft: 6, flex: 1 },
+  dateText: { fontSize: 14, color: authColors.textSecondary, marginLeft: 6, flex: 1 },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  locationText: { fontSize: 14, color: '#6B7280', marginLeft: 6, flex: 1 },
+  locationText: { fontSize: 14, color: authColors.textSecondary, marginLeft: 6, flex: 1 },
   priceContainer: { marginBottom: 8 },
   priceText: { fontSize: 15, fontWeight: '600', color: '#059669' },
   attendeesContainer: {
@@ -192,7 +196,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: authColors.borderMuted,
   },
   avatarStack: {
     flexDirection: 'row',
@@ -205,7 +209,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#fff',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: authColors.borderMuted,
     overflow: 'hidden',
   },
   avatarImage: { width: '100%', height: '100%' },
@@ -213,9 +217,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: authColors.borderMuted,
   },
-  attendeeCount: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  attendeeCount: { fontSize: 13, color: authColors.textSecondary, fontWeight: '500' },
 });
 
 export default PlanCardHome;

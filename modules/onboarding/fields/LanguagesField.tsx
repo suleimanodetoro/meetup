@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { authColors, authSpace } from '~/utils/authTheme';
 import { LANGUAGES } from '~/utils/constants';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 type Language = (typeof LANGUAGES)[number];
@@ -27,6 +28,8 @@ export function LanguagesField({ value, setValue }: StepBodyProps<string[]>) {
   }, [query]);
 
   const toggle = (code: string) => {
+    triggerLightHaptic();
+
     if (selected.includes(code)) {
       if (selected.length === 1) return; // keep at least one
       setValue(selected.filter((c) => c !== code));

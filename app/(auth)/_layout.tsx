@@ -19,7 +19,7 @@ export default function AuthLayout() {
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="check-email" />
       <Stack.Screen name="confirm-email" />
-      <Stack.Screen name="onboarding/[step]" />
+      <Stack.Screen name="onboarding/[step]" options={{ animation: 'none' }} />
     </Stack>
   );
 }

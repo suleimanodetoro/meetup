@@ -88,6 +88,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'app.usewaypoint',
+    appStoreUrl: process.env.EXPO_PUBLIC_APP_STORE_URL,
     buildNumber: '10',
     usesAppleSignIn: true,
     icon: {
@@ -108,6 +109,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
+    playStoreUrl: process.env.EXPO_PUBLIC_PLAY_STORE_URL,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#ffffff',

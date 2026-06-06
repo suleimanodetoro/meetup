@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 
 export interface RadioCardOption<Id extends string> {
   id: Id;
@@ -31,7 +32,10 @@ export function RadioCardList<Id extends string>({
         return (
           <Pressable
             key={opt.id}
-            onPress={() => setValue(opt.id)}
+            onPress={() => {
+              triggerLightHaptic();
+              setValue(opt.id);
+            }}
             accessibilityRole="radio"
             accessibilityLabel={opt.label}
             accessibilityState={{ selected }}
