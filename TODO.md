@@ -4,6 +4,33 @@ Tracking items deferred from cleanup passes. Each entry should explain _why_ it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
+## Home Friends Preview Paywall
+
+- Prioritize Premium and Founder users in the home screen's people/friends rail
+  so paid supporters get better profile visibility.
+- Add a free-user cap to how many friends/people can be viewed from home before
+  triggering the Premium paywall.
+- Founder should count as Premium for this gate, matching `useSubscription`.
+- Do this after the paywall redesign settles so the trigger can reuse the new
+  swipeable paywall instead of the old modal behavior.
+
+## Account Deletion And Purchases
+
+- Define what happens when a user deletes their account while they still have
+  active App Store / Play Store purchases.
+- Confirm whether we retain a minimal purchase ledger keyed by RevenueCat
+  `original_transaction_id` for refunds, restores, chargebacks, and App Store
+  audit history after profile deletion.
+- Ensure account deletion clears public identity fields such as Founder badge
+  visibility (`profiles.is_founder`) while preserving any legally required
+  payment records outside the public profile.
+- Document user-facing copy: deleting the Waypoint account does not cancel an
+  Apple/Google subscription; users must cancel from App Store / Play Store
+  subscription settings.
+- Add a restore path for users who delete and later reinstall/sign up with the
+  same Apple ID, so RevenueCat restore can reattach valid entitlements to the
+  new Supabase user account.
+
 ## Wire up RevenueCat (external steps)
 
 The code is in place ([lib/revenuecat.ts](lib/revenuecat.ts),
