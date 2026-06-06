@@ -268,7 +268,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'rating',
-    title: 'Rate Waypoint',
+    title: 'ENJOYING THE APP?',
     hideHeader: true,
     noScroll: true,
     Body: RatingBody,
@@ -278,7 +278,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
       await requestWaypointReview();
       return {};
     },
-    continueLabel: 'Rate Waypoint',
+    continueLabel: 'Continue',
   },
   {
     slug: 'take-a-bow',

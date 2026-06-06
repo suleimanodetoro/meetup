@@ -1,6 +1,7 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
 import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 const MAX_INTERESTS = 5;
@@ -9,6 +10,8 @@ export function InterestsField({ value, setValue }: StepBodyProps<InterestId[]>)
   const selected = value ?? [];
 
   const toggle = (id: InterestId) => {
+    triggerLightHaptic();
+
     if (selected.includes(id)) {
       setValue(selected.filter((s) => s !== id));
       return;

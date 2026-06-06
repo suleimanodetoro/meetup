@@ -67,6 +67,12 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
     });
   }, [visit.recent_users]);
 
+  const travelerCount = Math.max(visit.user_count || 0, recentUsers.length);
+  const travelerLabel =
+    travelerCount > 0
+      ? `${travelerCount} traveler${travelerCount === 1 ? '' : 's'} going`
+      : 'Be the first to go';
+
   // Safe date formatting
   const dateRange = useMemo(() => {
     try {
@@ -219,7 +225,9 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
               textShadowColor: 'rgba(0, 0, 0, 0.75)',
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: 3,
-            }}></Text>
+            }}>
+            {travelerLabel}
+          </Text>
         </View>
       </View>
     </Pressable>

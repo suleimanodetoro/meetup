@@ -14,22 +14,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
 import { PremiumBadge } from '~/components/PremiumBadge';
-
-const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
-  LANGUAGES.map((l) => [l.code, l]),
-);
-function formatLanguages(codes: readonly string[] | undefined): string {
-  if (!codes || codes.length === 0) return '';
-  return codes
-    .map((c) => LANGUAGE_BY_CODE.get(c)?.name ?? c)
-    .join(', ');
-}
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
+import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
+
+const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
+  LANGUAGES.map((l) => [l.code, l])
+);
+function formatLanguages(codes: readonly string[] | undefined): string {
+  if (!codes || codes.length === 0) return '';
+  return codes.map((c) => LANGUAGE_BY_CODE.get(c)?.name ?? c).join(', ');
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -56,14 +56,14 @@ interface UserProfile {
 export default function UserProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { session } = useAuth();
-  
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>(null);
   const [isRequester, setIsRequester] = useState(false);
   const [loading, setLoading] = useState(true);
   const [processingAction, setProcessingAction] = useState(false);
-  
+
   // Travel stats
   const [travelStats, setTravelStats] = useState({
     totalTrips: 0,
@@ -104,8 +104,9 @@ export default function UserProfileScreen() {
       // secondary RPC. Defaults to false on any failure. The cast bypasses
       // the generated Database types until they're regenerated against the
       // 20260524150000_add_is_premium_to_user_rpcs.sql migration.
-      void (supabase.rpc as any)('is_user_premium', { uid: userId })
-        .then(({ data }: { data: boolean | null }) => setIsPremium(!!data));
+      void (supabase.rpc as any)('is_user_premium', { uid: userId }).then(
+        ({ data }: { data: boolean | null }) => setIsPremium(!!data)
+      );
 
       // Fetch travel stats
       const { data: visits } = await supabase
@@ -114,7 +115,7 @@ export default function UserProfileScreen() {
         .eq('user_id', userId);
 
       if (visits) {
-        const uniqueCountries = new Set(visits.map(v => v.country_code).filter(Boolean));
+        const uniqueCountries = new Set(visits.map((v) => v.country_code).filter(Boolean));
         setTravelStats({
           totalTrips: visits.length,
           countriesVisited: uniqueCountries.size,
@@ -128,7 +129,7 @@ export default function UserProfileScreen() {
         .eq('user_id', userId);
 
       if (attendance && attendance.length > 0) {
-        const eventIds = attendance.map(a => a.event_id);
+        const eventIds = attendance.map((a) => a.event_id);
         const { data: events } = await supabase
           .from('events')
           .select('*')
@@ -144,11 +145,10 @@ export default function UserProfileScreen() {
 
       // Check friendship status if not viewing own profile
       if (userId !== session.user.id) {
-        const { data: friendshipData } = await supabase
-          .rpc('get_friendship_status', {
-            user1_id: session.user.id,
-            user2_id: userId
-          });
+        const { data: friendshipData } = await supabase.rpc('get_friendship_status', {
+          user1_id: session.user.id,
+          user2_id: userId,
+        });
 
         if (friendshipData && friendshipData.length > 0) {
           const friendship = friendshipData[0];
@@ -172,13 +172,11 @@ export default function UserProfileScreen() {
 
       if (!friendshipStatus) {
         // Send friend request
-        const { error } = await supabase
-          .from('friendships')
-          .insert({
-            requester_id: session.user.id,
-            addressee_id: userId,
-            status: 'pending',
-          });
+        const { error } = await supabase.from('friendships').insert({
+          requester_id: session.user.id,
+          addressee_id: userId,
+          status: 'pending',
+        });
 
         if (error) throw error;
         setFriendshipStatus('pending');
@@ -188,9 +186,9 @@ export default function UserProfileScreen() {
         // Accept friend request
         const { error } = await supabase
           .from('friendships')
-          .update({ 
+          .update({
             status: 'accepted',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('requester_id', userId)
           .eq('addressee_id', session.user.id);
@@ -211,7 +209,7 @@ export default function UserProfileScreen() {
         setIsRequester(false);
         Alert.alert('Cancelled', 'Friend request cancelled');
       }
-      
+
       await fetchUserData();
     } catch (error) {
       console.error('Error handling friend request:', error);
@@ -226,26 +224,22 @@ export default function UserProfileScreen() {
 
     setProcessingAction(true);
     try {
-      const { data, error } = await supabase
-        .rpc('get_or_create_dm_conversation_v3', {
-          sender_id: session.user.id,
-          recipient_id: userId
-        });
+      const { data, error } = await supabase.rpc('get_or_create_dm_conversation_v3', {
+        sender_id: session.user.id,
+        recipient_id: userId,
+      });
 
       if (error) throw error;
 
       const result = Array.isArray(data) ? data[0] : data;
-      
+
       if (result?.can_msg_out && result?.conv_id_out) {
         router.push({
           pathname: '/chat/dm/[conversationId]',
-          params: { conversationId: result.conv_id_out.toString() }
+          params: { conversationId: result.conv_id_out.toString() },
         });
       } else {
-        Alert.alert(
-          'Cannot Message',
-          result?.block_msg_out || 'Unable to start conversation'
-        );
+        Alert.alert('Cannot Message', result?.block_msg_out || 'Unable to start conversation');
       }
     } catch (error: any) {
       console.error('Error starting conversation:', error);
@@ -276,12 +270,21 @@ export default function UserProfileScreen() {
   };
 
   const getInterestDetails = (interestId: string) => {
-    return INTERESTS.find(i => i.id === interestId) || { id: interestId, label: interestId, emoji: '✨' };
+    return (
+      INTERESTS.find((i) => i.id === interestId) || {
+        id: interestId,
+        label: interestId,
+        emoji: '✨',
+      }
+    );
   };
 
-  const extractSocialUsername = (url: string, platform: 'instagram' | 'tiktok' | 'youtube'): string => {
+  const extractSocialUsername = (
+    url: string,
+    platform: 'instagram' | 'tiktok' | 'youtube'
+  ): string => {
     if (!url) return '';
-    
+
     try {
       if (platform === 'instagram') {
         const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
@@ -293,7 +296,7 @@ export default function UserProfileScreen() {
         const match = url.match(/youtube\.com\/(@|c\/|channel\/)([a-zA-Z0-9_-]+)/);
         return match ? match[2] : '';
       }
-    } catch (e) {
+    } catch {
       return '';
     }
     return '';
@@ -304,7 +307,7 @@ export default function UserProfileScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={authColors.accent} />
       </View>
     );
   }
@@ -327,40 +330,41 @@ export default function UserProfileScreen() {
     <View style={styles.container}>
       {/* Fixed Header Buttons */}
       <SafeAreaView style={styles.fixedHeaderButtons}>
-        <Pressable 
-          onPress={() => router.back()} 
-          style={styles.headerButton}
-        >
+        <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
         {!isOwnProfile && (
-          <Pressable style={styles.headerButton}>
+          <Pressable
+            onPress={() => Alert.alert('Profile options', 'More profile actions are coming soon.')}
+            style={styles.headerButton}>
             <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
           </Pressable>
         )}
       </SafeAreaView>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
-      >
+        contentContainerStyle={styles.scrollContentContainer}>
         {/* Header Image - Scrollable */}
         <View style={styles.headerImageContainer}>
           <Image
             source={{
-              uri: profile.avatar_url || 'https://via.placeholder.com/400'
+              uri: profile.avatar_url || 'https://via.placeholder.com/400',
             }}
             style={styles.headerImage}
           />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.62)']}
+            style={styles.headerScrim}
+          />
 
-          {isPremium && (
-            <PremiumBadge size={28} style={styles.premiumBadgeHeader} />
-          )}
+          {isPremium && <PremiumBadge size={28} style={styles.premiumBadgeHeader} />}
 
           {/* Name and Location Overlay */}
           <View style={styles.profileInfoOverlay}>
             <Text style={styles.profileName}>
-              {profile.full_name}{age ? `, ${age}` : ''}
+              {profile.full_name}
+              {age ? `, ${age}` : ''}
             </Text>
             {(profile.location || profile.nationality) && (
               <View style={styles.locationContainer}>
@@ -368,7 +372,7 @@ export default function UserProfileScreen() {
                   {getCountryFlag(profile.location_country_code || profile.nationality_code || '')}
                 </Text>
                 <Text style={styles.locationText}>
-                  {(profile.location || profile.nationality || '').toUpperCase()}
+                  {profile.location || profile.nationality || ''}
                 </Text>
               </View>
             )}
@@ -382,24 +386,26 @@ export default function UserProfileScreen() {
               disabled={processingAction}
               style={[
                 styles.actionButton,
-                friendshipStatus === 'accepted' && styles.actionButtonAccepted
-              ]}
-            >
-              <Ionicons 
-                name={
-                  friendshipStatus === 'accepted' 
-                    ? 'checkmark-circle' 
-                    : friendshipStatus === 'pending' && !isRequester
-                    ? 'person-add'
-                    : 'person-add-outline'
-                } 
-                size={20} 
-                color={friendshipStatus === 'accepted' ? '#34C759' : '#000'} 
-              />
-              <Text style={[
-                styles.actionButtonText,
-                friendshipStatus === 'accepted' && styles.actionButtonTextAccepted
+                friendshipStatus === 'accepted' && styles.actionButtonAccepted,
               ]}>
+              <Ionicons
+                name={
+                  friendshipStatus === 'accepted'
+                    ? 'checkmark-circle'
+                    : friendshipStatus === 'pending' && !isRequester
+                      ? 'person-add'
+                      : 'person-add-outline'
+                }
+                size={20}
+                color={
+                  friendshipStatus === 'accepted' ? authColors.success : authColors.textPrimary
+                }
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  friendshipStatus === 'accepted' && styles.actionButtonTextAccepted,
+                ]}>
                 {getFriendButtonText()}
               </Text>
             </Pressable>
@@ -407,9 +413,8 @@ export default function UserProfileScreen() {
             <Pressable
               onPress={handleMessage}
               disabled={processingAction}
-              style={[styles.actionButton, styles.messageButton]}
-            >
-              <Ionicons name="chatbubble-outline" size={20} color="#000" />
+              style={[styles.actionButton, styles.messageButton]}>
+              <Ionicons name="chatbubble-outline" size={20} color={authColors.textPrimary} />
               <Text style={styles.actionButtonText}>Message</Text>
             </Pressable>
           </View>
@@ -430,7 +435,7 @@ export default function UserProfileScreen() {
             <View style={styles.socialsContainer}>
               {profile.instagram_url && (
                 <View style={styles.socialPill}>
-                  <Ionicons name="logo-instagram" size={20} color="#000" />
+                  <Ionicons name="logo-instagram" size={20} color={authColors.textPrimary} />
                   <Text style={styles.socialText}>
                     {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not Set'}
                   </Text>
@@ -438,7 +443,7 @@ export default function UserProfileScreen() {
               )}
               {profile.tiktok_url && (
                 <View style={styles.socialPill}>
-                  <Ionicons name="logo-tiktok" size={20} color="#000" />
+                  <Ionicons name="logo-tiktok" size={20} color={authColors.textPrimary} />
                   <Text style={styles.socialText}>
                     {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not Set'}
                   </Text>
@@ -446,7 +451,7 @@ export default function UserProfileScreen() {
               )}
               {profile.youtube_url && (
                 <View style={styles.socialPill}>
-                  <Ionicons name="logo-youtube" size={20} color="#000" />
+                  <Ionicons name="logo-youtube" size={20} color={authColors.textPrimary} />
                   <Text style={styles.socialText}>
                     {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not Set'}
                   </Text>
@@ -462,10 +467,8 @@ export default function UserProfileScreen() {
             <Text style={styles.sectionTitle}>Travel Stats</Text>
           </View>
           <Text style={styles.travelStatsText}>
-            <Text style={styles.travelStatsNumber}>{travelStats.totalTrips}</Text>
-            {' '}Trips  •  {' '}
-            <Text style={styles.travelStatsNumber}>{travelStats.countriesVisited}</Text>
-            {' '}Countries
+            <Text style={styles.travelStatsNumber}>{travelStats.totalTrips}</Text> Trips •{' '}
+            <Text style={styles.travelStatsNumber}>{travelStats.countriesVisited}</Text> Countries
           </Text>
         </View>
 
@@ -478,8 +481,7 @@ export default function UserProfileScreen() {
                 <Pressable
                   key={event.id}
                   onPress={() => router.push(`/event/${event.id}`)}
-                  style={styles.planCard}
-                >
+                  style={styles.planCard}>
                   <Image
                     source={{ uri: event.image_uri || getCityImageUrl(event.city) }}
                     style={styles.planImage}
@@ -493,9 +495,9 @@ export default function UserProfileScreen() {
                     </Text>
                     {event.date && (
                       <Text style={styles.planDate}>
-                        {new Date(event.date).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric' 
+                        {new Date(event.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
                         })}
                       </Text>
                     )}
@@ -530,9 +532,7 @@ export default function UserProfileScreen() {
             <Text style={styles.sectionTitle}>Languages</Text>
             <View style={styles.languagesPill}>
               <Text style={styles.languagesIcon}>aA</Text>
-              <Text style={styles.languagesText}>
-                {formatLanguages(profile.languages)}
-              </Text>
+              <Text style={styles.languagesText}>{formatLanguages(profile.languages)}</Text>
             </View>
           </View>
         )}
@@ -546,35 +546,35 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: authColors.bg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: authColors.bg,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: authColors.bg,
+    padding: authSpace.xl,
   },
   errorText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 16,
+    color: authColors.textPrimary,
+    marginBottom: authSpace.lg,
   },
   errorButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
+    backgroundColor: authColors.ctaPrimaryBg,
+    paddingHorizontal: authSpace.xl,
+    paddingVertical: authSpace.md,
+    borderRadius: authRadius.pill,
   },
   errorButtonText: {
-    color: '#fff',
+    color: authColors.ctaPrimaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.38)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -611,6 +611,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  headerScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
   premiumBadgeHeader: {
     position: 'absolute',
     top: 60,
@@ -625,7 +632,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 36,
     fontWeight: '700',
-    color: '#fff',
+    color: authColors.ctaPrimaryText,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -641,91 +648,91 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 18,
-    color: '#fff',
+    color: authColors.ctaPrimaryText,
     fontWeight: '600',
-    letterSpacing: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   actionButtons: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 12,
+    paddingHorizontal: authSpace.xl,
+    paddingVertical: authSpace.xl,
+    gap: authSpace.md,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: authColors.surface,
     paddingVertical: 14,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    gap: 8,
+    borderRadius: authRadius.pill,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+    gap: authSpace.sm,
   },
   actionButtonAccepted: {
-    borderColor: '#34C759',
+    borderColor: authColors.success,
     backgroundColor: '#F0FFF4',
   },
   messageButton: {
-    backgroundColor: '#fff',
+    backgroundColor: authColors.surface,
   },
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: authColors.textPrimary,
   },
   actionButtonTextAccepted: {
-    color: '#34C759',
+    color: authColors.success,
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingHorizontal: authSpace.xl,
+    marginBottom: authSpace.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: authSpace.md,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 12,
+    fontSize: 22,
+    fontWeight: '800',
+    color: authColors.textPrimary,
+    marginBottom: authSpace.md,
+    letterSpacing: -0.3,
   },
   bioText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
+    fontSize: authType.body.fontSize,
+    lineHeight: authType.body.lineHeight,
+    color: authColors.textSecondary,
   },
   travelStatsText: {
     fontSize: 16,
-    color: '#666',
+    color: authColors.textSecondary,
     lineHeight: 24,
   },
   travelStatsNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#007AFF',
+    color: authColors.accent,
   },
   interestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: authSpace.sm,
   },
   interestPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
+    backgroundColor: authColors.surface,
+    paddingHorizontal: authSpace.lg,
     paddingVertical: 10,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
     gap: 6,
   },
   interestEmoji: {
@@ -734,85 +741,85 @@ const styles = StyleSheet.create({
   interestLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: authColors.textSecondary,
   },
   languagesPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    gap: 12,
+    backgroundColor: authColors.accentSoft,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.lg,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: authColors.accentBorder,
+    gap: authSpace.md,
   },
   languagesIcon: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: authColors.accent,
   },
   languagesText: {
     fontSize: 16,
-    color: '#000',
+    color: authColors.textSecondary,
     flex: 1,
   },
   socialsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: authSpace.md,
   },
   socialPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: authColors.surface,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.md,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    gap: 8,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+    gap: authSpace.sm,
   },
   socialText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#000',
+    color: authColors.textPrimary,
   },
   plansContainer: {
-    gap: 12,
+    gap: authSpace.md,
   },
   planCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: authColors.surface,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: authColors.borderSubtle,
     overflow: 'hidden',
   },
   planImage: {
     width: 80,
     height: 80,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: authColors.borderMuted,
   },
   planContent: {
     flex: 1,
-    padding: 12,
+    padding: authSpace.md,
     justifyContent: 'center',
   },
   planTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: authColors.textPrimary,
     marginBottom: 4,
   },
   planLocation: {
     fontSize: 14,
-    color: '#666',
+    color: authColors.textSecondary,
     marginBottom: 2,
   },
   planDate: {
     fontSize: 13,
-    color: '#007AFF',
+    color: authColors.accent,
     fontWeight: '500',
   },
 });

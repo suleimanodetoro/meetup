@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { authColors, authSpace } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 /**
@@ -41,14 +42,20 @@ export function NameField({
         maxLength={50}
         selectionColor={authColors.textPrimary}
         onSubmitEditing={() => {
-          if (!disabled && onContinue) onContinue();
+          if (!disabled && onContinue) {
+            triggerLightHaptic();
+            onContinue();
+          }
         }}
       />
       <View style={styles.underline} />
 
       <View style={styles.ctaRow}>
         <Pressable
-          onPress={() => onContinue?.()}
+          onPress={() => {
+            triggerLightHaptic();
+            onContinue?.();
+          }}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
           disabled={disabled}

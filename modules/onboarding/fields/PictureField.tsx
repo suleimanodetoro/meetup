@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 import type { StepBodyProps } from '../types';
 
 export interface PictureValue {
@@ -11,6 +12,7 @@ export interface PictureValue {
 
 export function PictureField({ value, setValue }: StepBodyProps<PictureValue>) {
   const pick = async () => {
+    triggerLightHaptic();
     const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
     if (picked) setValue({ uri: picked.uri, base64: picked.base64 });
   };

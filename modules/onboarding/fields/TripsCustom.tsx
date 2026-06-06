@@ -15,6 +15,7 @@ import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
 import { authColors } from '~/utils/authTheme';
+import { triggerLightHaptic } from '~/utils/haptics';
 import { OnboardingFrame } from '../OnboardingFrame';
 import type { CustomStepProps } from '../types';
 
@@ -111,7 +112,10 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         Destination
       </Text>
       <Pressable
-        onPress={() => setShowDestinationModal(true)}
+        onPress={() => {
+          triggerLightHaptic();
+          setShowDestinationModal(true);
+        }}
         style={{
           backgroundColor: authColors.surface,
           padding: 20,
@@ -142,16 +146,34 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         Travel Dates
       </Text>
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 40 }}>
-        <DateButton label="From" date={startDate} onPress={() => setShowStartPicker(true)} />
-        <DateButton label="To" date={endDate} onPress={() => setShowEndPicker(true)} />
+        <DateButton
+          label="From"
+          date={startDate}
+          onPress={() => {
+            triggerLightHaptic();
+            setShowStartPicker(true);
+          }}
+        />
+        <DateButton
+          label="To"
+          date={endDate}
+          onPress={() => {
+            triggerLightHaptic();
+            setShowEndPicker(true);
+          }}
+        />
       </View>
 
       <DestinationModal
         visible={showDestinationModal}
-        onClose={() => setShowDestinationModal(false)}
+        onClose={() => {
+          triggerLightHaptic();
+          setShowDestinationModal(false);
+        }}
         accessToken={session?.access_token ?? null}
         selected={destination}
         onSelect={(d) => {
+          triggerLightHaptic();
           setDestination(d);
           setShowDestinationModal(false);
         }}
@@ -164,6 +186,7 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         mode="date"
         minimumDate={new Date()}
         onConfirm={(date) => {
+          triggerLightHaptic();
           setStartDate(date);
           setShowStartPicker(false);
           if (!endDate) setTimeout(() => setShowEndPicker(true), 300);
@@ -181,6 +204,7 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         mode="date"
         minimumDate={startDate || new Date()}
         onConfirm={(date) => {
+          triggerLightHaptic();
           setEndDate(date);
           setShowEndPicker(false);
         }}
