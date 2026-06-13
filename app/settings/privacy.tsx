@@ -9,19 +9,35 @@ import {
   Switch,
   Pressable,
   Alert,
-  ActivityIndicator,Image
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { 
-  UserPrivacySettings, 
-  MessagePrivacy, 
-  ProfileVisibility,
-  BlockedUser 
-} from '~/types/messaging';
+import { UserPrivacySettings, BlockedUser } from '~/types/messaging';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import {
+  Card,
+  Check,
+  Row,
+  SectionFootnote,
+  SectionHeader,
+  settingsTheme,
+} from '~/components/SettingsList';
+
+const MESSAGE_OPTIONS = [
+  { value: 'everyone', label: 'Everyone' },
+  { value: 'friends_only', label: 'Friends only' },
+  { value: 'nobody', label: 'Nobody' },
+] as const;
+
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public (Anyone can see)' },
+  { value: 'friends_only', label: 'Friends only' },
+  { value: 'private', label: 'Private (Only me)' },
+] as const;
 
 export default function PrivacySettingsScreen() {
   const { session } = useAuth();
@@ -81,10 +97,12 @@ export default function PrivacySettingsScreen() {
     try {
       const { data } = await supabase
         .from('blocked_users')
-        .select(`
+        .select(
+          `
           *,
           blocked_profile:profiles!blocked_users_blocked_id_fkey(*)
-        `)
+        `
+        )
         .eq('blocker_id', session.user.id);
 
       setBlockedUsers((data || []) as unknown as BlockedUser[]);
@@ -97,8 +115,8 @@ export default function PrivacySettingsScreen() {
     if (!settings || !session?.user?.id) return;
 
     setSaving(true);
-    const updatedSettings = { ...settings, [key]: value };
-    setSettings(updatedSettings);
+    const previous = settings;
+    setSettings({ ...settings, [key]: value });
 
     try {
       const { error } = await supabase
@@ -109,8 +127,7 @@ export default function PrivacySettingsScreen() {
       if (error) throw error;
     } catch (error) {
       console.error('Error updating privacy settings:', error);
-      // Revert on error
-      setSettings(settings);
+      setSettings(previous); // Revert on error
       Alert.alert('Error', 'Failed to update setting');
     } finally {
       setSaving(false);
@@ -135,7 +152,7 @@ export default function PrivacySettingsScreen() {
                 .eq('blocker_id', blockerId)
                 .eq('blocked_id', blockedUserId);
 
-              setBlockedUsers(prev => prev.filter(b => b.blocked_id !== blockedUserId));
+              setBlockedUsers((prev) => prev.filter((b) => b.blocked_id !== blockedUserId));
               Alert.alert('User unblocked');
             } catch (error) {
               console.error('Error unblocking user:', error);
@@ -147,206 +164,135 @@ export default function PrivacySettingsScreen() {
     );
   };
 
-  const RadioOption = ({ 
-    label, 
-    value, 
-    currentValue, 
-    onSelect 
-  }: { 
-    label: string; 
-    value: string; 
-    currentValue: string; 
-    onSelect: (value: string) => void;
-  }) => (
-    <Pressable
-      style={styles.radioOption}
-      onPress={() => onSelect(value)}
-    >
-      <View style={styles.radioCircle}>
-        {currentValue === value && <View style={styles.radioSelected} />}
-      </View>
-      <Text style={styles.radioLabel}>{label}</Text>
-    </Pressable>
-  );
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={settingsTheme.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
+  const messagePrivacy = settings?.message_privacy || 'everyone';
+  const profileVisibility = settings?.profile_visibility || 'public';
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={26} color={settingsTheme.label} />
         </Pressable>
-        <Text style={styles.headerTitle}>Privacy Settings</Text>
-        <View style={styles.headerRight}>
-          {saving && <ActivityIndicator size="small" color="#007AFF" />}
-        </View>
+        <Text style={styles.title}>Privacy</Text>
+        {saving ? <ActivityIndicator size="small" color={settingsTheme.accent} /> : null}
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Message Privacy */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Who can message me</Text>
-          <Text style={styles.sectionDescription}>
-            Control who can start a conversation with you
-          </Text>
-          
-          <RadioOption
-            label="Everyone"
-            value="everyone"
-            currentValue={settings?.message_privacy || 'everyone'}
-            onSelect={(value) => updateSetting('message_privacy', value)}
-          />
-          <RadioOption
-            label="Friends only"
-            value="friends_only"
-            currentValue={settings?.message_privacy || 'everyone'}
-            onSelect={(value) => updateSetting('message_privacy', value)}
-          />
-          <RadioOption
-            label="Nobody"
-            value="nobody"
-            currentValue={settings?.message_privacy || 'everyone'}
-            onSelect={(value) => updateSetting('message_privacy', value)}
-          />
-        </View>
-
-        {/* Profile Visibility */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile visibility</Text>
-          <Text style={styles.sectionDescription}>
-            Control who can see your profile information
-          </Text>
-          
-          <RadioOption
-            label="Public (Anyone can see)"
-            value="public"
-            currentValue={settings?.profile_visibility || 'public'}
-            onSelect={(value) => updateSetting('profile_visibility', value)}
-          />
-          <RadioOption
-            label="Friends only"
-            value="friends_only"
-            currentValue={settings?.profile_visibility || 'public'}
-            onSelect={(value) => updateSetting('profile_visibility', value)}
-          />
-          <RadioOption
-            label="Private (Only me)"
-            value="private"
-            currentValue={settings?.profile_visibility || 'public'}
-            onSelect={(value) => updateSetting('profile_visibility', value)}
-          />
-        </View>
-
-        {/* Toggle Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Activity</Text>
-          
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Show online status</Text>
-              <Text style={styles.toggleDescription}>
-                Let others see when you're online
-              </Text>
-            </View>
-            <Switch
-              value={settings?.show_online_status || false}
-              onValueChange={(value) => updateSetting('show_online_status', value)}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <SectionHeader title="Who can message me" />
+        <Card>
+          {MESSAGE_OPTIONS.map((option) => (
+            <Row
+              key={option.value}
+              label={option.label}
+              onPress={() => updateSetting('message_privacy', option.value)}
+              right={<Check selected={messagePrivacy === option.value} />}
             />
-          </View>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Read receipts</Text>
-              <Text style={styles.toggleDescription}>
-                Show when you've read messages
-              </Text>
-            </View>
-            <Switch
-              value={settings?.show_read_receipts || false}
-              onValueChange={(value) => updateSetting('show_read_receipts', value)}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-            />
-          </View>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Friend requests</Text>
-              <Text style={styles.toggleDescription}>
-                Allow others to send you friend requests
-              </Text>
-            </View>
-            <Switch
-              value={settings?.allow_friend_requests || false}
-              onValueChange={(value) => updateSetting('allow_friend_requests', value)}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-            />
-          </View>
-        </View>
-
-        {/* Blocked Users */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Blocked users</Text>
-          <Text style={styles.sectionDescription}>
-            {blockedUsers.length > 0 
-              ? "Users you've blocked can't message you or see your profile"
-              : "You haven't blocked anyone"}
-          </Text>
-          
-          {blockedUsers.map((blocked) => (
-            <View key={blocked.id} style={styles.blockedUser}>
-              <Image
-                source={{ 
-                  uri: blocked.blocked_profile?.avatar_url || 'https://via.placeholder.com/40' 
-                }}
-                style={styles.blockedAvatar}
-              />
-              <Text style={styles.blockedName}>
-                {blocked.blocked_profile?.full_name || 'Unknown User'}
-              </Text>
-              <Pressable
-                style={styles.unblockButton}
-                onPress={() => unblockUser(blocked.blocked_id)}
-              >
-                <Text style={styles.unblockText}>Unblock</Text>
-              </Pressable>
-            </View>
           ))}
-        </View>
+        </Card>
+        <SectionFootnote>Control who can start a conversation with you.</SectionFootnote>
 
-        {/* Data & Storage */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data & Storage</Text>
-          
-          <Pressable style={styles.actionRow}>
-            <Text style={styles.actionLabel}>Clear message cache</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </Pressable>
-          
-          <Pressable style={styles.actionRow}>
-            <Text style={styles.actionLabel}>Download my data</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </Pressable>
-        </View>
+        <SectionHeader title="Profile visibility" />
+        <Card>
+          {VISIBILITY_OPTIONS.map((option) => (
+            <Row
+              key={option.value}
+              label={option.label}
+              onPress={() => updateSetting('profile_visibility', option.value)}
+              right={<Check selected={profileVisibility === option.value} />}
+            />
+          ))}
+        </Card>
+        <SectionFootnote>Control who can see your profile information.</SectionFootnote>
 
+        <SectionHeader title="Activity" />
+        <Card>
+          <Row
+            label="Show online status"
+            sublabel="Let others see when you're online"
+            right={
+              <Switch
+                value={settings?.show_online_status || false}
+                onValueChange={(value) => updateSetting('show_online_status', value)}
+                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                thumbColor="white"
+              />
+            }
+          />
+          <Row
+            label="Read receipts"
+            sublabel="Show when you've read messages"
+            right={
+              <Switch
+                value={settings?.show_read_receipts || false}
+                onValueChange={(value) => updateSetting('show_read_receipts', value)}
+                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                thumbColor="white"
+              />
+            }
+          />
+          <Row
+            label="Friend requests"
+            sublabel="Allow others to send you friend requests"
+            right={
+              <Switch
+                value={settings?.allow_friend_requests || false}
+                onValueChange={(value) => updateSetting('allow_friend_requests', value)}
+                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                thumbColor="white"
+              />
+            }
+          />
+        </Card>
+
+        <SectionHeader title="Blocked users" />
+        {blockedUsers.length > 0 ? (
+          <Card>
+            {blockedUsers.map((blocked) => (
+              <View key={blocked.id} style={styles.blockedRow}>
+                <Image
+                  source={{
+                    uri: blocked.blocked_profile?.avatar_url || 'https://via.placeholder.com/40',
+                  }}
+                  style={styles.blockedAvatar}
+                />
+                <Text style={styles.blockedName} numberOfLines={1}>
+                  {blocked.blocked_profile?.full_name || 'Unknown User'}
+                </Text>
+                <Pressable
+                  style={styles.unblockButton}
+                  onPress={() => unblockUser(blocked.blocked_id)}>
+                  <Text style={styles.unblockText}>Unblock</Text>
+                </Pressable>
+              </View>
+            ))}
+          </Card>
+        ) : (
+          <Card>
+            <Row label="You haven't blocked anyone" />
+          </Card>
+        )}
+        <SectionFootnote>
+          Blocked users can't message you or see your profile.
+        </SectionFootnote>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: settingsTheme.background,
   },
   loadingContainer: {
     flex: 1,
@@ -356,123 +302,54 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    gap: 16,
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 12,
   },
   backButton: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  headerRight: {
-    width: 40,
-    alignItems: 'flex-end',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    marginRight: 12,
-    alignItems: 'center',
+    width: 30,
+    height: 30,
     justifyContent: 'center',
   },
-  radioSelected: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#007AFF',
-  },
-  radioLabel: {
-    fontSize: 16,
-    color: '#000',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  toggleInfo: {
+  title: {
     flex: 1,
-    marginRight: 12,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: settingsTheme.label,
   },
-  toggleLabel: {
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 2,
+  content: {
+    paddingBottom: 48,
   },
-  toggleDescription: {
-    fontSize: 12,
-    color: '#666',
-  },
-  blockedUser: {
+  blockedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
   blockedAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
+    marginRight: 14,
+    backgroundColor: '#E9E9E9',
   },
   blockedName: {
     flex: 1,
-    fontSize: 16,
-    color: '#000',
+    fontSize: 17,
+    fontWeight: '500',
+    color: settingsTheme.label,
   },
   unblockButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: '#EEF1F4',
+    borderRadius: 9,
   },
   unblockText: {
     fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  actionLabel: {
-    fontSize: 16,
-    color: '#000',
+    color: settingsTheme.accent,
+    fontWeight: '700',
   },
 });

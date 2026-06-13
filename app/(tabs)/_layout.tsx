@@ -1,7 +1,6 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   AntDesign,
   FontAwesome5,
@@ -14,14 +13,12 @@ import { useState } from 'react';
 import CreateOptionsModal from '~/components/CreateOptionsModal';
 import { triggerLightHaptic } from '~/utils/haptics';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 const C = {
   accent: '#007AFF',
-  tabbarBg: '#FFFCF4',
-  activeBg: '#007AFF',
-  inactiveText: '#111111',
-  border: 'rgba(255,255,255,0.92)',
+  // Tinted translucent cream so the map / content shows through faintly behind the floating bar.
+  tabbarBg: 'rgba(255, 252, 244, 0.85)',
+  inactive: '#6F757D',
+  border: 'rgba(255,255,255,0.85)',
 };
 
 export default function TabLayout() {
@@ -88,12 +85,14 @@ function WaypointTabBar({
   createActive,
   onCreatePress,
 }: any) {
+  const activeRouteName = state.routes[state.index]?.name;
+
   return (
     <View
       pointerEvents="box-none"
       style={[styles.tabBarWrap, { bottom: Math.max(bottomInset, 16) }]}>
-      <Animated.View layout={LinearTransition.springify().damping(18)} style={styles.tabBar}>
-        {state.routes.map((route: any, index: number) => {
+      <View style={styles.tabBar}>
+        {state.routes.map((route: any) => {
           const options = descriptors[route.key]?.options ?? {};
           const label =
             typeof options.tabBarLabel === 'string'
@@ -102,8 +101,8 @@ function WaypointTabBar({
                 ? options.title
                 : route.name;
           const isCreate = route.name === 'create';
-          const isFocused = isCreate ? createActive : state.index === index;
-          const iconColor = isFocused ? '#FFFFFF' : C.inactiveText;
+          const isFocused = isCreate ? createActive : activeRouteName === route.name;
+          const iconColor = isFocused ? C.accent : C.inactive;
 
           const onPress = () => {
             triggerLightHaptic();
@@ -125,27 +124,18 @@ function WaypointTabBar({
           };
 
           return (
-            <AnimatedPressable
-              layout={LinearTransition.springify().damping(18)}
+            <Pressable
               key={route.key}
               onPress={onPress}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-              style={[styles.tabSegment, isFocused && styles.tabSegmentActive]}>
+              style={styles.tabSegment}>
               <TabIcon routeName={route.name} focused={isFocused} color={iconColor} />
-              {isFocused && (
-                <Animated.Text
-                  layout={LinearTransition.springify().damping(18)}
-                  style={styles.tabLabel}
-                  numberOfLines={1}>
-                  {label}
-                </Animated.Text>
-              )}
-            </AnimatedPressable>
+            </Pressable>
           );
         })}
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -162,7 +152,7 @@ function TabIcon({
   switch (routeName) {
     case 'index':
       return (
-        <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+        <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={25} color={color} />
       );
     case 'map':
       return <FontAwesome6 name="map-pin" size={22} color={color} />;
@@ -172,12 +162,12 @@ function TabIcon({
       return (
         <Ionicons
           name={focused ? 'chatbox-ellipses' : 'chatbox-ellipses-outline'}
-          size={24}
+          size={25}
           color={color}
         />
       );
     case 'profile':
-      return <AntDesign name="user" size={24} color={color} />;
+      return <AntDesign name="user" size={25} color={color} />;
     default:
       return <Ionicons name="ellipse-outline" size={22} color={color} />;
   }
@@ -192,7 +182,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 24,
     elevation: 16,
   },
@@ -201,31 +191,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    gap: 6,
+    gap: 4,
     borderRadius: 40,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: C.tabbarBg,
-    borderWidth: 1.3,
+    borderWidth: 1,
     borderColor: C.border,
   },
   tabSegment: {
+    width: 52,
     height: 48,
-    minWidth: 48,
     borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: 13,
-  },
-  tabSegmentActive: {
-    backgroundColor: C.activeBg,
-    gap: 7,
-  },
-  tabLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 17,
-    fontWeight: '700',
   },
 });

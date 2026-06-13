@@ -23,6 +23,7 @@ export type RenderMessageArgs = {
   message: MessageWithDetails;
   isOwn: boolean;
   showAvatar: boolean;
+  showTail: boolean;
   showSenderName: boolean;
   prev: MessageWithDetails | null;
   onPressUser?: (userId: string) => void;
@@ -52,44 +53,29 @@ export function ChatShell(props: ChatShellProps) {
   const lastSendErrorRef = useRef(chat.lastSendError);
 
   useEffect(() => {
-    if (
-      chat.lastSendError &&
-      chat.lastSendError !== lastSendErrorRef.current
-    ) {
-      Alert.alert(
-        "Couldn't send",
-        'Your message has been restored. Try again.',
-      );
+    if (chat.lastSendError && chat.lastSendError !== lastSendErrorRef.current) {
+      Alert.alert("Couldn't send", 'Your message has been restored. Try again.');
     }
     lastSendErrorRef.current = chat.lastSendError;
   }, [chat.lastSendError]);
 
-  const groupAvatars =
-    props.groupAvatarsBySender ?? chat.header.kind === 'event';
-  const showSenderName =
-    props.showSenderName ?? chat.header.kind === 'event';
+  const groupAvatars = props.groupAvatarsBySender ?? chat.header.kind === 'event';
+  const showSenderName = props.showSenderName ?? chat.header.kind === 'event';
 
-  const renderItem = ({
-    item,
-    index,
-  }: {
-    item: MessageWithDetails;
-    index: number;
-  }) => {
+  const renderItem = ({ item, index }: { item: MessageWithDetails; index: number }) => {
     const prev = index > 0 ? chat.messages[index - 1] : null;
+    const next = index < chat.messages.length - 1 ? chat.messages[index + 1] : null;
     const isOwn = item.user_id === meId;
-    const showAvatar =
-      !isOwn && (!groupAvatars || !prev || prev.user_id !== item.user_id);
-    const showName =
-      !isOwn &&
-      showSenderName &&
-      (!prev || prev.user_id !== item.user_id);
+    const showAvatar = !isOwn && (!groupAvatars || !prev || prev.user_id !== item.user_id);
+    const showTail = !groupAvatars || !next || next.user_id !== item.user_id;
+    const showName = !isOwn && showSenderName && (!prev || prev.user_id !== item.user_id);
 
     if (props.renderMessage) {
       return props.renderMessage({
         message: item,
         isOwn,
         showAvatar,
+        showTail,
         showSenderName: showName,
         prev,
         onPressUser,
@@ -101,6 +87,7 @@ export function ChatShell(props: ChatShellProps) {
         message={item}
         isOwn={isOwn}
         showAvatar={showAvatar}
+        showTail={showTail}
         showSenderName={showName}
         onPressUser={onPressUser}
       />
@@ -133,8 +120,7 @@ export function ChatShell(props: ChatShellProps) {
       {chat.status.phase === 'ready' && (
         <KeyboardAvoidingView
           style={styles.body}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <FlatList
             ref={flatListRef}
             data={chat.messages}
@@ -142,9 +128,7 @@ export function ChatShell(props: ChatShellProps) {
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={styles.messagesList}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             ListFooterComponent={<TypingRow users={chat.typingUsers} />}
           />
 
@@ -164,27 +148,24 @@ function DefaultBubble({
   message,
   isOwn,
   showAvatar,
+  showTail,
   showSenderName,
   onPressUser,
 }: {
   message: MessageWithDetails;
   isOwn: boolean;
   showAvatar: boolean;
+  showTail: boolean;
   showSenderName: boolean;
   onPressUser?: (userId: string) => void;
 }) {
   return (
     <View style={[styles.messageRow, isOwn && styles.messageRowOwn]}>
       {!isOwn && showAvatar && (
-        <Pressable
-          onPress={() => onPressUser?.(message.user_id)}
-          hitSlop={6}
-        >
+        <Pressable onPress={() => onPressUser?.(message.user_id)} hitSlop={6}>
           <Image
             source={{
-              uri:
-                message.user?.avatar_url ||
-                'https://via.placeholder.com/32',
+              uri: message.user?.avatar_url || 'https://via.placeholder.com/32',
             }}
             style={styles.avatar}
           />
@@ -192,30 +173,39 @@ function DefaultBubble({
       )}
       {!isOwn && !showAvatar && <View style={styles.avatarPlaceholder} />}
 
-      <View style={[styles.bubble, isOwn && styles.bubbleOwn]}>
-        {!isOwn && showSenderName && (
-          <Text style={styles.senderName}>
-            {message.user?.full_name ?? 'Unknown'}
-          </Text>
-        )}
-
-        {message.reply_to?.content ? (
-          <View style={styles.replyQuote}>
-            <Text style={styles.replyName}>
-              {message.reply_to.user?.full_name ?? 'Unknown'}
-            </Text>
-            <Text style={styles.replyText} numberOfLines={1}>
-              {message.reply_to.content}
-            </Text>
-          </View>
+      <View style={[styles.bubbleWrap, isOwn && styles.bubbleWrapOwn]}>
+        {showTail ? (
+          isOwn ? (
+            <>
+              <View style={styles.rightArrow} />
+              <View style={styles.rightArrowOverlap} />
+            </>
+          ) : (
+            <>
+              <View style={styles.leftArrow} />
+              <View style={styles.leftArrowOverlap} />
+            </>
+          )
         ) : null}
+        <View style={[styles.bubble, isOwn && styles.bubbleOwn]}>
+          {!isOwn && showSenderName && (
+            <Text style={styles.senderName}>{message.user?.full_name ?? 'Unknown'}</Text>
+          )}
 
-        <Text style={[styles.text, isOwn && styles.textOwn]}>
-          {message.content}
-        </Text>
-        <Text style={[styles.time, isOwn && styles.timeOwn]}>
-          {format(new Date(message.created_at), 'HH:mm')}
-        </Text>
+          {message.reply_to?.content ? (
+            <View style={styles.replyQuote}>
+              <Text style={styles.replyName}>{message.reply_to.user?.full_name ?? 'Unknown'}</Text>
+              <Text style={styles.replyText} numberOfLines={1}>
+                {message.reply_to.content}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={[styles.text, isOwn && styles.textOwn]}>{message.content}</Text>
+          <Text style={[styles.time, isOwn && styles.timeOwn]}>
+            {format(new Date(message.created_at), 'HH:mm')}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -272,16 +262,11 @@ function Composer({
       <Pressable
         style={[styles.sendButton, disabled && styles.sendButtonDisabled]}
         onPress={onSend}
-        disabled={disabled}
-      >
+        disabled={disabled}>
         {sending ? (
           <ActivityIndicator size="small" color="#007AFF" />
         ) : (
-          <Ionicons
-            name="send"
-            size={20}
-            color={disabled ? '#ccc' : '#007AFF'}
-          />
+          <Ionicons name="send" size={20} color={disabled ? '#ccc' : '#007AFF'} />
         )}
       </Pressable>
     </View>
@@ -317,12 +302,55 @@ const styles = StyleSheet.create({
   avatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
   avatarPlaceholder: { width: 32, marginRight: 8 },
   bubble: {
-    maxWidth: '75%',
     backgroundColor: '#f0f0f0',
     borderRadius: 16,
     padding: 12,
+    overflow: 'hidden',
   },
   bubbleOwn: { backgroundColor: '#007AFF' },
+  bubbleWrap: {
+    maxWidth: '75%',
+    position: 'relative',
+  },
+  bubbleWrapOwn: {
+    alignItems: 'flex-end',
+  },
+  rightArrow: {
+    position: 'absolute',
+    backgroundColor: '#007AFF',
+    width: 20,
+    height: 25,
+    bottom: 0,
+    right: -10,
+    borderBottomLeftRadius: 25,
+  },
+  rightArrowOverlap: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    width: 20,
+    height: 35,
+    bottom: -6,
+    right: -20,
+    borderBottomLeftRadius: 18,
+  },
+  leftArrow: {
+    position: 'absolute',
+    backgroundColor: '#f0f0f0',
+    width: 20,
+    height: 25,
+    bottom: 0,
+    left: -10,
+    borderBottomRightRadius: 25,
+  },
+  leftArrowOverlap: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    width: 20,
+    height: 35,
+    bottom: -6,
+    left: -20,
+    borderBottomRightRadius: 18,
+  },
   senderName: {
     fontSize: 12,
     fontWeight: '600',

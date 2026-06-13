@@ -45,6 +45,7 @@ interface UserProfile {
   nationality?: string;
   nationality_code?: string;
   location?: string;
+  location_country?: string;
   location_country_code?: string;
   languages?: string[];
   interests?: string[];
@@ -380,14 +381,22 @@ export default function UserProfileScreen() {
                 style={styles.founderOverlayLabel}
               />
             ) : null}
-            {(profile.location || profile.nationality) && (
+            {profile.location && (
               <View style={styles.locationContainer}>
                 <Text style={styles.locationFlag}>
-                  {getCountryFlag(profile.location_country_code || profile.nationality_code || '')}
+                  {getCountryFlag(profile.location_country_code || '')}
                 </Text>
                 <Text style={styles.locationText}>
-                  {profile.location || profile.nationality || ''}
+                  {[profile.location, profile.location_country].filter(Boolean).join(', ')}
                 </Text>
+              </View>
+            )}
+            {profile.nationality && (
+              <View style={styles.locationContainer}>
+                <Text style={styles.locationFlag}>
+                  {getCountryFlag(profile.nationality_code || '')}
+                </Text>
+                <Text style={styles.locationText}>From {profile.nationality}</Text>
               </View>
             )}
           </View>

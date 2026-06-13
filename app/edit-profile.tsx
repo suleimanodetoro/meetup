@@ -50,7 +50,7 @@ const socialHelpers = {
       const usernamePattern = /^@?[a-zA-Z0-9._]+$/;
       const urlPattern = /^https:\/\/(www\.)?instagram\.com\/[a-zA-Z0-9._]+\/?$/;
       return usernamePattern.test(input) || urlPattern.test(input);
-    }
+    },
   },
   tiktok: {
     toUrl: (input: string) => {
@@ -69,7 +69,7 @@ const socialHelpers = {
       const usernamePattern = /^@?[a-zA-Z0-9._]+$/;
       const urlPattern = /^https:\/\/(www\.)?tiktok\.com\/@[a-zA-Z0-9._]+\/?$/;
       return usernamePattern.test(input) || urlPattern.test(input);
-    }
+    },
   },
   youtube: {
     toUrl: (input: string) => {
@@ -88,8 +88,8 @@ const socialHelpers = {
       const usernamePattern = /^@?[a-zA-Z0-9_-]+$/;
       const urlPattern = /^https:\/\/(www\.)?youtube\.com\/(c\/|channel\/|@)[a-zA-Z0-9_-]+\/?$/;
       return usernamePattern.test(input) || urlPattern.test(input);
-    }
-  }
+    },
+  },
 };
 
 export default function EditProfile() {
@@ -109,7 +109,8 @@ export default function EditProfile() {
   const [dob, setDob] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Location (stored as nationality in DB)
+  // Nationality / origin. Current location is managed separately by onboarding
+  // and the map location flow (`profiles.location*`).
   const [country, setCountry] = useState<Country | null>(null);
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
@@ -118,8 +119,9 @@ export default function EditProfile() {
   // (male / female / other) — using a wider union here silently dropped
   // any onboarding-written 'other' into a state with no rendered option.
   const [gender, setGender] = useState<'male' | 'female' | 'other' | null>(null);
-  const [genderPreference, setGenderPreference] =
-    useState<'everyone' | 'guys' | 'girls'>('everyone');
+  const [genderPreference, setGenderPreference] = useState<'everyone' | 'guys' | 'girls'>(
+    'everyone'
+  );
 
   // Meeting Preference
   const [meetingPreference, setMeetingPreference] = useState<string | null>(null);
@@ -149,17 +151,17 @@ export default function EditProfile() {
       tiktok: setTiktokInput,
       youtube: setYoutubeInput,
     };
-    
+
     setters[platform](value);
 
     // Validate if not empty
     if (value.trim() && !socialHelpers[platform].validate(value)) {
-      setSocialErrors(prev => ({
+      setSocialErrors((prev) => ({
         ...prev,
         [platform]: `Invalid ${platform.charAt(0).toUpperCase() + platform.slice(1)} username or URL`,
       }));
     } else {
-      setSocialErrors(prev => ({
+      setSocialErrors((prev) => ({
         ...prev,
         [platform]: '',
       }));
@@ -168,23 +170,22 @@ export default function EditProfile() {
 
   // Handle interest toggle
   const handleToggleInterest = (interestId: string) => {
-    setInterests(prev => 
-      prev.includes(interestId) 
-        ? prev.filter(id => id !== interestId)
-        : [...prev, interestId]
+    setInterests((prev) =>
+      prev.includes(interestId) ? prev.filter((id) => id !== interestId) : [...prev, interestId]
     );
   };
 
   // Load profile (schema-correct)
   useEffect(() => {
-  (async () => {
-    if (!session?.user?.id) return;
-    setLoading(true);
-    
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(`
+    (async () => {
+      if (!session?.user?.id) return;
+      setLoading(true);
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select(
+            `
           id,
           full_name,
           bio,
@@ -202,93 +203,86 @@ export default function EditProfile() {
           instagram_url,
           tiktok_url,
           youtube_url
-        `)
-        .eq('id', session.user.id)
-        .single();
+        `
+          )
+          .eq('id', session.user.id)
+          .single();
 
-      if (error) {
-        console.error('Profile query error:', error);
-        throw error;
-      }
-
-      if (profile) {
-        setFullName(profile.full_name ?? '');
-        setBio(profile.bio ?? '');
-        setMainImage(profile.avatar_url ?? null);
-        setSecondImage(profile.avatar_url_2 ?? null);
-        setThirdImage(profile.avatar_url_3 ?? null);
-
-        // birth_date -> dob. `birth_date` is a postgres DATE (YYYY-MM-DD);
-        // appending a local time avoids the UTC-midnight-drift-into-prev-day
-        // bug in negative-UTC timezones.
-        if (profile.birth_date) {
-          const dobDate = new Date(`${profile.birth_date}T00:00:00`);
-          if (!isNaN(dobDate.getTime())) setDob(dobDate);
+        if (error) {
+          console.error('Profile query error:', error);
+          throw error;
         }
 
-        // nationality_code/name -> Country object
-        const byCode = profile.nationality_code
-          ? COUNTRIES.find((c) => c.code === profile.nationality_code)
-          : null;
-        const byName =
-          !byCode && profile.nationality
-            ? COUNTRIES.find((c) => c.name === profile.nationality)
+        if (profile) {
+          setFullName(profile.full_name ?? '');
+          setBio(profile.bio ?? '');
+          setMainImage(profile.avatar_url ?? null);
+          setSecondImage(profile.avatar_url_2 ?? null);
+          setThirdImage(profile.avatar_url_3 ?? null);
+
+          // birth_date -> dob. `birth_date` is a postgres DATE (YYYY-MM-DD);
+          // appending a local time avoids the UTC-midnight-drift-into-prev-day
+          // bug in negative-UTC timezones.
+          if (profile.birth_date) {
+            const dobDate = new Date(`${profile.birth_date}T00:00:00`);
+            if (!isNaN(dobDate.getTime())) setDob(dobDate);
+          }
+
+          // nationality_code/name -> Country object
+          const byCode = profile.nationality_code
+            ? COUNTRIES.find((c) => c.code === profile.nationality_code)
             : null;
-        const foundCountry = byCode ?? byName ?? null;
-        setCountry(foundCountry);
+          const byName =
+            !byCode && profile.nationality
+              ? COUNTRIES.find((c) => c.name === profile.nationality)
+              : null;
+          const foundCountry = byCode ?? byName ?? null;
+          setCountry(foundCountry);
 
-        // gender / gender_preference. Normalize any legacy values to the
-        // onboarding-aligned set; everything else falls through to 'other'.
-        if (profile.gender) {
-          const normalised: 'male' | 'female' | 'other' =
-            profile.gender === 'male' || profile.gender === 'female'
-              ? profile.gender
-              : 'other';
-          setGender(normalised);
-        }
-        if (profile.gender_preference) {
-          const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
-          setGenderPreference(gp);
-        }
+          // gender / gender_preference. Normalize any legacy values to the
+          // onboarding-aligned set; everything else falls through to 'other'.
+          if (profile.gender) {
+            const normalised: 'male' | 'female' | 'other' =
+              profile.gender === 'male' || profile.gender === 'female' ? profile.gender : 'other';
+            setGender(normalised);
+          }
+          if (profile.gender_preference) {
+            const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
+            setGenderPreference(gp);
+          }
 
-        // Meeting preference
-        if (profile.meeting_preference) {
-          setMeetingPreference(profile.meeting_preference);
-        }
+          // Meeting preference
+          if (profile.meeting_preference) {
+            setMeetingPreference(profile.meeting_preference);
+          }
 
-        // languages / interests (jsonb arrays)
-        if (Array.isArray(profile.languages)) {
-          setLanguages(profile.languages as string[]);
-        }
-        if (Array.isArray(profile.interests)) {
-          setInterests(profile.interests as string[]);
-        }
+          // languages / interests (jsonb arrays)
+          if (Array.isArray(profile.languages)) {
+            setLanguages(profile.languages as string[]);
+          }
+          if (Array.isArray(profile.interests)) {
+            setInterests(profile.interests as string[]);
+          }
 
-        // Extract username/handle from URLs for display
-        setInstagramInput(
-          profile.instagram_url
-            ? socialHelpers.instagram.fromUrl(profile.instagram_url)
-            : '',
-        );
-        setTiktokInput(
-          profile.tiktok_url
-            ? socialHelpers.tiktok.fromUrl(profile.tiktok_url)
-            : '',
-        );
-        setYoutubeInput(
-          profile.youtube_url
-            ? socialHelpers.youtube.fromUrl(profile.youtube_url)
-            : '',
-        );
+          // Extract username/handle from URLs for display
+          setInstagramInput(
+            profile.instagram_url ? socialHelpers.instagram.fromUrl(profile.instagram_url) : ''
+          );
+          setTiktokInput(
+            profile.tiktok_url ? socialHelpers.tiktok.fromUrl(profile.tiktok_url) : ''
+          );
+          setYoutubeInput(
+            profile.youtube_url ? socialHelpers.youtube.fromUrl(profile.youtube_url) : ''
+          );
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+        Alert.alert('Error', 'Failed to load your profile.');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-      Alert.alert('Error', 'Failed to load your profile.');
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, [session?.user?.id]);
+    })();
+  }, [session?.user?.id]);
 
   // Image picking (storage upload only; DB save happens in saveProfile)
   const pickImage = async (position: 'main' | 'second' | 'third') => {
@@ -309,9 +303,7 @@ export default function EditProfile() {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const publicUrl = publicData.publicUrl;
 
       if (position === 'main') setMainImage(publicUrl);
@@ -325,73 +317,82 @@ export default function EditProfile() {
 
   // Save (schema-correct payload)
   const saveProfile = async () => {
-  if (!session?.user?.id) return;
+    if (!session?.user?.id) return;
 
-  // Validate all social inputs before saving
-  const hasErrors = Object.values(socialErrors).some(error => error !== '');
-  if (hasErrors) {
-    Alert.alert('Invalid Input', 'Please fix the invalid social media usernames/URLs before saving.');
-    return;
-  }
-
-  try {
-    setSaving(true);
-
-    // Base payload with ALL avatar URLs
-    const basePayload: any = {
-      updated_at: new Date().toISOString(),
-      full_name: fullName || null,
-      bio: bio || null,
-      avatar_url: mainImage || null,
-      avatar_url_2: secondImage || null,
-      avatar_url_3: thirdImage || null,
-      birth_date: dob ? new Date(dob).toISOString().slice(0, 10) : null,
-      languages,
-      gender: gender ?? null,
-      nationality: country?.name ?? null,
-      nationality_code: country?.code ?? null,
-      interests,
-      gender_preference: genderPreference ?? null,
-      meeting_preference: meetingPreference ?? null,
-    };
-
-    // Try to save base fields first
-    const { error: baseError } = await supabase
-      .from('profiles')
-      .update(basePayload)
-      .eq('id', session.user.id);
-
-    if (baseError) {
-      console.error('Base save error:', baseError);
-      throw baseError;
+    // Validate all social inputs before saving
+    const hasErrors = Object.values(socialErrors).some((error) => error !== '');
+    if (hasErrors) {
+      Alert.alert(
+        'Invalid Input',
+        'Please fix the invalid social media usernames/URLs before saving.'
+      );
+      return;
     }
 
-    // Save social URLs as part of the same update path. We always include
-    // them — passing null when cleared lets the user actually unset a
-    // previously-saved handle.
-    const socialPayload = {
-      instagram_url: socialHelpers.instagram.toUrl(instagramInput) || null,
-      tiktok_url: socialHelpers.tiktok.toUrl(tiktokInput) || null,
-      youtube_url: socialHelpers.youtube.toUrl(youtubeInput) || null,
-    };
-    const { error: socialError } = await supabase
-      .from('profiles')
-      .update(socialPayload)
-      .eq('id', session.user.id);
-    if (socialError) throw socialError;
-    Alert.alert('Saved', 'Your profile has been updated.');
-    router.back();
-  } catch (err) {
-    console.error('Save failed:', err);
-    Alert.alert('Error', 'Failed to save profile.');
-  } finally {
-    setSaving(false);
-  }
-};
+    try {
+      setSaving(true);
+
+      // Base payload with ALL avatar URLs
+      const basePayload: any = {
+        updated_at: new Date().toISOString(),
+        full_name: fullName || null,
+        bio: bio || null,
+        avatar_url: mainImage || null,
+        avatar_url_2: secondImage || null,
+        avatar_url_3: thirdImage || null,
+        birth_date: dob ? new Date(dob).toISOString().slice(0, 10) : null,
+        languages,
+        gender: gender ?? null,
+        nationality: country?.name ?? null,
+        nationality_code: country?.code ?? null,
+        interests,
+        gender_preference: genderPreference ?? null,
+        meeting_preference: meetingPreference ?? null,
+      };
+
+      // Try to save base fields first
+      const { error: baseError } = await supabase
+        .from('profiles')
+        .update(basePayload)
+        .eq('id', session.user.id);
+
+      if (baseError) {
+        console.error('Base save error:', baseError);
+        throw baseError;
+      }
+
+      // Save social URLs as part of the same update path. We always include
+      // them — passing null when cleared lets the user actually unset a
+      // previously-saved handle.
+      const socialPayload = {
+        instagram_url: socialHelpers.instagram.toUrl(instagramInput) || null,
+        tiktok_url: socialHelpers.tiktok.toUrl(tiktokInput) || null,
+        youtube_url: socialHelpers.youtube.toUrl(youtubeInput) || null,
+      };
+      const { error: socialError } = await supabase
+        .from('profiles')
+        .update(socialPayload)
+        .eq('id', session.user.id);
+      if (socialError) throw socialError;
+      Alert.alert('Saved', 'Your profile has been updated.');
+      router.back();
+    } catch (err) {
+      console.error('Save failed:', err);
+      Alert.alert('Error', 'Failed to save profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'white',
+        }}>
         <ActivityIndicator size="large" />
       </SafeAreaView>
     );
@@ -408,20 +409,21 @@ export default function EditProfile() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
       {/* Header */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0'
-      }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: '#F0F0F0',
+        }}>
         <Pressable onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </Pressable>
         <Text style={{ fontSize: 20, fontWeight: '700' }}>Edit Profile</Text>
-        <Pressable 
+        <Pressable
           onPress={saveProfile}
           disabled={saving}
           style={{
@@ -430,8 +432,7 @@ export default function EditProfile() {
             paddingVertical: 8,
             borderRadius: 20,
             opacity: saving ? 0.6 : 1,
-          }}
-        >
+          }}>
           <Text style={{ color: 'white', fontWeight: '600', fontSize: 15 }}>
             {saving ? 'Saving...' : 'Update'}
           </Text>
@@ -441,136 +442,163 @@ export default function EditProfile() {
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         {/* Profile Pictures */}
         <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 12 }}>Profile Pictures</Text>
-        
+
         {/* Main Picture */}
-        <Pressable 
+        <Pressable
           onPress={() => pickImage('main')}
-          style={{ 
-            height: 280, 
-            borderRadius: 16, 
-            overflow: 'hidden', 
+          style={{
+            height: 280,
+            borderRadius: 16,
+            overflow: 'hidden',
             backgroundColor: '#4A90E2',
             marginBottom: 12,
-            position: 'relative'
-          }}
-        >
+            position: 'relative',
+          }}>
           {mainImage ? (
-            <Image source={{ uri: mainImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <Image
+              source={{ uri: mainImage }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
           ) : (
             <View style={{ flex: 1, backgroundColor: '#4A90E2' }} />
           )}
-          <View style={{ 
-            position: 'absolute', 
-            bottom: 16, 
-            left: 16,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 12
-          }}>
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              left: 16,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 12,
+            }}>
             <Text style={{ color: 'white', fontWeight: '600', fontSize: 15 }}>Main Picture</Text>
           </View>
-          <View style={{ 
-            position: 'absolute', 
-            bottom: 16, 
-            right: 16,
-            backgroundColor: 'rgba(255,255,255,0.9)',
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
             <Ionicons name="camera" size={20} color="#000" />
           </View>
         </Pressable>
 
         {/* Second and Third Pictures */}
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-          <Pressable 
+          <Pressable
             onPress={() => pickImage('second')}
-            style={{ 
-              flex: 1, 
-              height: 160, 
-              borderRadius: 12, 
-              overflow: 'hidden', 
+            style={{
+              flex: 1,
+              height: 160,
+              borderRadius: 12,
+              overflow: 'hidden',
               backgroundColor: '#E0E0E0',
-              position: 'relative'
-            }}
-          >
+              position: 'relative',
+            }}>
             {secondImage ? (
-              <Image source={{ uri: secondImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              <Image
+                source={{ uri: secondImage }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
             ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E0E0E0' }}>
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#E0E0E0',
+                }}>
                 <Ionicons name="add" size={40} color="#999" />
               </View>
             )}
-            <View style={{ 
-              position: 'absolute', 
-              bottom: 8, 
-              left: 8,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 8
-            }}>
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 8,
+              }}>
               <Text style={{ color: 'white', fontWeight: '500', fontSize: 12 }}>2nd Pic</Text>
             </View>
-            <View style={{ 
-              position: 'absolute', 
-              bottom: 8, 
-              right: 8,
-              backgroundColor: 'rgba(255,255,255,0.9)',
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Ionicons name="camera" size={16} color="#000" />
             </View>
           </Pressable>
 
-          <Pressable 
+          <Pressable
             onPress={() => pickImage('third')}
-            style={{ 
-              flex: 1, 
-              height: 160, 
-              borderRadius: 12, 
-              overflow: 'hidden', 
+            style={{
+              flex: 1,
+              height: 160,
+              borderRadius: 12,
+              overflow: 'hidden',
               backgroundColor: '#E0E0E0',
-              position: 'relative'
-            }}
-          >
+              position: 'relative',
+            }}>
             {thirdImage ? (
-              <Image source={{ uri: thirdImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              <Image
+                source={{ uri: thirdImage }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
             ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E0E0E0' }}>
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#E0E0E0',
+                }}>
                 <Ionicons name="add" size={40} color="#999" />
               </View>
             )}
-            <View style={{ 
-              position: 'absolute', 
-              bottom: 8, 
-              left: 8,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 8
-            }}>
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 8,
+              }}>
               <Text style={{ color: 'white', fontWeight: '500', fontSize: 12 }}>3rd Pic</Text>
             </View>
-            <View style={{ 
-              position: 'absolute', 
-              bottom: 8, 
-              right: 8,
-              backgroundColor: 'rgba(255,255,255,0.9)',
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Ionicons name="camera" size={16} color="#000" />
             </View>
           </Pressable>
@@ -590,7 +618,7 @@ export default function EditProfile() {
             paddingVertical: 12,
             fontSize: 15,
             marginBottom: 20,
-            backgroundColor: '#F9F9F9'
+            backgroundColor: '#F9F9F9',
           }}
         />
 
@@ -612,7 +640,7 @@ export default function EditProfile() {
             fontSize: 15,
             marginBottom: 20,
             minHeight: 100,
-            backgroundColor: '#F9F9F9'
+            backgroundColor: '#F9F9F9',
           }}
         />
 
@@ -630,11 +658,12 @@ export default function EditProfile() {
             paddingHorizontal: 16,
             paddingVertical: 14,
             marginBottom: 20,
-            backgroundColor: '#F9F9F9'
-          }}
-        >
+            backgroundColor: '#F9F9F9',
+          }}>
           <Text style={{ fontSize: 15, color: dob ? '#000' : '#999' }}>
-            {dob ? dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Select date'}
+            {dob
+              ? dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+              : 'Select date'}
           </Text>
           <Ionicons name="calendar-outline" size={20} color="#666" />
         </Pressable>
@@ -656,16 +685,16 @@ export default function EditProfile() {
                 borderWidth: 1,
                 borderColor: gender === opt ? '#007AFF' : '#E0E0E0',
                 backgroundColor: gender === opt ? '#EAF3FF' : 'white',
-              }}
-            >
+              }}>
               <Text style={{ fontSize: 18, marginRight: 6 }}>
                 {opt === 'male' ? '👨' : opt === 'female' ? '👩' : '✨'}
               </Text>
-              <Text style={{
-                fontSize: 14,
-                fontWeight: gender === opt ? '600' : '400',
-                color: gender === opt ? '#007AFF' : '#666',
-              }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: gender === opt ? '600' : '400',
+                  color: gender === opt ? '#007AFF' : '#666',
+                }}>
                 {opt.charAt(0).toUpperCase() + opt.slice(1)}
               </Text>
             </Pressable>
@@ -674,7 +703,9 @@ export default function EditProfile() {
 
         {/* Gender Preference */}
         <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Gender Preference</Text>
-        <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>You'll only receive messages from this gender</Text>
+        <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+          You&apos;ll only receive messages from this gender
+        </Text>
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
           {['everyone', 'guys', 'girls'].map((pref) => (
             <Pressable
@@ -690,16 +721,16 @@ export default function EditProfile() {
                 borderWidth: 1,
                 borderColor: genderPreference === pref ? '#007AFF' : '#E0E0E0',
                 backgroundColor: genderPreference === pref ? '#EAF3FF' : 'white',
-              }}
-            >
+              }}>
               <Text style={{ fontSize: 18, marginRight: 6 }}>
                 {pref === 'everyone' ? '👥' : pref === 'guys' ? '👨' : '👩'}
               </Text>
-              <Text style={{ 
-                fontSize: 14, 
-                fontWeight: genderPreference === pref ? '600' : '400',
-                color: genderPreference === pref ? '#007AFF' : '#666'
-              }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: genderPreference === pref ? '600' : '400',
+                  color: genderPreference === pref ? '#007AFF' : '#666',
+                }}>
                 {pref.charAt(0).toUpperCase() + pref.slice(1)}
               </Text>
             </Pressable>
@@ -708,7 +739,9 @@ export default function EditProfile() {
 
         {/* Meeting Preference */}
         <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Meeting Preference</Text>
-        <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>How do you prefer to meet people?</Text>
+        <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+          How do you prefer to meet people?
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
           {MEETING_PREFERENCES.map((pref) => (
             <Pressable
@@ -724,14 +757,14 @@ export default function EditProfile() {
                 borderColor: meetingPreference === pref.id ? '#007AFF' : '#E0E0E0',
                 flexDirection: 'row',
                 alignItems: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 18, marginRight: 8 }}>{pref.emoji}</Text>
-              <Text style={{ 
-                fontSize: 14, 
-                fontWeight: meetingPreference === pref.id ? '600' : '400',
-                color: meetingPreference === pref.id ? 'white' : '#666'
               }}>
+              <Text style={{ fontSize: 18, marginRight: 8 }}>{pref.emoji}</Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: meetingPreference === pref.id ? '600' : '400',
+                  color: meetingPreference === pref.id ? 'white' : '#666',
+                }}>
                 {pref.label}
               </Text>
             </Pressable>
@@ -740,7 +773,7 @@ export default function EditProfile() {
 
         {/* Social Media Links */}
         <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12 }}>Social Media</Text>
-        
+
         {/* Instagram */}
         <View style={{ marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -760,7 +793,7 @@ export default function EditProfile() {
               paddingHorizontal: 16,
               paddingVertical: 12,
               fontSize: 14,
-              backgroundColor: '#F9F9F9'
+              backgroundColor: '#F9F9F9',
             }}
           />
           {socialErrors.instagram ? (
@@ -789,7 +822,7 @@ export default function EditProfile() {
               paddingHorizontal: 16,
               paddingVertical: 12,
               fontSize: 14,
-              backgroundColor: '#F9F9F9'
+              backgroundColor: '#F9F9F9',
             }}
           />
           {socialErrors.tiktok ? (
@@ -818,7 +851,7 @@ export default function EditProfile() {
               paddingHorizontal: 16,
               paddingVertical: 12,
               fontSize: 14,
-              backgroundColor: '#F9F9F9'
+              backgroundColor: '#F9F9F9',
             }}
           />
           {socialErrors.youtube ? (
@@ -842,9 +875,8 @@ export default function EditProfile() {
             paddingHorizontal: 16,
             paddingVertical: 14,
             marginBottom: 20,
-            backgroundColor: '#F9F9F9'
-          }}
-        >
+            backgroundColor: '#F9F9F9',
+          }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {country && <Text style={{ fontSize: 24, marginRight: 10 }}>{country.flag}</Text>}
             <Text style={{ fontSize: 15, color: country ? '#000' : '#999' }}>
@@ -865,9 +897,8 @@ export default function EditProfile() {
             paddingHorizontal: 16,
             paddingVertical: 14,
             marginBottom: 20,
-            backgroundColor: '#F9F9F9'
-          }}
-        >
+            backgroundColor: '#F9F9F9',
+          }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {languages.length > 0 ? (
               languages.map((code) => {
@@ -880,11 +911,8 @@ export default function EditProfile() {
                       paddingHorizontal: 12,
                       paddingVertical: 6,
                       borderRadius: 16,
-                    }}
-                  >
-                    <Text
-                      style={{ color: 'white', fontSize: 13, fontWeight: '500' }}
-                    >
+                    }}>
+                    <Text style={{ color: 'white', fontSize: 13, fontWeight: '500' }}>
                       {lang ? lang.name : code}
                     </Text>
                   </View>
@@ -910,20 +938,20 @@ export default function EditProfile() {
             paddingHorizontal: 16,
             paddingVertical: 14,
             marginBottom: 32,
-            backgroundColor: '#F9F9F9'
-          }}
-        >
+            backgroundColor: '#F9F9F9',
+          }}>
           <Text style={{ fontSize: 15, color: interests.length > 0 ? '#000' : '#999' }}>
             {interests.length > 0 ? `${interests.length} selected` : 'Tap here to add interests'}
           </Text>
-          <View style={{
-            backgroundColor: '#007AFF',
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          <View
+            style={{
+              backgroundColor: '#007AFF',
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
             <Ionicons name="add" size={18} color="white" />
           </View>
         </Pressable>
@@ -934,16 +962,14 @@ export default function EditProfile() {
         visible={showDatePicker}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
+        onRequestClose={() => setShowDatePicker(false)}>
         <SafeAreaView
           style={{
             flex: 1,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: 'rgba(0,0,0,0.35)',
-          }}
-        >
+          }}>
           <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 20 }}>
             <DatePicker
               mode="date"
@@ -959,8 +985,7 @@ export default function EditProfile() {
                 borderRadius: 10,
                 paddingVertical: 12,
                 alignItems: 'center',
-              }}
-            >
+              }}>
               <Text style={{ color: 'white', fontWeight: '600' }}>Done</Text>
             </Pressable>
           </View>
@@ -971,16 +996,16 @@ export default function EditProfile() {
       <Modal
         visible={showCountryModal}
         animationType="slide"
-        onRequestClose={() => setShowCountryModal(false)}
-      >
+        onRequestClose={() => setShowCountryModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: '#F0F0F0'
-          }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: '#F0F0F0',
+            }}>
             <Pressable onPress={() => setShowCountryModal(false)}>
               <Ionicons name="close" size={28} color="#000" />
             </Pressable>
@@ -997,7 +1022,7 @@ export default function EditProfile() {
               paddingVertical: 12,
               borderRadius: 10,
               backgroundColor: '#F0F0F0',
-              fontSize: 15
+              fontSize: 15,
             }}
           />
           <FlatList
@@ -1015,9 +1040,8 @@ export default function EditProfile() {
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   borderBottomWidth: 1,
-                  borderBottomColor: '#F0F0F0'
-                }}
-              >
+                  borderBottomColor: '#F0F0F0',
+                }}>
                 <Text style={{ fontSize: 28, marginRight: 12 }}>{item.flag}</Text>
                 <Text style={{ fontSize: 16 }}>{item.name}</Text>
               </Pressable>
@@ -1030,17 +1054,17 @@ export default function EditProfile() {
       <Modal
         visible={showLanguagesModal}
         animationType="slide"
-        onRequestClose={() => setShowLanguagesModal(false)}
-      >
+        onRequestClose={() => setShowLanguagesModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: '#F0F0F0'
-          }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: '#F0F0F0',
+            }}>
             <Pressable onPress={() => setShowLanguagesModal(false)}>
               <Ionicons name="close" size={28} color="#000" />
             </Pressable>
@@ -1069,15 +1093,12 @@ export default function EditProfile() {
                     paddingVertical: 14,
                     borderBottomWidth: 1,
                     borderBottomColor: '#F0F0F0',
-                  }}
-                >
+                  }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{ fontSize: 24, marginRight: 10 }}>{lang.flag}</Text>
                     <Text style={{ fontSize: 16 }}>{lang.name}</Text>
                   </View>
-                  {selected ? (
-                    <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-                  ) : null}
+                  {selected ? <Ionicons name="checkmark-circle" size={24} color="#007AFF" /> : null}
                 </Pressable>
               );
             })}
@@ -1089,17 +1110,17 @@ export default function EditProfile() {
       <Modal
         visible={showInterestsModal}
         animationType="slide"
-        onRequestClose={() => setShowInterestsModal(false)}
-      >
+        onRequestClose={() => setShowInterestsModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: '#F0F0F0'
-          }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: '#F0F0F0',
+            }}>
             <Pressable onPress={() => setShowInterestsModal(false)}>
               <Ionicons name="close" size={28} color="#000" />
             </Pressable>
@@ -1108,7 +1129,7 @@ export default function EditProfile() {
               <Text style={{ color: '#007AFF', fontSize: 16, fontWeight: '600' }}>Done</Text>
             </Pressable>
           </View>
-          
+
           <InterestsSelector
             selectedInterests={interests}
             onToggleInterest={handleToggleInterest}
