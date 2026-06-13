@@ -289,7 +289,7 @@ export default function EditProfile() {
     const userId = session?.user?.id;
     if (!userId) return;
     try {
-      const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
+      const picked = await pickAndEncodeImage([1, 1], 1024, 0.5);
       if (!picked) return;
 
       // Per-user folder so the owner-scoped storage policy matches ((foldername)[1] = uid).

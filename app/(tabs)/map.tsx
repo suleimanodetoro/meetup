@@ -89,6 +89,10 @@ export default function MapScreen() {
   const { session } = useAuth();
   const mapRef = useRef<MapView>(null);
   const cameraRef = useRef<Camera>(null);
+  // Throttle the focus refetch: without this, every tab bounce re-runs a GPS fix
+  // + reverse-geocode + profile select/update + the city RPC (battery + egress).
+  const lastLoadRef = useRef(0);
+  const loadedOnceRef = useRef(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [userCity, setUserCity] = useState<string | null>(null);
@@ -108,6 +112,10 @@ export default function MapScreen() {
   // tab switches, so a plain useEffect on [] would only run once.
   useFocusEffect(
     useCallback(() => {
+      const now = Date.now();
+      if (loadedOnceRef.current && now - lastLoadRef.current < 60_000) return;
+      lastLoadRef.current = now;
+      loadedOnceRef.current = true;
       loadUserLocationAndCheckForChanges();
     }, [session?.user?.id])
   );

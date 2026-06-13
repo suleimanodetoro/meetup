@@ -107,28 +107,3 @@ export function getPlaceholderImageUrl(seed: string): string {
   // Lorem Picsum provides random images with optional seed
   return `https://picsum.photos/seed/${seedNumber}/800/600`;
 }
-
-/**
- * Alternative: Use UI Avatars for text-based placeholder
- * Creates a colored background with city initials
- */
-export function getCityInitialsImage(city: string): string {
-  const initials = city
-    .split(' ')
-    .map(word => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  
-  // UI Avatars generates text-based images
-  const params = new URLSearchParams({
-    name: initials,
-    size: '800',
-    background: '007AFF',
-    color: 'ffffff',
-    bold: 'true',
-    format: 'png'
-  });
-  
-  return `https://ui-avatars.com/api/?${params.toString()}`;
-}

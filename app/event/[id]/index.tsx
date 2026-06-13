@@ -547,13 +547,9 @@ export default function PlanDetailsScreen() {
                       }
                       android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
                     >
-                      <Image
-                        source={{ uri: `https://picsum.photos/400/300?random=${index}` }}
-                        style={styles.destinationImage}
-                        defaultSource={{
-                          uri: 'https://via.placeholder.com/400x300/007AFF/FFFFFF?text=Loading',
-                        }}
-                      />
+                      {/* Local solid behind the gradient/label — venues have no
+                          photo, so the old random picsum was wasted egress + flicker. */}
+                      <View style={[styles.destinationImage, { backgroundColor: '#3A4A63' }]} />
                       <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.8)']}
                         style={styles.destinationGradient}
