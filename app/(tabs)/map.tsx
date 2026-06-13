@@ -39,19 +39,6 @@ const FILTER_CHIPS = [
   { label: 'Foodies', emoji: '🍜' },
 ] as const;
 
-const MARKER_OFFSETS = [
-  { latOffset: 0.0105, lngOffset: -0.016 },
-  { latOffset: 0.009, lngOffset: -0.023 },
-  { latOffset: 0.0075, lngOffset: 0.014 },
-  { latOffset: -0.007, lngOffset: -0.008 },
-  { latOffset: -0.014, lngOffset: -0.018 },
-  { latOffset: -0.01, lngOffset: 0.011 },
-  { latOffset: 0.003, lngOffset: 0.024 },
-  { latOffset: 0.017, lngOffset: 0.032 },
-  { latOffset: -0.02, lngOffset: -0.032 },
-  { latOffset: -0.018, lngOffset: 0.027 },
-];
-
 interface User {
   id: string;
   full_name: string;
@@ -110,7 +97,6 @@ export default function MapScreen() {
   const [displayCountry, setDisplayCountry] = useState<string | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null);
   const [usersInCity, setUsersInCity] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0]);
   const [hasCheckedLocation, setHasCheckedLocation] = useState(false);
@@ -453,29 +439,8 @@ export default function MapScreen() {
           </Text>
           <View style={styles.travelerOnlineDot} />
         </View>
-        <Text style={styles.travelerDistance}>{travelerDistance(user.id)}</Text>
       </View>
     </Pressable>
-  );
-
-  const renderNearbyMarker = (user: User, index: number) => (
-    <MarkerView
-      key={user.id}
-      coordinate={[
-        mapCenter[0] + getRandomOffset(index).lngOffset,
-        mapCenter[1] + getRandomOffset(index).latOffset,
-      ]}
-      anchor={{ x: 0.5, y: 0.5 }}>
-      <Pressable style={styles.nearbyMarker} onPress={() => setSelectedUser(user)}>
-        <Image
-          source={{
-            uri: user.avatar_url || `https://i.pravatar.cc/120?u=${user.id}`,
-          }}
-          style={styles.nearbyMarkerImage}
-        />
-        <View style={styles.markerOnlineDot} />
-      </Pressable>
-    </MarkerView>
   );
 
   const renderCurrentUserMarker = () => {
@@ -501,7 +466,6 @@ export default function MapScreen() {
     );
   };
 
-  const visibleMapUsers = usersInCity.filter((user) => user.id !== session?.user?.id);
   const nearbyTitle =
     usersInCity.length === 1 ? '1 Nearby Traveler' : `${usersInCity.length} Nearby Travelers`;
   const displayLocationLabel = [displayCity || userCity, displayCountry || userCountry]
@@ -512,25 +476,8 @@ export default function MapScreen() {
       ? `See all ${usersInCity.length} Nearby Travelers`
       : 'Find Nearby Travelers';
 
-  // Generate stable positions that mimic a loose cluster around the current city.
-  const getRandomOffset = useCallback((index: number) => {
-    const preset = MARKER_OFFSETS[index % MARKER_OFFSETS.length];
-    const ring = Math.floor(index / MARKER_OFFSETS.length);
-    if (ring === 0) return preset;
-
-    return {
-      latOffset: preset.latOffset * (1 + ring * 0.18),
-      lngOffset: preset.lngOffset * (1 + ring * 0.18),
-    };
-  }, []);
-
   function firstName(name: string | null | undefined) {
     return name?.trim().split(/\s+/)[0] || 'Traveler';
-  }
-
-  function travelerDistance(seed: string) {
-    const total = seed.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    return `${8 + (total % 12)} mi`;
   }
 
   function renderFilterChip(chip: (typeof FILTER_CHIPS)[number]) {
@@ -599,7 +546,6 @@ export default function MapScreen() {
         />
 
         {mapReady && renderCurrentUserMarker()}
-        {mapReady && visibleMapUsers.map(renderNearbyMarker)}
       </MapView>
 
       <View pointerEvents="none" style={styles.mapWash} />
@@ -669,32 +615,6 @@ export default function MapScreen() {
           </LinearGradient>
         </Pressable>
       </View>
-
-      {/* User Detail Modal */}
-      {selectedUser && (
-        <Pressable style={styles.modalOverlay} onPress={() => setSelectedUser(null)}>
-          <View style={styles.userModal}>
-            <Image
-              source={{ uri: selectedUser.avatar_url || 'https://via.placeholder.com/120' }}
-              style={styles.modalAvatar}
-            />
-            <Text style={styles.modalName}>{selectedUser.full_name}</Text>
-            {selectedUser.bio && (
-              <Text style={styles.modalBio} numberOfLines={3}>
-                {selectedUser.bio}
-              </Text>
-            )}
-            <Pressable
-              style={styles.viewProfileButton}
-              onPress={() => {
-                setSelectedUser(null);
-                router.push(`/profile/${selectedUser.id}`);
-              }}>
-              <Text style={styles.viewProfileText}>View Profile</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -828,40 +748,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F0F0F0',
   },
-  nearbyMarker: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(38, 201, 106, 0.22)',
-    borderWidth: 3,
-    borderColor: 'rgba(52, 199, 89, 0.52)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#26C96A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    elevation: 9,
-  },
-  nearbyMarkerImage: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#E9E9E9',
-  },
-  markerOnlineDot: {
-    position: 'absolute',
-    top: 3,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#2ED573',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
   travelersTray: {
     position: 'absolute',
     left: 0,
@@ -968,13 +854,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#2ED573',
   },
-  travelerDistance: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '700',
-    marginTop: 2,
-  },
   emptyTravelers: {
     minHeight: TRAVELER_CARD_HEIGHT,
     marginHorizontal: 22,
@@ -1039,50 +918,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  userModal: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    width: '80%',
-    maxWidth: 320,
-  },
-  modalAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
-  },
-  modalName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 8,
-  },
-  modalBio: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  viewProfileButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 25,
-  },
-  viewProfileText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

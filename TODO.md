@@ -4,6 +4,46 @@ Tracking items deferred from cleanup passes. Each entry should explain _why_ it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
+## Map discovery — cluster same-city users + nearby-city fallback (privacy-safe)
+
+Future feature (post-launch, after the deslop phases). The honest replacement
+for the fake distances/pins removed in the deslop audit (Q3).
+
+**Hard constraint — keep location coarse.** Today the app collects only
+city-level location: a low-accuracy GPS fix (`Location.Accuracy.Low` in
+[app/(tabs)/map.tsx](<app/(tabs)/map.tsx>), `Lowest` in
+[modules/onboarding/fields/LocationField.tsx](modules/onboarding/fields/LocationField.tsx))
+is reverse-geocoded to a city; only `location` / `location_country` /
+`location_country_code` are written to `profiles`. The precise lat/lng is
+discarded — `profiles` has NO coordinate column. **Do NOT introduce per-user
+coordinates** — it's a stalking/privacy liability and an App Review concern.
+Everything below works on coarse, city-level data only.
+
+**Desired UX**
+- Same-city users appear clustered around the user's own bubble on the map.
+- When local density is low (few people in Dundee), widen the net to the nearest
+  cities (Manchester, then London…) so discovery isn't empty.
+- User cards show proximity — city-level, never pinpoint.
+
+**Privacy-safe implementation**
+- _Same-city pins:_ cluster avatars around the city centroid, framed as "in
+  <city>" (city-level), not a precise position. No per-user distance for
+  same-city — label "In Dundee" / "Nearby". (The cluster itself was always fine;
+  the removed sin was the invented "X mi" + implied pinpoint positions.)
+- _Distance (cross-city only):_ city-to-city distance from city centroids via
+  `getCityCoordinates` ([utils/geographic.ts](utils/geographic.ts)) — e.g.
+  "~60 mi · Manchester". Never reveals where _in_ a city anyone is.
+- _Density fallback:_ extend `get_nearby_city_users(user_city, user_country)`
+  (already returns same-country, other-city users) to rank same-city first, then
+  nearest cities by centroid distance, until a target count is met; widen
+  same-country → region if still sparse.
+
+**Note for the deslop phases:** when Phase 1 rewrites the discovery RPCs
+(`get_users_in_city`, `get_nearby_city_users`, `get_city_users_ranked`) for the
+visibility/blocks enforcement (S4), keep their return shapes compatible with
+this (don't drop the city/country fields it builds on), and make sure the S4
+visibility/block filters will also cover any future nearby-city expansion.
+
 ## Home Friends Preview Paywall
 
 - Prioritize Premium and Founder users in the home screen's people/friends rail
