@@ -14,6 +14,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -384,16 +385,27 @@ export default function PlanDetailsScreen() {
           <View style={styles.attendeesSection}>
             <View style={styles.avatarStack}>
               {event.attendees?.slice(0, 5).map((attendee, index) => (
-                <Image
-                  key={attendee.user.id}
-                  source={{ 
-                    uri: attendee.user.avatar_url || `https://i.pravatar.cc/100?u=${attendee.user.id}` 
-                  }}
-                  style={[
-                    styles.attendeeAvatar,
-                    { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index }
-                  ]}
-                />
+                attendee.user.avatar_url ? (
+                  <Image
+                    key={attendee.user.id}
+                    source={{ uri: attendee.user.avatar_url }}
+                    style={[
+                      styles.attendeeAvatar,
+                      { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
+                    ]}
+                  />
+                ) : (
+                  <InitialsAvatar
+                    key={attendee.user.id}
+                    name={attendee.user.full_name}
+                    id={attendee.user.id}
+                    size={44}
+                    style={[
+                      styles.attendeeAvatar,
+                      { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
+                    ]}
+                  />
+                )
               ))}
               {attendeeCount > 5 && (
                 <View style={[styles.moreAttendees, { marginLeft: -15, zIndex: 0 }]}>
@@ -584,12 +596,19 @@ export default function PlanDetailsScreen() {
                 style={styles.organizerRow}
                 onPress={() => router.push(`/profile/${event.creator!.id}`)}
               >
-                <Image
-                  source={{
-                    uri: event.creator.avatar_url || `https://i.pravatar.cc/100?u=${event.creator.id}`
-                  }}
-                  style={styles.organizerAvatar}
-                />
+                {event.creator.avatar_url ? (
+                  <Image
+                    source={{ uri: event.creator.avatar_url }}
+                    style={styles.organizerAvatar}
+                  />
+                ) : (
+                  <InitialsAvatar
+                    name={event.creator.full_name || event.creator.username}
+                    id={event.creator.id}
+                    size={50}
+                    style={styles.organizerAvatar}
+                  />
+                )}
                 <View style={styles.organizerInfo}>
                   <Text style={styles.organizerName}>
                     {event.creator.full_name || event.creator.username || 'Unknown'}

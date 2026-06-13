@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router } from 'expo-router';
 
 import debounce from 'lodash.debounce';
@@ -147,10 +148,16 @@ export default function SearchUsersScreen() {
 
     return (
       <Pressable style={styles.userCard} onPress={() => handleUserPress(item)}>
-        <Image
-          source={{ uri: item.avatar_url || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
-        />
+        {item.avatar_url ? (
+          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+        ) : (
+          <InitialsAvatar
+            name={item.full_name || item.username}
+            id={item.id}
+            size={50}
+            style={styles.avatar}
+          />
+        )}
 
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>

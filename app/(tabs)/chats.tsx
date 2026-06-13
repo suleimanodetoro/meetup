@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -204,7 +205,7 @@ export default function ChatsScreen() {
   // Render chat item
   const renderChatItem = ({ item }: { item: ChatItem }) => {
     const chatName = item.conversation_name || 'Unknown Chat';
-    const avatarUrl = item.avatar_url || 'https://via.placeholder.com/50';
+    const avatarUrl = item.avatar_url;
     const lastMessageTime = item.last_message_at;
     const lastMessageContent = item.last_message_content || '';
     const unreadCount = item.unread_count || 0;
@@ -213,7 +214,16 @@ export default function ChatsScreen() {
       <Pressable
         style={styles.chatItem}
         onPress={() => navigateToChat(item)}>
-        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        ) : (
+          <InitialsAvatar
+            name={chatName}
+            id={String(item.conversation_id)}
+            size={50}
+            style={styles.avatar}
+          />
+        )}
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
             <Text style={styles.chatName} numberOfLines={1}>

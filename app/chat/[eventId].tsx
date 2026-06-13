@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChatShell, useChat, type ChatHeader } from '~/modules/chat';
 
@@ -52,12 +53,16 @@ function GroupHeader({
         style={styles.headerInfo}
         onPress={() => router.push(`/event/${eventId}`)}
       >
-        <Image
-          source={{
-            uri: event?.image_uri || 'https://via.placeholder.com/40',
-          }}
-          style={styles.headerAvatar}
-        />
+        {event?.image_uri ? (
+          <Image source={{ uri: event.image_uri }} style={styles.headerAvatar} />
+        ) : (
+          <InitialsAvatar
+            name={event?.title || 'Group Chat'}
+            id={String(eventId)}
+            size={40}
+            style={styles.headerAvatar}
+          />
+        )}
         <View style={styles.headerText}>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {event?.title || 'Group Chat'}

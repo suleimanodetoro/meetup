@@ -20,6 +20,7 @@ import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -422,12 +423,11 @@ export default function MapScreen() {
       key={user.id}
       style={styles.travelerCard}
       onPress={() => router.push(`/profile/${user.id}`)}>
-      <Image
-        source={{
-          uri: user.avatar_url || `https://i.pravatar.cc/300?u=${user.id}`,
-        }}
-        style={styles.travelerImage}
-      />
+      {user.avatar_url ? (
+        <Image source={{ uri: user.avatar_url }} style={styles.travelerImage} />
+      ) : (
+        <InitialsAvatar name={user.full_name} id={user.id} size={64} style={styles.travelerImage} />
+      )}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
         locations={[0.35, 0.72, 1]}

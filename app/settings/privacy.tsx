@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router } from 'expo-router';
 import { UserPrivacySettings, BlockedUser } from '~/types/messaging';
 import { useAuth } from '~/contexts/AuthProvider';
@@ -259,12 +260,19 @@ export default function PrivacySettingsScreen() {
           <Card>
             {blockedUsers.map((blocked) => (
               <View key={blocked.id} style={styles.blockedRow}>
-                <Image
-                  source={{
-                    uri: blocked.blocked_profile?.avatar_url || 'https://via.placeholder.com/40',
-                  }}
-                  style={styles.blockedAvatar}
-                />
+                {blocked.blocked_profile?.avatar_url ? (
+                  <Image
+                    source={{ uri: blocked.blocked_profile.avatar_url }}
+                    style={styles.blockedAvatar}
+                  />
+                ) : (
+                  <InitialsAvatar
+                    name={blocked.blocked_profile?.full_name}
+                    id={blocked.blocked_id}
+                    size={40}
+                    style={styles.blockedAvatar}
+                  />
+                )}
                 <Text style={styles.blockedName} numberOfLines={1}>
                   {blocked.blocked_profile?.full_name || 'Unknown User'}
                 </Text>
