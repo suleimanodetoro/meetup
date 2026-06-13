@@ -22,7 +22,8 @@ import { TripsCustom } from './fields/TripsCustom';
 import { StepCancelled, type StepDef } from './types';
 
 async function uploadAvatar(userId: string, base64: string): Promise<string> {
-  const fileName = `${userId}-${Date.now()}.jpg`;
+  // Per-user folder so the owner-scoped storage policy matches ((foldername)[1] = uid).
+  const fileName = `${userId}/${Date.now()}.jpg`;
   const { error } = await supabase.storage.from('avatars').upload(fileName, decode(base64), {
     contentType: 'image/jpeg',
     upsert: true,

@@ -292,7 +292,8 @@ export default function EditProfile() {
       const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
       if (!picked) return;
 
-      const fileName = `${userId}-${position}-${Date.now()}.jpg`;
+      // Per-user folder so the owner-scoped storage policy matches ((foldername)[1] = uid).
+      const fileName = `${userId}/${position}-${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')

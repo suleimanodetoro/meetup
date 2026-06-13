@@ -70,6 +70,11 @@ visibility/block filters will also cover any future nearby-city expansion.
 - Add a restore path for users who delete and later reinstall/sign up with the
   same Apple ID, so RevenueCat restore can reattach valid entitlements to the
   new Supabase user account.
+- **Storage erasure (follow-up to Q8):** `delete_user_account()` now deletes the
+  user's `storage.objects` rows, but that does not reclaim the underlying S3
+  bytes. For true right-to-erasure, add a service-role edge function that calls
+  `storage.from('avatars').remove([...])` for the user's files, invoked from the
+  delete flow.
 
 ## Native rebuild for `expo-store-review`
 

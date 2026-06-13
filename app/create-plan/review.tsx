@@ -46,7 +46,8 @@ export default function ReviewScreen() {
       // Step 1: Upload image if exists
       let imageUrl = null;
       if (formData.imageBase64) {
-        const fileName = `plan-${Date.now()}-${session.user.id}.jpg`;
+        // Per-user folder so the owner-scoped storage policy matches ((foldername)[1] = uid).
+        const fileName = `${session.user.id}/plan-${Date.now()}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, decode(formData.imageBase64), {
