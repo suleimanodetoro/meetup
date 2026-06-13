@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 
 export async function pickAndEncodeImage(
   aspect: [number, number],
-  maxWidth = 2000,
+  maxWidth = 1024, // avatars/plan images render <= ~400px; 1024 is plenty and cuts upload+egress bytes ~4x vs 2000
   compress = 0.8
 ): Promise<{ uri: string; base64: string } | null> {
   // Check current permission status first. On iOS the user may grant

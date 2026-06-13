@@ -63,8 +63,8 @@ export default function PlanImageScreen() {
 
       // Convert to JPEG and optionally downscale if huge
       const ops: ImageManipulator.Action[] = [];
-      if (asset.width && asset.width > 2000) {
-        ops.push({ resize: { width: 2000 } });
+      if (asset.width && asset.width > 1024) {
+        ops.push({ resize: { width: 1024 } });
       }
 
       const manipulated = await ImageManipulator.manipulateAsync(asset.uri, ops, {

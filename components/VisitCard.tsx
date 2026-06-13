@@ -52,10 +52,12 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
     return GRADIENTS[index];
   }, [visit.city]);
 
-  // Always use placeholder image service for consistent, city-specific images
+  // Prefer the curated image when present; only fall back to a city-seeded
+  // placeholder otherwise. (Previously always used the placeholder, discarding
+  // the real visit.image_url the home feed sets.)
   const displayImageUrl = useMemo(() => {
-    return getPlaceholderImageUrl(visit.city);
-  }, [visit.city]);
+    return visit.image_url || getPlaceholderImageUrl(visit.city);
+  }, [visit.image_url, visit.city]);
 
   const recentUsers = useMemo(() => {
     const seen = new Set<string>();

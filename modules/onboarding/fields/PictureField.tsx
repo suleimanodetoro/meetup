@@ -13,7 +13,7 @@ export interface PictureValue {
 export function PictureField({ value, setValue }: StepBodyProps<PictureValue>) {
   const pick = async () => {
     triggerLightHaptic();
-    const picked = await pickAndEncodeImage([1, 1], 2000, 0.5);
+    const picked = await pickAndEncodeImage([1, 1], 1024, 0.5);
     if (picked) setValue({ uri: picked.uri, base64: picked.base64 });
   };
 
