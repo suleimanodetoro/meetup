@@ -29,3 +29,19 @@ android
 # Session scratch docs (continuity notes between Claude sessions)
 HANDOFF.md
 CONTINUE-PROMPT.md
+# >>> security-audit 2026-06-13 (added by Claude) >>>
+.env
+.env.*
+!.env.example
+!.env.sample
+*.p8
+*.pem
+*.key
+*-accessKeys.csv
+*accessKeys*.csv
+*service_account*.json
+*serviceAccount*.json
+*.har
+secrets/
+.secrets-quarantine/
+# <<< security-audit 2026-06-13 <<<

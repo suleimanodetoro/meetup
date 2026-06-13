@@ -31,6 +31,22 @@ analysis.
   same Apple ID, so RevenueCat restore can reattach valid entitlements to the
   new Supabase user account.
 
+## Native rebuild for `expo-store-review`
+
+`expo-store-review` is in `package.json`, but its native module
+(`ExpoStoreReview`) is not compiled into the current dev binary, so importing it
+eagerly crashed the Settings screen (`Cannot find native module 'ExpoStoreReview'`,
+which also surfaced as a bogus "missing default export" / "no route named
+settings"). Mitigation shipped: Settings → "Leave a review" now lazy-loads the
+module and falls back to a "coming in the next build" alert when the native side
+is absent ([app/settings.tsx](app/settings.tsx)).
+
+Before release: rebuild the dev/prod client (`npx expo run:ios`, or an EAS
+build) so `ExpoStoreReview` is linked in and the native review prompt actually
+fires. No config plugin needed — it auto-links; it only needs a native build.
+General rule for this app: pure-JS changes hot-reload, but any newly added
+native module requires a native rebuild before it can be imported.
+
 ## Wire up RevenueCat (external steps)
 
 The code is in place ([lib/revenuecat.ts](lib/revenuecat.ts),
@@ -244,6 +260,42 @@ Dashboard → **Authentication → Email Templates**.
 If you're using a custom SMTP, also confirm the **From** name + address
 under **Authentication → SMTP Settings** so reset emails don't land in
 spam.
+
+Custom email work still needed:
+
+- Replace Supabase default copy with Waypoint-branded HTML templates for:
+  - Confirm signup / email verification
+  - Reset password
+  - Magic-link/sign-in email if we enable it later
+  - Email change confirmation if we expose account email changes
+- Use consistent sender identity:
+  - From name: `Waypoint`
+  - From email: `hello@usewaypoint.app` or `no-reply@usewaypoint.app`
+  - Reply-to: `hello@usewaypoint.app`
+- Set up SMTP/domain authentication before production:
+  - SPF
+  - DKIM
+  - DMARC
+  - Confirm the sending domain is `usewaypoint.app`
+- Template requirements:
+  - Keep `{{ .ConfirmationURL }}` exactly where Supabase expects it.
+  - Include fallback plain URL text in case the button does not render.
+  - Include support/contact line: `hello@usewaypoint.app`.
+  - Do not include misleading "instant access" copy when email confirmation is enabled.
+- Email verification behavior:
+  - Enable **Confirm email** in Supabase production before App Store launch.
+  - Sign-up should route to `/check-email`.
+  - Tapping the email link should open `waypoint://confirm-email?code=...`.
+  - `/confirm-email` should exchange the code, refresh auth, and route to onboarding.
+- Password reset behavior:
+  - Forgot-password email should open `waypoint://reset-password?code=...`.
+  - Reset screen should accept the new password, update it, and route back into the app.
+- Test matrix:
+  - Gmail, Apple Mail/iCloud, Outlook
+  - iOS real device
+  - expired/used link
+  - wrong-device/open-in-browser fallback
+  - resend confirmation from check-email screen
 
 ### 4. Smoke-test on a real device
 

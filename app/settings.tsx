@@ -3,29 +3,39 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   Pressable,
-  Switch,
   Alert,
   ActivityIndicator,
-  Modal,
   Linking,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Purchases from 'react-native-purchases';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { isRevenueCatConfigured } from '~/lib/revenuecat';
 import UpsellModal from '~/components/UpsellModal';
+import {
+  Card,
+  Chevron,
+  ExternalLinkIcon,
+  Row,
+  SectionHeader,
+  settingsTheme,
+} from '~/components/SettingsList';
+
+const SUPPORT_EMAIL = 'hello@usewaypoint.app';
+const TERMS_URL = 'https://www.usewaypoint.app/terms';
+const PRIVACY_URL = 'https://www.usewaypoint.app/privacy';
 
 export default function SettingsScreen() {
   const { signOut } = useAuth();
-  const [hideNearbyDistance, setHideNearbyDistance] = useState(false);
-  const [hideActiveStatus, setHideActiveStatus] = useState(false);
-  const [unitOfMeasurement, setUnitOfMeasurement] = useState('km');
-  const [showUnitPicker, setShowUnitPicker] = useState(false);
   const [showFounderModal, setShowFounderModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -56,7 +66,6 @@ export default function SettingsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            // Show confirmation with text input
             Alert.prompt(
               'Confirm Deletion',
               'Type "DELETE" to confirm account deletion',
@@ -86,14 +95,10 @@ export default function SettingsScreen() {
   const performAccountDeletion = async () => {
     setIsDeleting(true);
     try {
-      // Call Supabase function to delete user account
       const { error } = await supabase.rpc('delete_user_account');
-
       if (error) throw error;
 
-      // Sign out after deletion
       await signOut();
-
       Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
     } catch (error: any) {
       console.error('Error deleting account:', error);
@@ -103,315 +108,150 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleRestorePurchases = async () => {
+    if (restoring) return;
+    if (!isRevenueCatConfigured()) {
+      Alert.alert('Unavailable', 'Purchases are not available right now.');
+      return;
+    }
+    setRestoring(true);
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      const restored = Object.keys(customerInfo.entitlements.active).length > 0;
+      Alert.alert(
+        restored ? 'Purchases Restored' : 'Nothing to Restore',
+        restored
+          ? 'Your purchases have been restored to this account.'
+          : 'No previous purchases were found for this Apple ID.'
+      );
+    } catch (error: any) {
+      console.error('[Settings] restore failed:', error);
+      Alert.alert('Restore Failed', error?.message ?? 'Please try again in a moment.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleLeaveReview = async () => {
+    try {
+      // Loaded lazily so a dev build whose binary predates expo-store-review
+      // can't crash the whole Settings screen at import time — it just falls
+      // through to the alert below until the next native rebuild.
+      const StoreReview = await import('expo-store-review');
+      if (await StoreReview.hasAction()) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch (error) {
+      console.warn('[Settings] store review unavailable:', error);
+    }
+    Alert.alert(
+      'Thanks for the love!',
+      'In-app reviews will be available in the next build of the app.'
+    );
+  };
+
   const handleReportIssue = () => {
-    // Open email client with pre-filled subject
-    Linking.openURL('mailto:hello@usewaypoint.app?subject=Issue Report');
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Issue Report`);
   };
-
-  const handleLeaveReview = () => {
-    // In production, this would open App Store/Play Store
-    Alert.alert('Leave a Review', 'This would open the app store for review');
-  };
-
-  const handleRestorePurchases = () => {
-    Alert.alert('Restore Purchases', 'No purchases to restore');
-  };
-
-  const handleCommunityGuidelines = () => {
-    // In production, this would open a web view or external link
-    Linking.openURL('https://www.usewaypoint.app/terms');
-  };
-
-  const handleTermsAndConditions = () => {
-    // In production, this would open a web view or external link
-    Linking.openURL('https://www.usewaypoint.app/terms');
-  };
-
-  const handlePrivacyPolicy = () => {
-    // In production, this would open a web view or external link
-    Linking.openURL('https://www.usewaypoint.app/privacy');
-  };
-
-  const SettingRow = ({
-    label,
-    onPress,
-    rightElement,
-    textColor = '#000',
-    showBorder = true,
-  }: {
-    label: string;
-    onPress?: () => void;
-    rightElement?: React.ReactNode;
-    textColor?: string;
-    showBorder?: boolean;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingVertical: 20,
-        borderBottomWidth: showBorder ? 1 : 0,
-        borderBottomColor: '#F0F0F0',
-      }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <Text
-          style={{
-            fontSize: 18,
-            color: textColor,
-          }}>
-          {label}
-        </Text>
-        {rightElement}
-      </View>
-    </Pressable>
-  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: '#F0F0F0',
-        }}>
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
-          <Ionicons name="arrow-back" size={28} color="#000" />
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={26} color={settingsTheme.label} />
         </Pressable>
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: '700',
-            marginLeft: 20,
-          }}>
-          Settings
-        </Text>
+        <Text style={styles.title}>Settings</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={{ paddingHorizontal: 20 }}>
-          {/* Unit of measurement */}
-          <SettingRow
-            label="Unit of measurement"
-            onPress={() => setShowUnitPicker(true)}
-            rightElement={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 18, color: '#666' }}>{unitOfMeasurement}</Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </View>
-            }
-          />
-
-          {/* Hide my nearby distance */}
-          <SettingRow
-            label="Hide my nearby distance"
-            rightElement={
-              <Switch
-                value={hideNearbyDistance}
-                onValueChange={setHideNearbyDistance}
-                trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
-                thumbColor="white"
-              />
-            }
-          />
-
-          {/* Hide active status */}
-          <SettingRow
-            label="Hide active status"
-            rightElement={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View
-                  style={{
-                    backgroundColor: '#E3F2FD',
-                    paddingHorizontal: 12,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                  }}>
-                  <Text style={{ fontSize: 14, color: '#007AFF', fontWeight: '600' }}>
-                    Pro Feature
-                  </Text>
-                </View>
-                <Switch
-                  value={hideActiveStatus}
-                  onValueChange={setHideActiveStatus}
-                  trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
-                  thumbColor="white"
-                  disabled
-                />
-              </View>
-            }
-          />
-
-          {/* Spacer */}
-          <View style={{ height: 20 }} />
-          {/* Privacy Settings */}
-          <SettingRow label="Privacy Settings" onPress={() => router.push('/settings/privacy')} />
-
-          {/* Report an issue */}
-          <SettingRow label="Report an issue" onPress={handleReportIssue} showBorder={false} />
-
-          {/* Leave a review */}
-          <SettingRow label="Leave a review" onPress={handleLeaveReview} showBorder={false} />
-
-          {/* Spacer */}
-          <View style={{ height: 20 }} />
-
-          {/* Restore Purchases */}
-          <SettingRow
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <SectionHeader title="Subscription" />
+        <Card dividerInset={52}>
+          <Row
+            icon="refresh-outline"
             label="Restore Purchases"
             onPress={handleRestorePurchases}
-            showBorder={false}
+            right={
+              restoring ? <ActivityIndicator size="small" color={settingsTheme.accent} /> : undefined
+            }
           />
-
-          <SettingRow
+          <Row
+            icon="diamond"
+            iconColor={settingsTheme.accent}
             label="Support Waypoint"
             onPress={() => setShowFounderModal(true)}
-            rightElement={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 14, color: '#007AFF', fontWeight: '700' }}>Founder</Text>
-                <Ionicons name="diamond" size={18} color="#007AFF" />
+            right={
+              <View style={styles.founderTag}>
+                <Text style={styles.founderText}>Founder</Text>
+                <Ionicons name="diamond" size={14} color={settingsTheme.accent} />
               </View>
             }
-            showBorder={false}
           />
+        </Card>
 
-          {/* Spacer */}
-          <View style={{ height: 30 }} />
+        <SectionHeader title="Preferences" />
+        <Card dividerInset={52}>
+          <Row
+            icon="lock-closed-outline"
+            label="Privacy Settings"
+            onPress={() => router.push('/settings/privacy')}
+            right={<Chevron />}
+          />
+        </Card>
 
-          {/* Community Guidelines */}
-          <SettingRow
+        <SectionHeader title="Support" />
+        <Card dividerInset={52}>
+          <Row icon="chatbox-ellipses-outline" label="Report an issue" onPress={handleReportIssue} />
+          <Row icon="star-outline" label="Leave a review" onPress={handleLeaveReview} />
+        </Card>
+
+        <SectionHeader title="Legal" />
+        <Card dividerInset={52}>
+          <Row
+            icon="people-outline"
             label="Community Guidelines"
-            onPress={handleCommunityGuidelines}
-            showBorder={false}
+            onPress={() => Linking.openURL(TERMS_URL)}
+            right={<ExternalLinkIcon />}
           />
-
-          {/* Terms and Conditions */}
-          <SettingRow
+          <Row
+            icon="document-text-outline"
             label="Terms and Conditions"
-            onPress={handleTermsAndConditions}
-            showBorder={false}
+            onPress={() => Linking.openURL(TERMS_URL)}
+            right={<ExternalLinkIcon />}
           />
+          <Row
+            icon="shield-checkmark-outline"
+            label="Privacy Policy"
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            right={<ExternalLinkIcon />}
+          />
+        </Card>
 
-          {/* Privacy Policy */}
-          <SettingRow label="Privacy Policy" onPress={handlePrivacyPolicy} showBorder={false} />
+        <SectionHeader title="Account" />
+        <Card dividerInset={52}>
+          <Row icon="log-out-outline" label="Log Out" onPress={handleLogout} />
+        </Card>
 
-          {/* Spacer */}
-          <View style={{ height: 30 }} />
-
-          {/* Logout */}
-          <SettingRow label="Logout" onPress={handleLogout} showBorder={false} />
-
-          {/* Spacer */}
-          <View style={{ height: 20 }} />
-
-          {/* Delete Account */}
-          <SettingRow
+        <Card style={styles.destructiveCard}>
+          <Row
+            icon="trash-outline"
             label="Delete Account"
+            destructive
+            center
             onPress={handleDeleteAccount}
-            textColor="#FF3B30"
-            showBorder={false}
           />
-        </View>
+        </Card>
       </ScrollView>
 
-      {/* Unit Picker Modal */}
-      <Modal visible={showUnitPicker} transparent animationType="fade">
-        <Pressable
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-          onPress={() => setShowUnitPicker(false)}>
-          <View
-            style={{
-              backgroundColor: 'white',
-              borderRadius: 16,
-              padding: 20,
-              width: '80%',
-              maxWidth: 300,
-            }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '600',
-                marginBottom: 20,
-                textAlign: 'center',
-              }}>
-              Select Unit
-            </Text>
-
-            {['km', 'mi'].map((unit) => (
-              <Pressable
-                key={unit}
-                onPress={() => {
-                  setUnitOfMeasurement(unit);
-                  setShowUnitPicker(false);
-                }}
-                style={{
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  backgroundColor: unitOfMeasurement === unit ? '#F0F7FF' : 'white',
-                  borderRadius: 12,
-                  marginBottom: 10,
-                  borderWidth: 1,
-                  borderColor: unitOfMeasurement === unit ? '#007AFF' : '#E0E0E0',
-                }}>
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: unitOfMeasurement === unit ? '#007AFF' : '#000',
-                    fontWeight: unitOfMeasurement === unit ? '600' : '400',
-                    textAlign: 'center',
-                  }}>
-                  {unit === 'km' ? 'Kilometers (km)' : 'Miles (mi)'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Loading overlay for account deletion */}
       {isDeleting && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-          <View
-            style={{
-              backgroundColor: 'white',
-              borderRadius: 16,
-              padding: 30,
-              alignItems: 'center',
-            }}>
-            <ActivityIndicator size="large" color="#FF3B30" />
-            <Text
-              style={{
-                marginTop: 16,
-                fontSize: 16,
-                color: '#333',
-              }}>
-              Deleting account...
-            </Text>
+        <View style={styles.deletingOverlay}>
+          <View style={styles.deletingCard}>
+            <ActivityIndicator size="large" color={settingsTheme.destructive} />
+            <Text style={styles.deletingText}>Deleting account...</Text>
           </View>
         </View>
       )}
+
       <UpsellModal
         visible={showFounderModal}
         onDismiss={() => setShowFounderModal(false)}
@@ -421,3 +261,62 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: settingsTheme.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  backButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: settingsTheme.label,
+  },
+  content: {
+    paddingBottom: 48,
+  },
+  founderTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  founderText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: settingsTheme.accent,
+  },
+  destructiveCard: {
+    marginTop: 26,
+  },
+  deletingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deletingCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+  },
+  deletingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#333',
+  },
+});

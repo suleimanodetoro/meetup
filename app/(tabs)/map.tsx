@@ -1,6 +1,7 @@
 // app/(tabs)/map.tsx
 import React, { useState, useRef, useCallback } from 'react';
 import {
+  Dimensions,
   View,
   Text,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '~/utils/supabase';
@@ -23,6 +25,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Set Mapbox token
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
+
+const FLOATING_TAB_BAR_HEIGHT = 64;
+const FLOATING_TAB_BAR_GAP = 12;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TRAVELER_CARD_WIDTH = Math.min(132, (SCREEN_WIDTH - 58) / 3);
+const TRAVELER_CARD_HEIGHT = 164;
+
+const FILTER_CHIPS = [
+  { label: 'Filter', icon: 'options-outline' as const },
+  { label: 'Studying Abroad', emoji: '📚' },
+  { label: 'Backpacking', emoji: '🎒' },
+  { label: 'Foodies', emoji: '🍜' },
+] as const;
+
+const MARKER_OFFSETS = [
+  { latOffset: 0.0105, lngOffset: -0.016 },
+  { latOffset: 0.009, lngOffset: -0.023 },
+  { latOffset: 0.0075, lngOffset: 0.014 },
+  { latOffset: -0.007, lngOffset: -0.008 },
+  { latOffset: -0.014, lngOffset: -0.018 },
+  { latOffset: -0.01, lngOffset: 0.011 },
+  { latOffset: 0.003, lngOffset: 0.024 },
+  { latOffset: 0.017, lngOffset: 0.032 },
+  { latOffset: -0.02, lngOffset: -0.032 },
+  { latOffset: -0.018, lngOffset: 0.027 },
+];
 
 interface User {
   id: string;
@@ -37,15 +65,22 @@ interface User {
   gender: string | null;
 }
 
+type CurrentUserProfile = Pick<
+  User,
+  'id' | 'full_name' | 'avatar_url' | 'location_country_code' | 'nationality_code'
+>;
+
 // Mapbox Geocoding API helper
-async function geocodeCity(cityName: string): Promise<{ lat: number; lng: number; cityName: string; country: string } | null> {
+async function geocodeCity(
+  cityName: string
+): Promise<{ lat: number; lng: number; cityName: string; country: string } | null> {
   try {
     const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
     const response = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cityName)}.json?types=place&limit=1&access_token=${token}`
     );
     const data = await response.json();
-    
+
     if (data.features && data.features.length > 0) {
       const feature = data.features[0];
       const [lng, lat] = feature.center;
@@ -62,14 +97,18 @@ async function geocodeCity(cityName: string): Promise<{ lat: number; lng: number
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const floatingTabBarClearance =
+    Math.max(insets.bottom, 16) + FLOATING_TAB_BAR_HEIGHT + FLOATING_TAB_BAR_GAP;
   const { session } = useAuth();
   const mapRef = useRef<MapView>(null);
   const cameraRef = useRef<Camera>(null);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [userCity, setUserCity] = useState<string | null>(null);
   const [displayCity, setDisplayCity] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string | null>(null);
+  const [displayCountry, setDisplayCountry] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null);
   const [usersInCity, setUsersInCity] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,146 +117,120 @@ export default function MapScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
-  // Re-run on every tab focus so changes made in edit-profile (or anywhere
-  // else that updates `profiles.location`) are reflected when the user
-  // comes back to the map. Tab screens stay mounted across tab switches,
-  // so a plain useEffect on [] would only run once at first mount.
+  // Re-run on every tab focus so current-location changes are reflected
+  // when the user comes back to the map. Tab screens stay mounted across
+  // tab switches, so a plain useEffect on [] would only run once.
   useFocusEffect(
     useCallback(() => {
       loadUserLocationAndCheckForChanges();
-    }, [session?.user?.id]),
+    }, [session?.user?.id])
   );
 
   const loadUserLocationAndCheckForChanges = async () => {
-  try {
-    // 1. Get stored location from database
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('location, location_country, location_country_code')
-      .eq('id', session?.user?.id ?? '')
-      .single();
+    try {
+      // 1. Get stored location from database
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select(
+          'full_name, avatar_url, location, location_country, location_country_code, nationality_code'
+        )
+        .eq('id', session?.user?.id ?? '')
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const storedCity = profile?.location;
-    const storedCountry = profile?.location_country;
-
-    // 2. Check device location FIRST
-    const { status } = await Location.getForegroundPermissionsAsync();
-    
-    let currentCity: string | null = null;
-    let currentCountry: string | null | undefined = null;
-    let currentCountryCode: string | null | undefined = null;
-    let currentCoords: { latitude: number; longitude: number } | null = null;
-
-    if (status === 'granted') {
-      try {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-          timeInterval: 5000,
-          distanceInterval: 0,
+      if (profile && session?.user?.id) {
+        setCurrentUserProfile({
+          id: session.user.id,
+          full_name: profile.full_name ?? 'You',
+          avatar_url: profile.avatar_url ?? null,
+          location_country_code: profile.location_country_code ?? null,
+          nationality_code: profile.nationality_code ?? null,
         });
-
-        currentCoords = location.coords;
-
-        const reverseGeocode = await Location.reverseGeocodeAsync({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        });
-
-        if (reverseGeocode && reverseGeocode.length > 0) {
-          const place = reverseGeocode[0];
-          currentCity = place.city || place.district || place.subregion;
-          currentCountry = place.country;
-          currentCountryCode = place.isoCountryCode;
-        }
-      } catch {
-        // Location lookup is best-effort; we fall back to the stored profile
-        // location below if reverse-geocoding fails.
       }
-    }
 
-    // 3. Decide which location to use
-    let displayLocationCity = storedCity;
-    let displayLocationCountry = storedCountry;
+      const storedCity = profile?.location ?? null;
+      const storedCountry = profile?.location_country ?? null;
+      const storedCountryCode = profile?.location_country_code ?? null;
 
-    // If we have current location and it's different from stored, show alert
-    if (currentCity && storedCity && currentCity.toLowerCase() !== storedCity.toLowerCase()) {
-      // Use current location immediately, but ask user
-      displayLocationCity = currentCity;
-      displayLocationCountry = currentCountry;
-      
-      Alert.alert(
-        'Location Changed',
-        `We detected you're now in ${currentCity}. Would you like to update your stored location?`,
-        [
-          { 
-            text: 'Keep ' + storedCity, 
-            onPress: () => {
-              // Revert to stored location
-              setUserCity(storedCity);
-              setDisplayCity(storedCity);
-              setUserCountry(storedCountry);
-              
-              geocodeCity(storedCity).then(coords => {
-                if (coords) {
-                  setMapCenter([coords.lng, coords.lat]);
-                  setTimeout(() => {
-                    cameraRef.current?.setCamera({
-                      centerCoordinate: [coords.lng, coords.lat],
-                      zoomLevel: 12,
-                      animationDuration: 2000,
-                    });
-                  }, 100);
-                }
-              });
-              
-              fetchUsersInCity(storedCity, storedCountry);
-            }
-          },
-          { 
-            text: 'Update to ' + currentCity,
-            onPress: () => updateLocationInDB(currentCity, currentCountry, currentCountryCode),
-            style: 'default'
+      let currentCity: string | null = null;
+      let currentCountry: string | null = null;
+      let currentCountryCode: string | null = null;
+      let currentCoords: { latitude: number; longitude: number } | null = null;
+
+      try {
+        let permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== 'granted' && permission.canAskAgain) {
+          permission = await Location.requestForegroundPermissionsAsync();
+        }
+
+        if (permission.status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+          });
+          currentCoords = location.coords;
+
+          const reverseGeocode = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+
+          if (reverseGeocode && reverseGeocode.length > 0) {
+            const place = reverseGeocode[0];
+            currentCity = place.city || place.district || place.subregion || place.region || null;
+            currentCountry = place.country ?? null;
+            currentCountryCode = place.isoCountryCode ?? null;
           }
-        ]
-      );
-    } else if (!storedCity && currentCity) {
-      // No stored location but we have current location
-      displayLocationCity = currentCity;
-      displayLocationCountry = currentCountry;
-      
-      Alert.alert(
-        'Set Your Location',
-        `We detected you're in ${currentCity}. Set this as your location?`,
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { 
-            text: 'Set Location', 
-            onPress: () => updateLocationInDB(currentCity, currentCountry, currentCountryCode)
-          }
-        ]
-      );
-    } else if (!storedCity && !currentCity) {
-      // No location at all
-      Alert.alert(
-        'Set Your Location',
-        'Please set your current city to see nearby profiles.',
-        [
+        }
+      } catch (locationError) {
+        console.warn(
+          'Current location lookup failed; falling back to saved location.',
+          locationError
+        );
+      }
+
+      const activeCity = currentCity ?? storedCity;
+      const activeCountry = currentCountry ?? storedCountry;
+      const usingDetectedLocation = !!currentCity;
+
+      if (!activeCity) {
+        Alert.alert('Set Your Location', 'Please set your current city to see nearby profiles.', [
           { text: 'Later', style: 'cancel' },
-          { text: 'Set Location', onPress: () => detectAndSetLocation() }
-        ]
-      );
-    }
+          { text: 'Set Location', onPress: () => detectAndSetLocation() },
+        ]);
+        setHasCheckedLocation(true);
+        return;
+      }
 
-    // 4. Set the map to the display location
-    if (displayLocationCity) {
-      setUserCity(storedCity); // Keep stored location in state
-      setDisplayCity(displayLocationCity);
-      setUserCountry(displayLocationCountry);
-      
-      // Use current coords if available, otherwise geocode the city
-      if (currentCoords && displayLocationCity === currentCity) {
+      if (usingDetectedLocation && session?.user?.id) {
+        const storedCityKey = storedCity?.trim().toLowerCase() ?? null;
+        const currentCityKey = currentCity?.trim().toLowerCase() ?? null;
+        const storedCountryKey = storedCountryCode ?? storedCountry;
+        const currentCountryKey = currentCountryCode ?? currentCountry;
+
+        if (storedCityKey !== currentCityKey || storedCountryKey !== currentCountryKey) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              location: currentCity,
+              location_country: currentCountry,
+              location_country_code: currentCountryCode,
+              location_updated_at: new Date().toISOString(),
+            })
+            .eq('id', session.user.id);
+
+          if (updateError) {
+            console.error('Error syncing current location:', updateError);
+          }
+        }
+      }
+
+      setUserCity(activeCity);
+      setDisplayCity(activeCity);
+      setUserCountry(activeCountry);
+      setDisplayCountry(activeCountry);
+
+      if (currentCoords && usingDetectedLocation) {
         setMapCenter([currentCoords.longitude, currentCoords.latitude]);
         setTimeout(() => {
           cameraRef.current?.setCamera({
@@ -227,7 +240,7 @@ export default function MapScreen() {
           });
         }, 100);
       } else {
-        const coords = await geocodeCity(displayLocationCity);
+        const coords = await geocodeCity(activeCity);
         if (coords) {
           setMapCenter([coords.lng, coords.lat]);
           setTimeout(() => {
@@ -239,19 +252,22 @@ export default function MapScreen() {
           }, 100);
         }
       }
-      
-      await fetchUsersInCity(displayLocationCity, displayLocationCountry);
+
+      await fetchUsersInCity(activeCity, activeCountry);
+
+      setHasCheckedLocation(true);
+    } catch (error) {
+      console.error('Error loading location:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setHasCheckedLocation(true);
-  } catch (error) {
-    console.error('Error loading location:', error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const updateLocationInDB = async (city: string, country: string | null | undefined, countryCode: string | null | undefined) => {
+  const updateLocationInDB = async (
+    city: string,
+    country: string | null | undefined,
+    countryCode: string | null | undefined
+  ) => {
     const userId = session?.user?.id;
     if (!userId) return;
     try {
@@ -270,6 +286,7 @@ export default function MapScreen() {
       setUserCity(city);
       setDisplayCity(city);
       setUserCountry(country || null);
+      setDisplayCountry(country || null);
 
       const coords = await geocodeCity(city);
       if (coords) {
@@ -287,19 +304,16 @@ export default function MapScreen() {
       setIsSearching(false);
     } catch (err) {
       console.error('Error updating location:', err);
-      Alert.alert(
-        "Couldn't update location",
-        'Please try again in a moment.',
-      );
+      Alert.alert("Couldn't update location", 'Please try again in a moment.');
     }
   };
 
   const detectAndSetLocation = async () => {
     try {
       setLoading(true);
-      
+
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required to detect your city.');
         setLoading(false);
@@ -318,7 +332,7 @@ export default function MapScreen() {
       if (reverseGeocode && reverseGeocode.length > 0) {
         const place = reverseGeocode[0];
         const city = place.city || place.district || place.subregion;
-        
+
         if (city) {
           await updateLocationInDB(city, place.country, place.isoCountryCode);
         } else {
@@ -341,8 +355,9 @@ export default function MapScreen() {
 
     setIsSearching(false);
     setDisplayCity(userCity);
+    setDisplayCountry(userCountry);
     setSearchQuery('');
-    
+
     const coords = await geocodeCity(userCity);
     if (coords) {
       setMapCenter([coords.lng, coords.lat]);
@@ -354,7 +369,7 @@ export default function MapScreen() {
         });
       }, 100);
     }
-    
+
     await fetchUsersInCity(userCity, userCountry);
   };
 
@@ -376,17 +391,18 @@ export default function MapScreen() {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     try {
       setLoading(true);
       setIsSearching(true);
-      
+
       const result = await geocodeCity(searchQuery);
-      
+
       if (result) {
         setDisplayCity(result.cityName);
+        setDisplayCountry(result.country || null);
         setMapCenter([result.lng, result.lat]);
-        
+
         setTimeout(() => {
           cameraRef.current?.setCamera({
             centerCoordinate: [result.lng, result.lat],
@@ -394,7 +410,7 @@ export default function MapScreen() {
             animationDuration: 2000,
           });
         }, 100);
-        
+
         await fetchUsersInCity(result.cityName, result.country);
       } else {
         Alert.alert('Location not found', 'Please try a different search term.');
@@ -410,45 +426,128 @@ export default function MapScreen() {
   const renderUserCard = (user: User) => (
     <Pressable
       key={user.id}
-      style={styles.userCard}
+      style={styles.travelerCard}
       onPress={() => router.push(`/profile/${user.id}`)}>
       <Image
-        source={{ 
-          uri: user.avatar_url || 'https://via.placeholder.com/100' 
+        source={{
+          uri: user.avatar_url || `https://i.pravatar.cc/300?u=${user.id}`,
         }}
-        style={styles.userAvatar}
+        style={styles.travelerImage}
       />
-      <View style={styles.userInfo}>
-        <View style={styles.userHeader}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {user.full_name}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+        locations={[0.35, 0.72, 1]}
+        style={styles.travelerGradient}
+      />
+      {(user.location_country_code || user.nationality_code) && (
+        <View style={styles.travelerFlagPill}>
+          <Text style={styles.travelerFlag}>
+            {getCountryFlag(user.location_country_code || user.nationality_code || '')}
           </Text>
-          {(user.location_country_code || user.nationality_code) && (
-            <Text style={styles.userFlag}>
-              {getCountryFlag(user.location_country_code || user.nationality_code || '')}
-            </Text>
-          )}
         </View>
-        <Text style={styles.userLocation} numberOfLines={1}>
-          {user.location}
-        </Text>
-        {user.interests && user.interests.length > 0 && (
-          <Text style={styles.userInterests} numberOfLines={1}>
-            {user.interests.slice(0, 2).join(' • ')}
+      )}
+      <View style={styles.travelerInfo}>
+        <View style={styles.travelerNameRow}>
+          <Text style={styles.travelerName} numberOfLines={1}>
+            {firstName(user.full_name)}
           </Text>
-        )}
+          <View style={styles.travelerOnlineDot} />
+        </View>
+        <Text style={styles.travelerDistance}>{travelerDistance(user.id)}</Text>
       </View>
     </Pressable>
   );
 
-  // Generate stable random positions
+  const renderNearbyMarker = (user: User, index: number) => (
+    <MarkerView
+      key={user.id}
+      coordinate={[
+        mapCenter[0] + getRandomOffset(index).lngOffset,
+        mapCenter[1] + getRandomOffset(index).latOffset,
+      ]}
+      anchor={{ x: 0.5, y: 0.5 }}>
+      <Pressable style={styles.nearbyMarker} onPress={() => setSelectedUser(user)}>
+        <Image
+          source={{
+            uri: user.avatar_url || `https://i.pravatar.cc/120?u=${user.id}`,
+          }}
+          style={styles.nearbyMarkerImage}
+        />
+        <View style={styles.markerOnlineDot} />
+      </Pressable>
+    </MarkerView>
+  );
+
+  const renderCurrentUserMarker = () => {
+    const profile = currentUserProfile ?? usersInCity[0];
+
+    return (
+      <MarkerView coordinate={mapCenter} anchor={{ x: 0.5, y: 0.5 }}>
+        <Pressable
+          style={styles.featuredMarker}
+          onPress={() => profile && router.push(`/profile/${profile.id}`)}>
+          <View style={styles.featuredMarkerHalo} />
+          <View style={styles.featuredMarkerImageWrap}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.featuredMarkerImage} />
+            ) : (
+              <View style={styles.featuredMarkerFallback}>
+                <Ionicons name="person" size={38} color="#8A8A8A" />
+              </View>
+            )}
+          </View>
+        </Pressable>
+      </MarkerView>
+    );
+  };
+
+  const visibleMapUsers = usersInCity.filter((user) => user.id !== session?.user?.id);
+  const nearbyTitle =
+    usersInCity.length === 1 ? '1 Nearby Traveler' : `${usersInCity.length} Nearby Travelers`;
+  const displayLocationLabel = [displayCity || userCity, displayCountry || userCountry]
+    .filter(Boolean)
+    .join(', ');
+  const ctaLabel =
+    usersInCity.length > 0
+      ? `See all ${usersInCity.length} Nearby Travelers`
+      : 'Find Nearby Travelers';
+
+  // Generate stable positions that mimic a loose cluster around the current city.
   const getRandomOffset = useCallback((index: number) => {
-    const angle = (index * 137.5) % 360;
-    const radius = 0.01 + (index * 0.002) % 0.02;
-    const latOffset = radius * Math.cos(angle * Math.PI / 180);
-    const lngOffset = radius * Math.sin(angle * Math.PI / 180);
-    return { latOffset, lngOffset };
+    const preset = MARKER_OFFSETS[index % MARKER_OFFSETS.length];
+    const ring = Math.floor(index / MARKER_OFFSETS.length);
+    if (ring === 0) return preset;
+
+    return {
+      latOffset: preset.latOffset * (1 + ring * 0.18),
+      lngOffset: preset.lngOffset * (1 + ring * 0.18),
+    };
   }, []);
+
+  function firstName(name: string | null | undefined) {
+    return name?.trim().split(/\s+/)[0] || 'Traveler';
+  }
+
+  function travelerDistance(seed: string) {
+    const total = seed.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return `${8 + (total % 12)} mi`;
+  }
+
+  function renderFilterChip(chip: (typeof FILTER_CHIPS)[number]) {
+    return (
+      <Pressable
+        key={chip.label}
+        style={styles.filterChip}
+        onPress={chip.label === 'Filter' ? returnToHomeLocation : undefined}>
+        {'icon' in chip ? (
+          <Ionicons name={chip.icon} size={16} color="#141414" />
+        ) : (
+          <Text style={styles.filterEmoji}>{chip.emoji}</Text>
+        )}
+        <Text style={styles.filterChipText}>{chip.label}</Text>
+      </Pressable>
+    );
+  }
 
   if (loading || !hasCheckedLocation) {
     return (
@@ -477,61 +576,43 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Map */}
-      <MapView 
+      <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
-        styleURL={Mapbox.StyleURL.Street}
-        compassEnabled
-        compassPosition={{ top: 100, right: 20 }}
+        styleURL={Mapbox.StyleURL.Light}
+        compassEnabled={false}
         logoEnabled={false}
         attributionEnabled={false}
-        onDidFinishLoadingMap={() => setMapReady(true)}> 
-        
+        onDidFinishLoadingMap={() => setMapReady(true)}>
         <Camera
           ref={cameraRef}
           centerCoordinate={mapCenter}
-          zoomLevel={12}
+          zoomLevel={12.4}
+          padding={{
+            paddingTop: 70,
+            paddingBottom: 300,
+            paddingLeft: 0,
+            paddingRight: 0,
+          }}
           animationMode="flyTo"
           animationDuration={2000}
         />
 
-        {mapReady && usersInCity.map((user, index) => {
-          const offset = getRandomOffset(index);
-          return (
-            <MarkerView
-              key={user.id}
-              coordinate={[
-                mapCenter[0] + offset.lngOffset,
-                mapCenter[1] + offset.latOffset
-              ]}
-              anchor={{ x: 0.5, y: 1 }}>
-              <Pressable 
-                style={styles.markerContainer}
-                onPress={() => setSelectedUser(user)}>
-                <Image
-                  source={{ 
-                    uri: user.avatar_url || 'https://via.placeholder.com/50' 
-                  }}
-                  style={styles.markerAvatar}
-                />
-                <View style={styles.markerTail} />
-              </Pressable>
-            </MarkerView>
-          );
-        })}
+        {mapReady && renderCurrentUserMarker()}
+        {mapReady && visibleMapUsers.map(renderNearbyMarker)}
       </MapView>
 
-      {/* Search Bar */}
-      <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-        <View style={[styles.searchContainer, { top: insets.top + 10 }]}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#666" />
+      <View pointerEvents="none" style={styles.mapWash} />
+
+      <SafeAreaView pointerEvents="box-none" style={styles.topOverlay}>
+        <View style={[styles.searchContainer, { paddingTop: insets.top + 12 }]}>
+          <View style={[styles.searchBar, isSearching && styles.searchBarSearching]}>
+            <Ionicons name="search" size={24} color="#111111" />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search for a city..."
-              placeholderTextColor="#999"
+              placeholder={displayLocationLabel || 'Search for a city'}
+              placeholderTextColor="#111111"
               style={styles.searchInput}
               onSubmitEditing={handleSearch}
               returnKeyType="search"
@@ -542,63 +623,56 @@ export default function MapScreen() {
               </Pressable>
             )}
           </View>
-          
-          {userCity && !isSearching && (
-            <View style={styles.currentCityPill}>
-              <Ionicons name="location" size={14} color="#007AFF" />
-              <Text style={styles.currentCityText}>{userCity}</Text>
-            </View>
-          )}
 
-          {isSearching && displayCity && (
-            <View style={styles.currentCityPill}>
-              <Ionicons name="search" size={14} color="#007AFF" />
-              <Text style={styles.currentCityText}>{displayCity}</Text>
-            </View>
-          )}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsContent}>
+            {FILTER_CHIPS.map(renderFilterChip)}
+          </ScrollView>
         </View>
       </SafeAreaView>
 
-      {/* Users List */}
-      {usersInCity.length > 0 && (
-        <View style={styles.usersListContainer}>
-          <View style={styles.usersListHeader}>
-            <Text style={styles.usersListTitle}>
-              {usersInCity.length} {usersInCity.length === 1 ? 'person' : 'people'} in {displayCity || userCity}
-            </Text>
-          </View>
-          <ScrollView 
-            horizontal 
+      <View style={[styles.travelersTray, { bottom: floatingTabBarClearance }]}>
+        <View style={styles.sheetHandle} />
+        <View style={styles.travelersHeader}>
+          <Text style={styles.travelersTitle}>{nearbyTitle}</Text>
+          <Pressable
+            style={styles.seeAllButton}
+            onPress={() => router.push('/search-users')}
+            disabled={usersInCity.length === 0}>
+            <Text style={styles.seeAllText}>See All</Text>
+            <Ionicons name="chevron-forward" size={18} color="#1189D8" />
+          </Pressable>
+        </View>
+
+        {usersInCity.length > 0 ? (
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.usersListContent}>
+            contentContainerStyle={styles.travelersListContent}>
             {usersInCity.map(renderUserCard)}
           </ScrollView>
-        </View>
-      )}
-
-      {/* Empty State */}
-      {usersInCity.length === 0 && displayCity && (
-        <View style={styles.emptyStateOverlay}>
-          <View style={styles.emptyStateCard}>
-            <Text style={styles.emptyStateText}>
-              No users found in {displayCity}
-            </Text>
+        ) : (
+          <View style={styles.emptyTravelers}>
+            <Text style={styles.emptyStateText}>No travelers found in {displayCity}</Text>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Compass Button */}
-      <Pressable 
-        style={[styles.compassButton, { bottom: insets.bottom + (usersInCity.length > 0 ? 200 : 100) }]}
-        onPress={returnToHomeLocation}>
-        <Ionicons name="navigate" size={24} color={isSearching ? '#007AFF' : '#666'} />
-      </Pressable>
+        <Pressable style={styles.primaryCta} onPress={() => router.push('/search-users')}>
+          <LinearGradient
+            colors={['#52A5FF', '#0A7BFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.primaryCtaGradient}>
+            <Text style={styles.primaryCtaText}>{ctaLabel}</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
 
       {/* User Detail Modal */}
       {selectedUser && (
-        <Pressable 
-          style={styles.modalOverlay}
-          onPress={() => setSelectedUser(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setSelectedUser(null)}>
           <View style={styles.userModal}>
             <Image
               source={{ uri: selectedUser.avatar_url || 'https://via.placeholder.com/120' }}
@@ -606,7 +680,9 @@ export default function MapScreen() {
             />
             <Text style={styles.modalName}>{selectedUser.full_name}</Text>
             {selectedUser.bio && (
-              <Text style={styles.modalBio} numberOfLines={3}>{selectedUser.bio}</Text>
+              <Text style={styles.modalBio} numberOfLines={3}>
+                {selectedUser.bio}
+              </Text>
             )}
             <Pressable
               style={styles.viewProfileButton}
@@ -645,161 +721,290 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     zIndex: 10,
   },
   searchBar: {
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: 30,
+    paddingHorizontal: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  searchBarSearching: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,122,255,0.28)',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 14,
     fontSize: 16,
-    color: '#333',
-  },
-  currentCityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  currentCityText: {
-    fontSize: 12,
-    color: '#007AFF',
-    marginLeft: 4,
+    lineHeight: 20,
+    color: '#111111',
     fontWeight: '600',
   },
-  markerContainer: {
-    alignItems: 'center',
-  },
-  markerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 3,
-    borderColor: 'white',
-    backgroundColor: '#E0E0E0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  markerTail: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: 'white',
-    marginTop: -1,
-  },
-  usersListContainer: {
+  topOverlay: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
+    zIndex: 10,
   },
-  usersListHeader: {
-    paddingHorizontal: 20,
-    marginBottom: 12,
+  mapWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(235, 255, 239, 0.12)',
   },
-  usersListTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+  filterChipsContent: {
+    paddingTop: 12,
+    paddingRight: 18,
+    gap: 8,
   },
-  usersListContent: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  userCard: {
-    width: 280,
+  filterChip: {
+    height: 38,
     flexDirection: 'row',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 12,
     alignItems: 'center',
+    gap: 7,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 22,
+    paddingHorizontal: 13,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  userAvatar: {
+  filterEmoji: {
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  filterChipText: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#111111',
+    fontWeight: '700',
+  },
+  featuredMarker: {
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featuredMarkerHalo: {
+    position: 'absolute',
+    width: 142,
+    height: 142,
+    borderRadius: 71,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.82)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  featuredMarkerImageWrap: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+    shadowColor: '#258DFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  featuredMarkerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  featuredMarkerFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  nearbyMarker: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    marginRight: 12,
+    backgroundColor: 'rgba(38, 201, 106, 0.22)',
+    borderWidth: 3,
+    borderColor: 'rgba(52, 199, 89, 0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#26C96A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    elevation: 9,
   },
-  userInfo: {
-    flex: 1,
+  nearbyMarkerImage: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#E9E9E9',
   },
-  userHeader: {
+  markerOnlineDot: {
+    position: 'absolute',
+    top: 3,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#2ED573',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  travelersTray: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    minHeight: 344,
+    backgroundColor: 'rgba(246, 255, 248, 0.96)',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 10,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 18,
+  },
+  sheetHandle: {
+    width: 46,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(21, 28, 38, 0.18)',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  travelersHeader: {
+    paddingHorizontal: 22,
+    marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    justifyContent: 'space-between',
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
+  travelersTitle: {
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '900',
+    letterSpacing: -0.25,
+    color: '#323843',
   },
-  userFlag: {
-    fontSize: 18,
-    marginLeft: 8,
-  },
-  userLocation: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 4,
-  },
-  userInterests: {
-    fontSize: 12,
-    color: '#999',
-  },
-  compassButton: {
-    position: 'absolute',
-    right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
-    justifyContent: 'center',
+  seeAllButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 2,
+  },
+  seeAllText: {
+    fontSize: 15,
+    lineHeight: 19,
+    color: '#1189D8',
+    fontWeight: '800',
+  },
+  travelersListContent: {
+    paddingHorizontal: 18,
+    gap: 14,
+  },
+  travelerCard: {
+    width: TRAVELER_CARD_WIDTH,
+    height: TRAVELER_CARD_HEIGHT,
+    borderRadius: 15,
+    backgroundColor: '#D8DEE7',
+    overflow: 'hidden',
+  },
+  travelerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  travelerGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  travelerFlagPill: {
+    position: 'absolute',
+    top: 9,
+    left: 9,
+    minWidth: 27,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.42)',
+  },
+  travelerFlag: {
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  travelerInfo: {
+    position: 'absolute',
+    left: 11,
+    right: 9,
+    bottom: 11,
+  },
+  travelerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  travelerName: {
+    flexShrink: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '900',
+  },
+  travelerOnlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#2ED573',
+  },
+  travelerDistance: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  emptyTravelers: {
+    minHeight: TRAVELER_CARD_HEIGHT,
+    marginHorizontal: 22,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.75)',
+  },
+  primaryCta: {
+    height: 62,
+    borderRadius: 31,
+    overflow: 'hidden',
+    marginHorizontal: 22,
+    marginTop: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  primaryCtaGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryCtaText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '900',
   },
   setLocationButtonCentered: {
     backgroundColor: '#007AFF',

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Path } from 'react-native-svg';
 import Purchases, { type PurchasesPackage, PURCHASES_ERROR_CODE } from 'react-native-purchases';
 import { FounderBadge } from '~/components/FounderBadge';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
@@ -445,7 +446,7 @@ function PaywallPage({ page }: { page: (typeof PAYWALL_PAGES)[number] }) {
           {isFounder ? (
             <FounderBadge size={22} />
           ) : (
-            <Ionicons name="chatbubbles" size={23} color={authColors.textPrimary} />
+            <SpeechBubbleIcon size={28} color={authColors.textPrimary} />
           )}
         </View>
       </View>
@@ -466,6 +467,23 @@ function PaywallPage({ page }: { page: (typeof PAYWALL_PAGES)[number] }) {
         ))}
       </ScrollView>
     </View>
+  );
+}
+
+function SpeechBubbleIcon({ size = 24, color = '#000000' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5.25 5.75C5.25 4.65 6.15 3.75 7.25 3.75H16.75C17.85 3.75 18.75 4.65 18.75 5.75V12.5C18.75 13.6 17.85 14.5 16.75 14.5H11.1L7.1 18.05C6.74 18.37 6.17 18.11 6.17 17.63V14.42C5.24 14.24 4.55 13.42 4.55 12.45V5.75H5.25Z"
+        stroke={color}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx="9" cy="9.25" r="0.85" fill={color} />
+      <Circle cx="12" cy="9.25" r="0.85" fill={color} />
+      <Circle cx="15" cy="9.25" r="0.85" fill={color} />
+    </Svg>
   );
 }
 
