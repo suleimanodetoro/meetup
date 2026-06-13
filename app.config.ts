@@ -32,14 +32,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-image-picker',
       {
         photosPermission:
-          'This app needs to access your photos library to let you upload it online',
+          'Waypoint needs access to your photo library so you can choose a profile photo and trip images to upload.',
+        // App is photo-library-only — suppress the camera/mic usage strings the
+        // picker plugin injects by default (unused = App Review 5.1.1 reject risk).
+        cameraPermission: false,
+        microphonePermission: false,
       },
     ],
     [
       'expo-location',
       {
-        locationAlwaysAndWhenInUsePermission: 'Allow $(PRODUCT_NAME) to use your location.',
-        locationWhenInUsePermission: 'Show current location on map.',
+        // Foreground-only: no background location anywhere, so do NOT declare the
+        // "Always" string (Apple flags an unused Always declaration).
+        locationWhenInUsePermission:
+          'Waypoint uses your location to show your city on the map and find travelers near you.',
       },
     ],
     [
@@ -116,7 +122,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: 'app.usewaypoint',
     permissions: [
-      'android.permission.RECORD_AUDIO',
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
       'android.permission.POST_NOTIFICATIONS',
