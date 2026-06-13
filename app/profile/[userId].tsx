@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
@@ -351,12 +352,16 @@ export default function UserProfileScreen() {
         contentContainerStyle={styles.scrollContentContainer}>
         {/* Header Image - Scrollable */}
         <View style={styles.headerImageContainer}>
-          <Image
-            source={{
-              uri: profile.avatar_url || 'https://via.placeholder.com/400',
-            }}
-            style={styles.headerImage}
-          />
+          {profile.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.headerImage} />
+          ) : (
+            <InitialsAvatar
+              name={profile.full_name}
+              id={profile.id}
+              size={120}
+              style={[styles.headerImage, { borderRadius: 0 }]}
+            />
+          )}
           <LinearGradient
             colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.62)']}
             style={styles.headerScrim}

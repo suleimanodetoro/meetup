@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import { FriendRequest, Profile, Event } from '~/types/messaging';
@@ -176,10 +177,16 @@ export default function FriendRequestsScreen() {
           style={styles.profileSection}
           onPress={() => router.push(`/profile/${item.from_user.id}`)}
         >
-          <Image
-            source={{ uri: item.from_user.avatar_url || 'https://via.placeholder.com/60' }}
-            style={styles.avatar}
-          />
+          {item.from_user.avatar_url ? (
+            <Image source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <InitialsAvatar
+              name={item.from_user.full_name || item.from_user.username}
+              id={item.from_user.id}
+              size={60}
+              style={styles.avatar}
+            />
+          )}
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
               {item.from_user.full_name || item.from_user.username || 'Unknown User'}

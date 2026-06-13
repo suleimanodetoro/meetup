@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChatShell, useChat, type ChatHeader } from '~/modules/chat';
 
@@ -40,12 +41,16 @@ function DMHeader({ header }: { header: ChatHeader }) {
         style={styles.headerCenter}
         onPress={() => other?.id && router.push(`/profile/${other.id}`)}
       >
-        <Image
-          source={{
-            uri: other?.avatar_url || 'https://via.placeholder.com/40',
-          }}
-          style={styles.headerAvatar}
-        />
+        {other?.avatar_url ? (
+          <Image source={{ uri: other.avatar_url }} style={styles.headerAvatar} />
+        ) : (
+          <InitialsAvatar
+            name={other?.full_name || 'Direct Message'}
+            id={other?.id}
+            size={40}
+            style={styles.headerAvatar}
+          />
+        )}
         <Text style={styles.headerTitle} numberOfLines={1}>
           {other?.full_name || 'Direct Message'}
         </Text>

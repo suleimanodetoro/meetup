@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { format } from 'date-fns';
 import { useAuth } from '~/contexts/AuthProvider';
 import type { MessageWithDetails, Profile } from '~/types/messaging';
@@ -163,12 +164,16 @@ function DefaultBubble({
     <View style={[styles.messageRow, isOwn && styles.messageRowOwn]}>
       {!isOwn && showAvatar && (
         <Pressable onPress={() => onPressUser?.(message.user_id)} hitSlop={6}>
-          <Image
-            source={{
-              uri: message.user?.avatar_url || 'https://via.placeholder.com/32',
-            }}
-            style={styles.avatar}
-          />
+          {message.user?.avatar_url ? (
+            <Image source={{ uri: message.user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <InitialsAvatar
+              name={message.user?.full_name}
+              id={message.user_id}
+              size={32}
+              style={styles.avatar}
+            />
+          )}
         </Pressable>
       )}
       {!isOwn && !showAvatar && <View style={styles.avatarPlaceholder} />}
