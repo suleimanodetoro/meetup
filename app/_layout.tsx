@@ -7,6 +7,7 @@ import { CreatePlanProvider } from '~/contexts/CreatePlanContext';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ErrorBoundary } from '~/components/ErrorBoundary';
 import { configureRevenueCat } from '~/lib/revenuecat';
 import { waypointNotifications } from '~/modules/notifications';
 // Slug-only import — dependency-free. Importing from ./sequence.ts here
@@ -150,7 +151,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
         <CreatePlanProvider>
           <NotificationStartupEffect />
           <NavigationController>
@@ -181,6 +183,7 @@ export default function RootLayout() {
           </NavigationController>
         </CreatePlanProvider>
       </AuthProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

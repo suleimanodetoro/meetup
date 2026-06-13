@@ -76,6 +76,25 @@ visibility/block filters will also cover any future nearby-city expansion.
   `storage.from('avatars').remove([...])` for the user's files, invoked from the
   delete flow.
 
+## Pre-launch follow-ups (deslop audit)
+
+- **Crash reporting (Q1 — deferred):** the app now has an error boundary
+  ([components/ErrorBoundary.tsx](components/ErrorBoundary.tsx)) so a render throw
+  no longer white-screens — but production errors aren't collected yet. Wire a
+  reporter before / just after launch. Sentry's free tier (5k errors/mo) is the
+  simplest "reliable cheap/free" fit: `npx expo install @sentry/react-native`,
+  add the config plugin + `Sentry.init({ dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: !__DEV__ })`, set the DSN as an EAS secret, rebuild, then add
+  `Sentry.captureException(error)` in `ErrorBoundary.componentDidCatch` (a TODO
+  is marked there). Alternatives if preferred: PostHog error tracking, Bugsnag.
+- **Mapbox token cap (S11):** `EXPO_PUBLIC_MAPBOX_TOKEN` ships in the bundle and
+  is extractable. Set a billing alert / hard cap in the Mapbox dashboard (the
+  only real bound for a native `pk` token), rotate the current token (public
+  scopes only), and move it to an EAS secret. No code change; don't rename the var.
+- **Type-cast sweep (Q5, optional):** `types/supabase.ts` is regenerated and
+  accurate now; the ~34 `as any` / `as unknown as` RPC casts can be removed
+  incrementally where the regenerated types resolve them.
+
 ## Native rebuild for `expo-store-review`
 
 `expo-store-review` is in `package.json`, but its native module
