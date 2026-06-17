@@ -1,10 +1,9 @@
 // app/edit-profile.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -13,7 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { AppImage } from '~/components/AppImage';
+import { router, useNavigation } from 'expo-router';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
@@ -21,6 +21,7 @@ import { COUNTRIES } from '~/utils/countryFlags';
 import { LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
 import { useAuth } from '~/contexts/AuthProvider';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
+import { removeStorageObjectsByUrl } from '~/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import InterestsSelector from '~/components/InterestsSelector';
 
@@ -94,6 +95,7 @@ const socialHelpers = {
 
 export default function EditProfile() {
   const { session } = useAuth();
+  const navigation = useNavigation();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,6 +104,30 @@ export default function EditProfile() {
   const [mainImage, setMainImage] = useState<string | null>(null);
   const [secondImage, setSecondImage] = useState<string | null>(null);
   const [thirdImage, setThirdImage] = useState<string | null>(null);
+
+  // Storage-cleanup bookkeeping for avatar slots. `originalPhotos` is the set of
+  // photo URLs the profile loaded with (the live DB values); on a successful save
+  // any of these no longer referenced is orphaned and gets deleted. `sessionUploads`
+  // tracks files uploaded during THIS edit so re-picking a slot before saving can
+  // immediately drop the intermediate file (never committed, safe to remove).
+  const originalPhotosRef = useRef<(string | null)[]>([null, null, null]);
+  const sessionUploadsRef = useRef<Set<string>>(new Set());
+
+  // Reclaim photos uploaded during this edit but never saved, when the user leaves
+  // without saving (header back, swipe-back, hardware back). A successful save
+  // clears sessionUploads first, so on that path this deletes nothing. This is the
+  // cancel-side counterpart to the save-time cleanup — together they keep the
+  // shared avatars bucket free of orphans from abandoned edits.
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', () => {
+      const pending = [...sessionUploadsRef.current];
+      if (pending.length) {
+        sessionUploadsRef.current.clear();
+        void removeStorageObjectsByUrl(pending);
+      }
+    });
+    return unsub;
+  }, [navigation]);
 
   // Basic Info
   const [fullName, setFullName] = useState('');
@@ -219,6 +245,12 @@ export default function EditProfile() {
           setMainImage(profile.avatar_url ?? null);
           setSecondImage(profile.avatar_url_2 ?? null);
           setThirdImage(profile.avatar_url_3 ?? null);
+          // Baseline for storage cleanup — the files currently live in the DB.
+          originalPhotosRef.current = [
+            profile.avatar_url ?? null,
+            profile.avatar_url_2 ?? null,
+            profile.avatar_url_3 ?? null,
+          ];
 
           // birth_date -> dob. `birth_date` is a postgres DATE (YYYY-MM-DD);
           // appending a local time avoids the UTC-midnight-drift-into-prev-day
@@ -307,6 +339,18 @@ export default function EditProfile() {
       const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const publicUrl = publicData.publicUrl;
 
+      // If this slot already held a file we uploaded earlier in this same edit
+      // session (i.e. never committed to the DB), that intermediate is now
+      // unreferenced — delete it now. We never delete the original DB file here,
+      // because the user could still cancel; that cleanup waits for a save.
+      const prev =
+        position === 'main' ? mainImage : position === 'second' ? secondImage : thirdImage;
+      if (prev && sessionUploadsRef.current.has(prev)) {
+        void removeStorageObjectsByUrl([prev]);
+        sessionUploadsRef.current.delete(prev);
+      }
+      sessionUploadsRef.current.add(publicUrl);
+
       if (position === 'main') setMainImage(publicUrl);
       if (position === 'second') setSecondImage(publicUrl);
       if (position === 'third') setThirdImage(publicUrl);
@@ -333,8 +377,14 @@ export default function EditProfile() {
     try {
       setSaving(true);
 
-      // Base payload with ALL avatar URLs
-      const basePayload: any = {
+      // Single atomic update — avatars, profile fields AND social handles together.
+      // (This used to be two sequential updates: base first, then social. That
+      // committed the new avatar URLs in update #1 but gated the orphan-cleanup
+      // below on update #2 succeeding — so a social-update failure left the new
+      // avatars saved while the old file was never deleted. One update keeps the
+      // commit and the cleanup that follows it consistent. Social handles are
+      // always included so clearing one actually unsets a previously-saved value.)
+      const payload: any = {
         updated_at: new Date().toISOString(),
         full_name: fullName || null,
         bio: bio || null,
@@ -349,32 +399,40 @@ export default function EditProfile() {
         interests,
         gender_preference: genderPreference ?? null,
         meeting_preference: meetingPreference ?? null,
-      };
-
-      // Try to save base fields first
-      const { error: baseError } = await supabase
-        .from('profiles')
-        .update(basePayload)
-        .eq('id', session.user.id);
-
-      if (baseError) {
-        console.error('Base save error:', baseError);
-        throw baseError;
-      }
-
-      // Save social URLs as part of the same update path. We always include
-      // them — passing null when cleared lets the user actually unset a
-      // previously-saved handle.
-      const socialPayload = {
         instagram_url: socialHelpers.instagram.toUrl(instagramInput) || null,
         tiktok_url: socialHelpers.tiktok.toUrl(tiktokInput) || null,
         youtube_url: socialHelpers.youtube.toUrl(youtubeInput) || null,
       };
-      const { error: socialError } = await supabase
+
+      const { error: saveError } = await supabase
         .from('profiles')
-        .update(socialPayload)
+        .update(payload)
         .eq('id', session.user.id);
-      if (socialError) throw socialError;
+      if (saveError) {
+        console.error('Save error:', saveError);
+        throw saveError;
+      }
+
+      // Storage cleanup — only now that the new URLs are committed. Remove (a) any
+      // original avatar file the saved profile no longer references (replaced or
+      // cleared), and (b) any file uploaded during this edit that didn't end up
+      // saved (an intermediate left by re-picking a slot — covers the case where a
+      // rapid re-pick read stale state and skipped the inline cleanup). Best-effort:
+      // logged, never surfaced, never blocks the save.
+      const savedPhotos = [mainImage || null, secondImage || null, thirdImage || null];
+      const orphanedOriginals = originalPhotosRef.current.filter(
+        (orig) => orig && !savedPhotos.includes(orig)
+      );
+      const unsavedUploads = [...sessionUploadsRef.current].filter(
+        (u) => !savedPhotos.includes(u)
+      );
+      const toDelete = [...orphanedOriginals, ...unsavedUploads];
+      if (toDelete.length) void removeStorageObjectsByUrl(toDelete);
+      // Re-baseline so a second save in the same session won't re-delete, and the
+      // just-saved files are now the live set (not pending intermediates).
+      originalPhotosRef.current = savedPhotos;
+      sessionUploadsRef.current.clear();
+
       Alert.alert('Saved', 'Your profile has been updated.');
       router.back();
     } catch (err) {
@@ -456,10 +514,10 @@ export default function EditProfile() {
             position: 'relative',
           }}>
           {mainImage ? (
-            <Image
+            <AppImage
               source={{ uri: mainImage }}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
+              contentFit="cover"
             />
           ) : (
             <View style={{ flex: 1, backgroundColor: '#4A90E2' }} />
@@ -505,10 +563,10 @@ export default function EditProfile() {
               position: 'relative',
             }}>
             {secondImage ? (
-              <Image
+              <AppImage
                 source={{ uri: secondImage }}
                 style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <View
@@ -560,10 +618,10 @@ export default function EditProfile() {
               position: 'relative',
             }}>
             {thirdImage ? (
-              <Image
+              <AppImage
                 source={{ uri: thirdImage }}
                 style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <View

@@ -2,7 +2,8 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
@@ -197,10 +198,11 @@ export default function WelcomeScreen() {
           accessibilityLabel="Waypoint"
         >
           <View style={styles.logoTile}>
-            <Image
+            <AppImage
               source={require('~/assets/ios-light.png')}
               style={styles.logoImage}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={0}
               accessibilityIgnoresInvertColors
             />
           </View>

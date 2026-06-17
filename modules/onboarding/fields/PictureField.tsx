@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
@@ -21,7 +22,7 @@ export function PictureField({ value, setValue }: StepBodyProps<PictureValue>) {
     <View style={styles.container}>
       <Pressable onPress={pick} style={styles.photoCard}>
         {value?.uri ? (
-          <Image source={{ uri: value.uri }} style={styles.photo} />
+          <AppImage source={{ uri: value.uri }} style={styles.photo} />
         ) : (
           <View style={styles.placeholder}>
             <Ionicons name="camera" size={30} color={authColors.accent} />

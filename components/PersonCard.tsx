@@ -1,6 +1,7 @@
 // components/PersonCard.tsx
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, Pressable, Image, Dimensions } from 'react-native';
+import { View, Text, Pressable, Dimensions } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -70,7 +71,7 @@ export const PersonCard = React.memo<PersonCardProps>(({ person }) => {
           backgroundColor: authColors.borderMuted,
         }}>
         {person.avatar_url && !imageError ? (
-          <Image
+          <AppImage
             source={{ uri: person.avatar_url }}
             style={{ width: '100%', height: '100%' }}
             onError={() => setImageError(true)}

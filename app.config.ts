@@ -19,6 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
+    './plugins/withFmtConstevalFix',
     'expo-video',
     'expo-web-browser',
     'expo-apple-authentication',

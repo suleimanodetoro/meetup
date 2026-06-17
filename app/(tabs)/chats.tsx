@@ -6,11 +6,11 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Image,
   TextInput,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -215,7 +215,7 @@ export default function ChatsScreen() {
         style={styles.chatItem}
         onPress={() => navigateToChat(item)}>
         {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          <AppImage source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <InitialsAvatar
             name={chatName}

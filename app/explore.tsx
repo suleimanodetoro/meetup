@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
@@ -87,7 +87,7 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: ExplorePlan }) => {
       <View style={{ flexDirection: 'row' }}>
         <View style={{ width: 124, height: 124 }}>
           {plan.image_uri ? (
-            <Image source={{ uri: plan.image_uri }} style={{ width: '100%', height: '100%' }} />
+            <AppImage source={{ uri: plan.image_uri }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <View
               style={{
@@ -139,7 +139,7 @@ const ExplorePlanCard = React.memo(({ plan }: { plan: ExplorePlan }) => {
                   }}
                 >
                   {attendee?.avatar_url ? (
-                    <Image
+                    <AppImage
                       source={{ uri: attendee.avatar_url }}
                       style={{ width: '100%', height: '100%' }}
                     />

@@ -111,6 +111,31 @@ fires. No config plugin needed — it auto-links; it only needs a native build.
 General rule for this app: pure-JS changes hot-reload, but any newly added
 native module requires a native rebuild before it can be imported.
 
+## Native rebuild for `expo-image` (C1 — REQUIRED before next run)
+
+C1 (egress reduction) migrated all ~36 `<Image>` call sites off React Native's
+built-in `<Image>` onto `expo-image` (v2.4.1) via the wrapper
+[components/AppImage.tsx](components/AppImage.tsx) (`AppImage` / `AppImageBackground`,
+`cachePolicy="memory-disk"`, 120ms transition). RN `<Image>` has no persistent
+disk cache, so avatars / event photos were re-downloaded from Supabase Storage on
+every remount, list recycle, memory eviction and app restart. expo-image caches to
+disk+memory → each image is fetched once per device. This is the biggest egress lever.
+
+`expo-image` is a **native module**. The current dev binary does NOT have it
+compiled in, so the app will crash (`Cannot find native module 'ExpoImage'`) on
+any screen with an image until you rebuild:
+
+```
+npx expo prebuild --clean
+npx expo run:ios        # and/or run:android, or an EAS build
+```
+
+Auto-links; no config plugin needed. Until the rebuild, hot-reload will fail on
+image screens — this is expected, not a regression in the JS.
+
+Minor behavior change to eyeball after rebuild: images now fade in over 120ms
+(set in AppImage.tsx — drop to `transition={0}` there if you want instant pops).
+
 ## Wire up RevenueCat (external steps)
 
 The code is in place ([lib/revenuecat.ts](lib/revenuecat.ts),

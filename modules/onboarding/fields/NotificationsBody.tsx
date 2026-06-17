@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
 
 const waypointLogo = require('~/assets/ios-light.png');
@@ -16,7 +17,7 @@ export function NotificationsBody() {
           <View style={styles.phoneNotch} />
           <View style={styles.feedCardLarge}>
             <View style={styles.logoTile}>
-              <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+              <AppImage source={waypointLogo} style={styles.logoImage} contentFit="cover" transition={0} />
             </View>
             <View style={styles.feedCopy}>
               <View style={styles.feedLineWide} />
@@ -25,7 +26,7 @@ export function NotificationsBody() {
           </View>
           <View style={styles.feedCardSmall}>
             <View style={styles.logoTileSmall}>
-              <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+              <AppImage source={waypointLogo} style={styles.logoImage} contentFit="cover" transition={0} />
             </View>
             <View style={styles.feedCopy}>
               <View style={styles.feedLineMedium} />
@@ -36,7 +37,7 @@ export function NotificationsBody() {
 
         <View style={styles.notificationCard}>
           <View style={styles.notificationLogo}>
-            <Image source={waypointLogo} style={styles.logoImage} resizeMode="cover" />
+            <AppImage source={waypointLogo} style={styles.logoImage} contentFit="cover" transition={0} />
           </View>
           <View style={styles.notificationCopy}>
             <Text style={styles.notificationTitle}>Waypoint</Text>

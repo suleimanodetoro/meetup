@@ -7,11 +7,11 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Image,
   ActivityIndicator,
   Alert,
   RefreshControl,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -178,7 +178,7 @@ export default function FriendRequestsScreen() {
           onPress={() => router.push(`/profile/${item.from_user.id}`)}
         >
           {item.from_user.avatar_url ? (
-            <Image source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
+            <AppImage source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
           ) : (
             <InitialsAvatar
               name={item.from_user.full_name || item.from_user.username}

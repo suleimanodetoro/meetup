@@ -5,12 +5,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   Pressable,
   ActivityIndicator,
   Alert,
   Dimensions,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -24,6 +24,7 @@ import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
+import { presentUserSafetyActions } from '~/modules/safety';
 
 const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
   LANGUAGES.map((l) => [l.code, l])
@@ -340,7 +341,15 @@ export default function UserProfileScreen() {
         </Pressable>
         {!isOwnProfile && (
           <Pressable
-            onPress={() => Alert.alert('Profile options', 'More profile actions are coming soon.')}
+            onPress={() => {
+              if (!session?.user?.id || !userId) return;
+              presentUserSafetyActions({
+                currentUserId: session.user.id,
+                targetUserId: userId,
+                targetName: profile?.full_name,
+                onBlocked: () => router.back(),
+              });
+            }}
             style={styles.headerButton}>
             <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
           </Pressable>
@@ -353,7 +362,7 @@ export default function UserProfileScreen() {
         {/* Header Image - Scrollable */}
         <View style={styles.headerImageContainer}>
           {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.headerImage} />
+            <AppImage source={{ uri: profile.avatar_url }} style={styles.headerImage} />
           ) : (
             <InitialsAvatar
               name={profile.full_name}
@@ -510,7 +519,7 @@ export default function UserProfileScreen() {
                   key={event.id}
                   onPress={() => router.push(`/event/${event.id}`)}
                   style={styles.planCard}>
-                  <Image
+                  <AppImage
                     source={{ uri: event.image_uri || getCityImageUrl(event.city) }}
                     style={styles.planImage}
                   />

@@ -1,6 +1,7 @@
 // components/VisitCard.tsx
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, Image, Dimensions, type ColorValue } from 'react-native';
+import { View, Text, Pressable, Dimensions, type ColorValue } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,14 +116,14 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
 
       {/* City or event image overlay */}
       {displayImageUrl && (
-        <Image
+        <AppImage
           source={{ uri: displayImageUrl }}
           style={{
             width: '100%',
             height: '100%',
             position: 'absolute',
           }}
-          resizeMode="cover"
+          contentFit="cover"
           onError={() => {}}
         />
       )}
@@ -200,7 +201,7 @@ export const VisitCard = React.memo<VisitCardProps>(({ visit }) => {
                   overflow: 'hidden',
                 }}>
                 {user?.avatar_url ? (
-                  <Image
+                  <AppImage
                     source={{ uri: user.avatar_url }}
                     style={{ width: '100%', height: '100%' }}
                   />

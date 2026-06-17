@@ -83,6 +83,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'friend-requests',
       'explore',
       'search',
+      'report',
     ];
 
     const isAllowedRoute =
@@ -176,6 +177,7 @@ export default function RootLayout() {
               <Stack.Screen name="friend-requests" />
               <Stack.Screen name="explore" />
               <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="report" options={{ presentation: 'modal' }} />
 
               {/* 404 */}
               <Stack.Screen name="+not-found" />

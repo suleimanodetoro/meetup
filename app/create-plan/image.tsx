@@ -3,13 +3,13 @@ import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   Alert,
   ActivityIndicator,
   SafeAreaView,
   StyleSheet,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -124,7 +124,7 @@ export default function PlanImageScreen() {
           style={[styles.dropzone, busy && styles.dropzoneDisabled]}>
           {previewUri ? (
             <>
-              <Image source={{ uri: previewUri }} style={styles.image} />
+              <AppImage source={{ uri: previewUri }} style={styles.image} />
               {!busy && (
                 <Pressable
                   onPress={(e) => {

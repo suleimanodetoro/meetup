@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   ScrollView,
   StatusBar,
@@ -12,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import Mapbox, { Camera, MapView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -520,7 +520,7 @@ function Avatar({
   return (
     <View style={[styles.avatarShell, { width: size, height: size, borderRadius: size / 2 }]}>
       {avatarUrl ? (
-        <Image
+        <AppImage
           source={{ uri: avatarUrl }}
           style={[styles.avatarImage, { borderRadius: size / 2 }]}
         />
@@ -535,12 +535,9 @@ function VerificationBadge({ profile }: { profile: ProfilePageData }) {
   if (profile.isFounder) return <FounderBadge showLabel style={styles.inlineBadge} />;
   if (profile.hasSubscription) return <PremiumBadge size={18} style={styles.inlineBadge} />;
 
-  return (
-    <View style={styles.notVerifiedBadge}>
-      <Ionicons name="shield-checkmark" size={15} color="#FF4F6D" />
-      <Text style={styles.notVerifiedText}>Not Verified</Text>
-    </View>
-  );
+  // No "Not Verified" badge: the app does no identity verification, so implying a
+  // verification status (verified vs not) would mislead users about how vetted accounts are.
+  return null;
 }
 
 function ProfileSection({

@@ -1,6 +1,7 @@
 // components/UserCard.tsx
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { PremiumBadge } from './PremiumBadge';
 
@@ -39,7 +40,7 @@ export default function UserCard({ user }: UserCardProps) {
       <View style={styles.leftSection}>
         <View style={styles.avatarContainer}>
           {user.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+            <AppImage source={{ uri: user.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarText}>
@@ -47,11 +48,8 @@ export default function UserCard({ user }: UserCardProps) {
               </Text>
             </View>
           )}
-          {user.is_verified && !user.is_premium && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
-            </View>
-          )}
+          {/* No "verified" checkmark: the app performs no identity verification, so a
+              verified-style badge would falsely imply vetted/trusted accounts. */}
           {user.is_premium && (
             <PremiumBadge size={18} style={styles.premiumBadgePosition} />
           )}

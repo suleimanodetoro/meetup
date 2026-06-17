@@ -1,10 +1,10 @@
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -54,7 +54,7 @@ function GroupHeader({
         onPress={() => router.push(`/event/${eventId}`)}
       >
         {event?.image_uri ? (
-          <Image source={{ uri: event.image_uri }} style={styles.headerAvatar} />
+          <AppImage source={{ uri: event.image_uri }} style={styles.headerAvatar} />
         ) : (
           <InitialsAvatar
             name={event?.title || 'Group Chat'}

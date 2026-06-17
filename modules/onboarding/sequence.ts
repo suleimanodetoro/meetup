@@ -35,6 +35,29 @@ async function uploadAvatar(userId: string, base64: string): Promise<string> {
   return publicUrl;
 }
 
+// Waypoint is an 18+ service (see Terms of Service + App Store age rating).
+// The birthday step MUST reject anyone who declares an age below this, both for
+// legal reasons (COPPA / under-18 safety) and to keep our published "you must be
+// 18+" claim truthful. This is a self-declared gate (we cannot verify a real DOB),
+// but it must actually refuse under-18 dates rather than wave them through.
+const MINIMUM_AGE = 18;
+
+/**
+ * Hard block for users who declare an under-18 birthday. Shows an explanatory
+ * alert and resolves once dismissed; the caller then aborts the step so the
+ * user cannot complete onboarding (and therefore cannot use the social Service).
+ */
+function rejectUnderage(age: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    Alert.alert(
+      'You must be 18 to use Waypoint',
+      `Based on the birthday you entered, you are ${age}. Waypoint is only for people aged ${MINIMUM_AGE} and over, so we can't set up your account. If you entered the wrong date, tap back and try again.`,
+      [{ text: 'OK', onPress: () => resolve() }],
+      { cancelable: false }
+    );
+  });
+}
+
 /**
  * Prompts the user to confirm their age before persisting the birthday.
  * Resolves true on confirm, false on cancel. Inspired by Swarm's
@@ -84,6 +107,13 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
     isValid: (v: string | undefined) => !!v,
     commit: async (v: string | undefined) => {
       if (!v) throw new StepCancelled('No birthday set');
+      const age = calculateAge(new Date(v));
+      if (age < MINIMUM_AGE) {
+        await rejectUnderage(age);
+        // Abort the step: the user stays on the birthday screen and cannot
+        // advance, so onboarding never completes for an under-18 account.
+        throw new StepCancelled('User is under the minimum age');
+      }
       const ok = await confirmAge(v);
       if (!ok) throw new StepCancelled('User declined age confirmation');
       return { birth_date: v };

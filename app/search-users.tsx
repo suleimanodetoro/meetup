@@ -6,11 +6,11 @@ import {
   FlatList,
   TextInput,
   Pressable,
-  Image,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -149,7 +149,7 @@ export default function SearchUsersScreen() {
     return (
       <Pressable style={styles.userCard} onPress={() => handleUserPress(item)}>
         {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+          <AppImage source={{ uri: item.avatar_url }} style={styles.avatar} />
         ) : (
           <InitialsAvatar
             name={item.full_name || item.username}

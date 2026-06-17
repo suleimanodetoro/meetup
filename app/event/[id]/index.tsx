@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   Pressable,
   ActivityIndicator,
   Alert,
@@ -13,6 +12,7 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ import { getInterestEmoji } from '~/utils/constants';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/geographic';
+import { openReport } from '~/modules/safety';
 
 const { width, height } = Dimensions.get('window');
 
@@ -312,12 +313,19 @@ export default function PlanDetailsScreen() {
       <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
         {/* Header with Image */}
         <View style={styles.headerContainer}>
-          <Image
-            source={{ 
-              uri: event.image_uri || 'https://source.unsplash.com/800x600/?bangkok,travel' 
-            }}
-            style={styles.headerImage}
-          />
+          {event.image_uri ? (
+            <AppImage source={{ uri: event.image_uri }} style={styles.headerImage} />
+          ) : (
+            <LinearGradient
+              colors={['#3A4A63', '#243044']}
+              style={[styles.headerImage, styles.headerPlaceholder]}
+            >
+              <Ionicons name="location" size={44} color="rgba(255,255,255,0.45)" />
+              {event.city ? (
+                <Text style={styles.headerPlaceholderText}>{event.city}</Text>
+              ) : null}
+            </LinearGradient>
+          )}
           
           {/* FIXED: Back/Close Button - changes icon based on fromCreation */}
           <Pressable 
@@ -386,7 +394,7 @@ export default function PlanDetailsScreen() {
             <View style={styles.avatarStack}>
               {event.attendees?.slice(0, 5).map((attendee, index) => (
                 attendee.user.avatar_url ? (
-                  <Image
+                  <AppImage
                     key={attendee.user.id}
                     source={{ uri: attendee.user.avatar_url }}
                     style={[
@@ -597,7 +605,7 @@ export default function PlanDetailsScreen() {
                 onPress={() => router.push(`/profile/${event.creator!.id}`)}
               >
                 {event.creator.avatar_url ? (
-                  <Image
+                  <AppImage
                     source={{ uri: event.creator.avatar_url }}
                     style={styles.organizerAvatar}
                   />
@@ -621,7 +629,17 @@ export default function PlanDetailsScreen() {
           </Pressable>
 
           {/* Report Button */}
-          <Pressable style={styles.reportButton}>
+          <Pressable
+            style={styles.reportButton}
+            onPress={() =>
+              openReport({
+                targetType: 'event',
+                targetId: id,
+                reportedUserId: event.creator?.id ?? null,
+                name: event.title,
+              })
+            }
+          >
             <Text style={styles.reportText}>Report Group</Text>
           </Pressable>
         </View>
@@ -669,6 +687,16 @@ const styles = StyleSheet.create({
   headerImage: {
     width: '100%',
     height: '100%',
+  },
+  headerPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  headerPlaceholderText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 18,
+    fontWeight: '600',
   },
   headerBackButton: {
     position: 'absolute',
