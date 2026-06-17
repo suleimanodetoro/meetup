@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,7 +76,7 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
     <Pressable onPress={() => router.push(`/event/${plan.id}` as never)} style={styles.container}>
       <View style={styles.imageContainer}>
         {plan.image_uri ? (
-          <Image source={{ uri: plan.image_uri }} style={styles.image} />
+          <AppImage source={{ uri: plan.image_uri }} style={styles.image} />
         ) : (
           <LinearGradient colors={['#667eea', '#764ba2']} style={styles.imagePlaceholder}>
             <Ionicons name="calendar" size={32} color="white" />
@@ -122,7 +123,7 @@ const PlanCardHome = memo(({ plan }: PlanCardHomeProps) => {
               {displayAttendees.map((user, index) => (
                 <View key={user.id} style={[styles.avatar, index > 0 && { marginLeft: -8 }]}>
                   {user?.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+                    <AppImage source={{ uri: user.avatar_url }} style={styles.avatarImage} />
                   ) : (
                     <View style={styles.avatarPlaceholder}>
                       <Ionicons name="person" size={12} color="#999" />

@@ -10,8 +10,8 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -261,7 +261,7 @@ export default function PrivacySettingsScreen() {
             {blockedUsers.map((blocked) => (
               <View key={blocked.id} style={styles.blockedRow}>
                 {blocked.blocked_profile?.avatar_url ? (
-                  <Image
+                  <AppImage
                     source={{ uri: blocked.blocked_profile.avatar_url }}
                     style={styles.blockedAvatar}
                   />

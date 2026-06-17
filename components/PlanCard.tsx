@@ -1,6 +1,7 @@
 // components/PlanCard.tsx
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -35,7 +36,7 @@ export default function PlanCard({ plan }: PlanCardProps) {
       {/* Image or Gradient */}
       <View style={styles.imageContainer}>
         {plan.image_uri ? (
-          <Image source={{ uri: plan.image_uri }} style={styles.image} />
+          <AppImage source={{ uri: plan.image_uri }} style={styles.image} />
         ) : (
           <LinearGradient
             colors={['#667eea', '#764ba2']}
@@ -94,7 +95,7 @@ export default function PlanCard({ plan }: PlanCardProps) {
         {plan.host_name && (
           <View style={styles.hostInfo}>
             {plan.host_avatar ? (
-              <Image source={{ uri: plan.host_avatar }} style={styles.hostAvatar} />
+              <AppImage source={{ uri: plan.host_avatar }} style={styles.hostAvatar} />
             ) : (
               <View style={[styles.hostAvatar, styles.hostAvatarPlaceholder]}>
                 <Text style={styles.hostInitial}>

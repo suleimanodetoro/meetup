@@ -1,14 +1,16 @@
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChatShell, useChat, type ChatHeader } from '~/modules/chat';
+import { useAuth } from '~/contexts/AuthProvider';
+import { presentUserSafetyActions } from '~/modules/safety';
 
 export default function DMChatScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
@@ -27,7 +29,19 @@ export default function DMChatScreen() {
 }
 
 function DMHeader({ header }: { header: ChatHeader }) {
+  const { session } = useAuth();
   const other = header.kind === 'dm' ? header.other : null;
+
+  const openSafetyActions = () => {
+    if (!session?.user?.id || !other?.id) return;
+    presentUserSafetyActions({
+      currentUserId: session.user.id,
+      targetUserId: other.id,
+      targetName: other.full_name,
+      onBlocked: () => router.back(),
+    });
+  };
+
   return (
     <View style={styles.header}>
       <Pressable
@@ -42,7 +56,7 @@ function DMHeader({ header }: { header: ChatHeader }) {
         onPress={() => other?.id && router.push(`/profile/${other.id}`)}
       >
         {other?.avatar_url ? (
-          <Image source={{ uri: other.avatar_url }} style={styles.headerAvatar} />
+          <AppImage source={{ uri: other.avatar_url }} style={styles.headerAvatar} />
         ) : (
           <InitialsAvatar
             name={other?.full_name || 'Direct Message'}
@@ -55,9 +69,14 @@ function DMHeader({ header }: { header: ChatHeader }) {
           {other?.full_name || 'Direct Message'}
         </Text>
       </Pressable>
-      <View style={styles.headerButton}>
-        <Ionicons name="information-circle-outline" size={24} color="#000" />
-      </View>
+      <Pressable
+        onPress={openSafetyActions}
+        style={styles.headerButton}
+        hitSlop={6}
+        disabled={!other?.id}
+      >
+        <Ionicons name="ellipsis-horizontal" size={24} color="#000" />
+      </Pressable>
     </View>
   );
 }

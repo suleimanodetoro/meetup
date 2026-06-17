@@ -1,4 +1,5 @@
-import { ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppImageBackground } from '~/components/AppImage';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import type { StepBodyProps } from '../types';
@@ -60,9 +61,9 @@ export function LocationField({ value }: StepBodyProps<LocationValue>) {
   return (
     <View style={styles.container}>
       <View style={styles.heroCard} accessibilityIgnoresInvertColors>
-        <ImageBackground
+        <AppImageBackground
           source={{ uri: HERO_IMAGE_URI }}
-          resizeMode="cover"
+          contentFit="cover"
           style={styles.heroImage}
           imageStyle={styles.heroImageInner}
         />

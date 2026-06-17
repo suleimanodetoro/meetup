@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  Image,
   Alert,
   RefreshControl,
   StyleSheet,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
@@ -141,10 +141,11 @@ export default function HomeScreen() {
           <View style={styles.topRow}>
             <View style={styles.brandRow}>
               <View style={styles.logoWrap}>
-                <Image
+                <AppImage
                   source={require('../../assets/ios-light.png')}
                   style={styles.logo}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={0}
                 />
               </View>
               <Text style={styles.brandTitle}>Waypoint</Text>
@@ -155,7 +156,7 @@ export default function HomeScreen() {
               style={styles.avatarButton}>
               <View style={styles.avatar}>
                 {userProfile?.avatar_url ? (
-                  <Image
+                  <AppImage
                     source={{ uri: userProfile.avatar_url }}
                     style={styles.avatarImage}
                     onError={() => {}}

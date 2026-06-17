@@ -8,8 +8,8 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  Image,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
@@ -252,10 +252,10 @@ export default function ReviewScreen() {
             <Text className="text-lg font-semibold text-gray-900">{formData.title}</Text>
 
             {imagePreviewUri && (
-              <Image
+              <AppImage
                 source={{ uri: imagePreviewUri }}
-                className="mt-3 h-48 w-full rounded-xl"
-                resizeMode="cover"
+                style={{ marginTop: 12, height: 192, width: '100%', borderRadius: 12 }}
+                contentFit="cover"
               />
             )}
           </View>

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -165,7 +165,7 @@ function DefaultBubble({
       {!isOwn && showAvatar && (
         <Pressable onPress={() => onPressUser?.(message.user_id)} hitSlop={6}>
           {message.user?.avatar_url ? (
-            <Image source={{ uri: message.user.avatar_url }} style={styles.avatar} />
+            <AppImage source={{ uri: message.user.avatar_url }} style={styles.avatar} />
           ) : (
             <InitialsAvatar
               name={message.user?.full_name}

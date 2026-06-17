@@ -9,10 +9,10 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  Image,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { AppImage } from '~/components/AppImage';
 import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -424,7 +424,7 @@ export default function MapScreen() {
       style={styles.travelerCard}
       onPress={() => router.push(`/profile/${user.id}`)}>
       {user.avatar_url ? (
-        <Image source={{ uri: user.avatar_url }} style={styles.travelerImage} />
+        <AppImage source={{ uri: user.avatar_url }} style={styles.travelerImage} />
       ) : (
         <InitialsAvatar name={user.full_name} id={user.id} size={64} style={styles.travelerImage} />
       )}
@@ -462,7 +462,7 @@ export default function MapScreen() {
           <View style={styles.featuredMarkerHalo} />
           <View style={styles.featuredMarkerImageWrap}>
             {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.featuredMarkerImage} />
+              <AppImage source={{ uri: profile.avatar_url }} style={styles.featuredMarkerImage} />
             ) : (
               <View style={styles.featuredMarkerFallback}>
                 <Ionicons name="person" size={38} color="#8A8A8A" />
