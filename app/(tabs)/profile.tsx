@@ -503,14 +503,14 @@ function ProfileSheetBody({ profile }: { profile: ProfilePageData }) {
       <ProfileSection
         title="Sidequests you've joined"
         actionLabel="See all"
-        onAction={() => router.push('/explore')}>
+        onAction={() => router.push('/my-sidequests')}>
         <GroupsContent groups={profile.joinedPlans} />
       </ProfileSection>
 
       <ProfileSection
         title="My Friends"
         actionLabel="See all"
-        onAction={() => router.push('/search-users')}>
+        onAction={() => router.push('/friends')}>
         <FriendsContent friends={profile.friends} />
       </ProfileSection>
     </>
