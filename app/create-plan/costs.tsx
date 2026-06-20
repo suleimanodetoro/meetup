@@ -1,5 +1,5 @@
 // app/create-plan/costs.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 interface CostItem {
@@ -25,17 +26,22 @@ interface CostItem {
 
 export default function CostsScreen() {
   const { formData, updateField, nextStep, setStep } = useCreatePlan();
+  // Restore the "No expected cost" choice on remount (the flow re-mounts steps),
+  // and don't surface the synthetic marker row as an editable cost item.
+  const isNoCost = formData.costs.some((c) => c.name === 'No expected cost');
   const [costs, setCosts] = useState<CostItem[]>(
-    formData.costs.length > 0 ? formData.costs : [{ name: '', isOptional: false }]
+    formData.costs.length > 0 && !isNoCost ? formData.costs : [{ name: '', isOptional: false }]
   );
-  const [noCost, setNoCost] = useState(false);
+  const [noCost, setNoCost] = useState(isNoCost);
 
   useEffect(() => {
     updateField('costs', noCost ? [{ name: 'No expected cost', isOptional: false }] : costs);
-  }, [costs, noCost]);
-  useEffect(() => {
-    setStep(7);
-  }, [setStep]);
+  }, [costs, noCost, updateField]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(7);
+    }, [setStep]),
+  );
 
   const addCostItem = () => {
     setCosts([...costs, { name: '', isOptional: false }]);
@@ -67,13 +73,7 @@ export default function CostsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={7} totalSteps={9} />

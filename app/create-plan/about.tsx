@@ -1,5 +1,5 @@
 // app/create-plan/about.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function AboutActivityScreen() {
@@ -23,10 +23,12 @@ export default function AboutActivityScreen() {
 
   useEffect(() => {
     updateField('description', localDescription);
-  }, [localDescription]);
-  useEffect(() => {
-    setStep(3);
-  }, [setStep]);
+  }, [localDescription, updateField]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(3);
+    }, [setStep]),
+  );
 
   const handleContinue = () => {
     if (canContinue()) {
@@ -41,13 +43,7 @@ export default function AboutActivityScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={28} color="#333" />
-          </Pressable>
-          <Text style={styles.headerTitle}>Create Plan</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <CreatePlanHeader />
 
         {/* Progress */}
         <StepperProgress currentStep={3} totalSteps={9} />
@@ -61,8 +57,8 @@ export default function AboutActivityScreen() {
             {/* Hints */}
             <View style={styles.hints}>
               <Text style={styles.hintTitle}>Include:</Text>
-              <Text style={styles.hintItem}>• What we'll do and for how long</Text>
-              <Text style={styles.hintItem}>• Where we'll meet</Text>
+              <Text style={styles.hintItem}>• What we&apos;ll do and for how long</Text>
+              <Text style={styles.hintItem}>• Where we&apos;ll meet</Text>
               <Text style={styles.hintItem}>• What to bring / any limits</Text>
             </View>
 

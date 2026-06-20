@@ -1,5 +1,5 @@
 // app/create-plan/destinations.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,10 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { getSuggestions, retrieveDetails } from '~/utils/AddressAutocomplete';
 import { useAuth } from '~/contexts/AuthProvider';
@@ -41,7 +42,7 @@ export default function DestinationsScreen() {
 
   useEffect(() => {
     updateField('venues', venues);
-  }, [venues]);
+  }, [venues, updateField]);
 
   // 1) Auto-search with 300ms debounce
   useEffect(() => {
@@ -55,9 +56,11 @@ export default function DestinationsScreen() {
     return () => clearTimeout(delaySearch);
   }, [searchQuery]);
 
-  useEffect(() => {
-  setStep(5);
-}, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(5);
+    }, [setStep]),
+  );
 
   // 2) Updated handleSearch with type filtering + better result handling
   const handleSearch = async () => {
@@ -197,13 +200,7 @@ export default function DestinationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={5} totalSteps={9} />

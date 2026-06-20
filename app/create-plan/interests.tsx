@@ -1,9 +1,9 @@
 // app/create-plan/interests.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, SafeAreaView, StyleSheet, ScrollView, Alert } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
 
@@ -15,11 +15,13 @@ export default function InterestsScreen() {
 
   useEffect(() => {
     updateField('interests', selectedInterests);
-  }, [selectedInterests, updateField]); 
+  }, [selectedInterests, updateField]);
 
-  useEffect(() => {
-  setStep(6);
-}, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(6);
+    }, [setStep]),
+  );
 
 
   const toggleInterest = (id: InterestId) => {
@@ -44,13 +46,7 @@ export default function InterestsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={6} totalSteps={9} />

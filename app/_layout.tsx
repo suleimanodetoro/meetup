@@ -1,13 +1,16 @@
 // app/_layout.tsx
 import '../global.css';
 
-import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState, usePathname } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthProvider, { useAuth } from '~/contexts/AuthProvider';
 import { CreatePlanProvider } from '~/contexts/CreatePlanContext';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { useFonts } from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '~/components/ErrorBoundary';
+import { FONTS_TO_LOAD, applyGlobalFont } from '~/utils/fonts';
 import { configureRevenueCat } from '~/lib/revenuecat';
 import { waypointNotifications } from '~/modules/notifications';
 // Slug-only import — dependency-free. Importing from ./sequence.ts here
@@ -19,6 +22,17 @@ import { ONBOARDING_SLUGS } from '~/modules/onboarding/slugs';
 // platform's API key env var isn't set, so dev environments without an
 // RC project don't crash the app.
 configureRevenueCat();
+
+// Make Plus Jakarta Sans the global default for all text before anything renders.
+applyGlobalFont();
+
+// Deferred deep link: a shared sidequest/profile link tapped while logged out is
+// stashed here, then consumed after the user finishes signing up so they land on it.
+const PENDING_SHARE_LINK_KEY = 'pendingShareLink';
+
+function isShareablePath(p: string | null | undefined): p is string {
+  return !!p && (p.startsWith('/event/') || p.startsWith('/profile/'));
+}
 
 function NotificationStartupEffect() {
   const { session, isAuthenticated, hasCompletedOnboarding, isLoading } = useAuth();
@@ -45,6 +59,7 @@ function NotificationStartupEffect() {
 function NavigationController({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompletedOnboarding, onboardingStep, isLoading } = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
@@ -91,7 +106,14 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 
     // ----- Unauthenticated: keep them inside (auth) -----
     if (!isAuthenticated) {
-      if (!inAuthGroup) router.replace('/welcome'); // lives in (auth)
+      if (!inAuthGroup) {
+        // Deferred deep link: remember a shared sidequest/profile they opened while
+        // logged out, so we can land them on it after they sign up.
+        if (isShareablePath(pathname)) {
+          void AsyncStorage.setItem(PENDING_SHARE_LINK_KEY, pathname).catch(() => {});
+        }
+        router.replace('/welcome'); // lives in (auth)
+      }
       return;
     }
 
@@ -105,10 +127,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
         // every Continue, so returning users continue where they left off
         // instead of always landing back on /name. Clamp into the sequence
         // bounds defensively.
-        const resumeIndex = Math.max(
-          0,
-          Math.min(onboardingStep, ONBOARDING_SLUGS.length - 1),
-        );
+        const resumeIndex = Math.max(0, Math.min(onboardingStep, ONBOARDING_SLUGS.length - 1));
         const resumeSlug = ONBOARDING_SLUGS[resumeIndex];
         router.replace(`/onboarding/${resumeSlug}`); // lives in (auth)/onboarding/[step]
       }
@@ -134,9 +153,26 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     onboardingStep,
     isLoading,
     segments,
+    pathname,
     rootNavigationState?.key,
     router,
   ]);
+
+  // Deferred deep link (consume): once signed in + onboarded, land the user on the
+  // shared link they opened while logged out. One-shot per app session; runs after
+  // the gate above has settled them into the app.
+  const consumedDeepLinkRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !hasCompletedOnboarding) return;
+    if (consumedDeepLinkRef.current) return;
+    consumedDeepLinkRef.current = true;
+    void AsyncStorage.getItem(PENDING_SHARE_LINK_KEY).then((target) => {
+      if (isShareablePath(target)) {
+        void AsyncStorage.removeItem(PENDING_SHARE_LINK_KEY);
+        router.replace(target as never);
+      }
+    });
+  }, [isAuthenticated, hasCompletedOnboarding, isLoading, router]);
 
   if (isLoading || !rootNavigationState?.key) {
     return (
@@ -150,41 +186,53 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts(FONTS_TO_LOAD);
+
+  if (!fontsLoaded) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
         <AuthProvider>
-        <CreatePlanProvider>
-          <NotificationStartupEffect />
-          <NavigationController>
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* App groups */}
-              <Stack.Screen name="(tabs)" />
+          <CreatePlanProvider>
+            <NotificationStartupEffect />
+            <NavigationController>
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* App groups */}
+                <Stack.Screen name="(tabs)" />
 
-              {/* Dynamic deep-linkable routes */}
-              <Stack.Screen name="event/[id]" />
-              <Stack.Screen name="city/[name]" />
-              <Stack.Screen name="chat/[eventId]" />
-              <Stack.Screen name="chat/dm/[conversationId]" />
-              <Stack.Screen name="profile/[userId]" />
+                {/* Dynamic deep-linkable routes */}
+                <Stack.Screen name="event/[id]" />
+                <Stack.Screen name="city/[name]" />
+                <Stack.Screen name="chat/[eventId]" />
+                <Stack.Screen name="chat/dm/[conversationId]" />
+                <Stack.Screen name="profile/[userId]" />
 
-              {/* Common static routes */}
-              <Stack.Screen name="edit-profile" />
-              <Stack.Screen name="add-trip" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="settings/privacy" />
-              <Stack.Screen name="search-users" />
-              <Stack.Screen name="friend-requests" />
-              <Stack.Screen name="explore" />
-              <Stack.Screen name="search" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="report" options={{ presentation: 'modal' }} />
+                {/* Common static routes */}
+                <Stack.Screen name="edit-profile" />
+                <Stack.Screen name="add-trip" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="settings/privacy" />
+                <Stack.Screen name="search-users" />
+                <Stack.Screen name="friend-requests" />
+                <Stack.Screen name="explore" />
+                <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="report" options={{ presentation: 'modal' }} />
 
-              {/* 404 */}
-              <Stack.Screen name="+not-found" />
-            </Stack>
-          </NavigationController>
-        </CreatePlanProvider>
-      </AuthProvider>
+                {/* 404 */}
+                <Stack.Screen name="+not-found" />
+              </Stack>
+            </NavigationController>
+          </CreatePlanProvider>
+        </AuthProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>
   );

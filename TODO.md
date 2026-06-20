@@ -4,6 +4,40 @@ Tracking items deferred from cleanup passes. Each entry should explain _why_ it
 was deferred so a future contributor can pick it up without re-doing the
 analysis.
 
+## Sharing / universal links (external steps)
+
+The in-app sharing flow is shipped: functional Share buttons on the sidequest
+detail ([app/event/[id]/index.tsx](<app/event/[id]/index.tsx>)) and profile
+([app/profile/[userId].tsx](<app/profile/[userId].tsx>)) open the native share
+sheet with an `https://usewaypoint.app/event|profile/<id>` link
+([utils/share.ts](utils/share.ts)); the auth gate
+([app/_layout.tsx](app/_layout.tsx)) captures a shared link tapped while logged
+out (`pendingShareLink`) and lands the user on it after onboarding (deferred deep
+link). `associatedDomains` (iOS) + Android `intentFilters` are declared in
+[app.config.ts](app.config.ts).
+
+For a shared link to actually **open the app** for a recipient (especially one
+without it installed), three things must be done OUTSIDE this repo:
+
+1. **Host domain-verification files on `usewaypoint.app`** (the marketing site):
+   - `/.well-known/apple-app-site-association` (no extension, `application/json`)
+     with appID `<TEAMID>.app.usewaypoint` and paths `["/event/*", "/profile/*"]`.
+   - `/.well-known/assetlinks.json` with package `app.usewaypoint` + the release
+     signing key's SHA-256 fingerprint.
+2. **Web fallback pages** for `/event/:id` and `/profile/:id` — a recipient without
+   the app lands on the website, so those routes need at least an "Open in Waypoint"
+   page with App Store / Play links (`EXPO_PUBLIC_APP_STORE_URL` /
+   `EXPO_PUBLIC_PLAY_STORE_URL`). Per product decision, **no content is shown
+   pre-signup** — a generic get-the-app/sign-up page; keep it minimal so no private
+   profile/quest data leaks.
+3. **Native rebuild** so the new `associatedDomains`/`intentFilters` compile in:
+   `npx expo prebuild --clean && npx expo run:ios` (+ Android) or an EAS build.
+
+Until 1–3 land, share links work app-to-app via the `waypoint://` scheme, but a
+tapped https link just opens the website. **Verify after rebuild:** a shared link
+cold-opens the app to the right screen, and logged-out → routes through sign-up →
+lands on the shared content.
+
 ## Map discovery — cluster same-city users + nearby-city fallback (privacy-safe)
 
 Future feature (post-launch, after the deslop phases). The honest replacement

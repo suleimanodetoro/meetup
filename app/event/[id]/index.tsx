@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
 import { router, useLocalSearchParams } from 'expo-router';
+import { shareContent } from '~/utils/share';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,7 +151,11 @@ export default function PlanDetailsScreen() {
         const isUserAttending = eventData.attendees?.some(
           a => a.user.id === session.user.id
         );
-        setIsAttending(!!isUserAttending);
+        // The creator is the host of their own sidequest — always a member,
+        // even if the attendance row never landed (e.g. an interrupted
+        // creation), so they see the host state, not a "Join" button.
+        const isHost = eventData.user_id === session.user.id;
+        setIsAttending(!!isUserAttending || isHost);
       }
     } catch (error) {
       console.error('Error fetching event:', error);
@@ -340,7 +345,9 @@ export default function PlanDetailsScreen() {
           </Pressable>
 
           {/* Share Button */}
-          <Pressable style={styles.shareButton}>
+          <Pressable
+            style={styles.shareButton}
+            onPress={() => id && shareContent('event', id, event?.title)}>
             <Ionicons name="share-outline" size={24} color="#000" />
           </Pressable>
 
@@ -367,8 +374,15 @@ export default function PlanDetailsScreen() {
                 {getCountryFlag(event.country_code)}
               </Text>
               <Text style={styles.locationText}>
-                {event.location_name || event.city}
-                {event.country && `, ${event.country}`}
+                {/* Venue + city reads naturally ("Firewater, Dundee"); the flag
+                    already conveys the country and the map pin shows the city.
+                    Dedupe so a city-only quest never renders "Dundee, Dundee". */}
+                {[event.location_name, event.city]
+                  .filter(
+                    (p, i, a) =>
+                      !!p && a.findIndex((x) => x?.toLowerCase() === p?.toLowerCase()) === i,
+                  )
+                  .join(', ') || event.country || 'Location'}
               </Text>
               {event.city ? (
                 <Ionicons

@@ -475,17 +475,17 @@ export default function MapScreen() {
   };
 
   const nearbyTitle =
-    usersInCity.length === 1 ? '1 Nearby Traveler' : `${usersInCity.length} Nearby Travelers`;
+    usersInCity.length === 1 ? '1 person nearby' : `${usersInCity.length} people nearby`;
   const displayLocationLabel = [displayCity || userCity, displayCountry || userCountry]
     .filter(Boolean)
     .join(', ');
   const ctaLabel =
     usersInCity.length > 0
-      ? `See all ${usersInCity.length} Nearby Travelers`
-      : 'Find Nearby Travelers';
+      ? `See all ${usersInCity.length} people nearby`
+      : 'Find people nearby';
 
   function firstName(name: string | null | undefined) {
-    return name?.trim().split(/\s+/)[0] || 'Traveler';
+    return name?.trim().split(/\s+/)[0] || 'Someone';
   }
 
   function renderFilterChip(chip: (typeof FILTER_CHIPS)[number]) {

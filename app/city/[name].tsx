@@ -36,12 +36,13 @@ function formatWindowLabel(from?: string, to?: string): string | null {
 }
 
 export default function CityDetailScreen() {
-  const { name, from, to, cc, country } = useLocalSearchParams<{
+  const { name, from, to, cc, country, tab } = useLocalSearchParams<{
     name: string;
     from?: string;
     to?: string;
     cc?: string;
     country?: string;
+    tab?: string;
   }>();
   const cityName = name ? decodeURIComponent(name) : undefined;
   const fromParam = isValidDateString(from) ? from : undefined;
@@ -65,7 +66,7 @@ export default function CityDetailScreen() {
   } = useCityOverview(cityName, window);
   const { hasSubscription, isLoading: subscriptionLoading } = useSubscription();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans'>(tab === 'plans' ? 'plans' : 'users');
   const [cityCoordinates, setCityCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [coordsLoading, setCoordsLoading] = useState(false);
 

@@ -1,5 +1,5 @@
 // app/create-plan/image.tsx
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function PlanImageScreen() {
@@ -28,9 +29,13 @@ export default function PlanImageScreen() {
     return undefined;
   }, [formData.imageUri, formData.imageBase64]);
 
-  useEffect(() => {
-    setStep(2);
-  }, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(2);
+    }, [setStep]),
+  );
+
+  const canProceed = !busy && !!previewUri;
 
   const pickImage = async () => {
     try {
@@ -94,6 +99,10 @@ export default function PlanImageScreen() {
   };
 
   const handleContinue = () => {
+    if (!previewUri) {
+      Alert.alert('Image required', 'Please add a cover image before continuing.');
+      return;
+    }
     nextStep();
     router.push('/create-plan/about');
   };
@@ -101,13 +110,7 @@ export default function PlanImageScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={2} totalSteps={9} />
@@ -115,7 +118,7 @@ export default function PlanImageScreen() {
       {/* Content */}
       <View style={styles.content}>
         <Text style={styles.title}>Plan Image</Text>
-        <Text style={styles.subtitle}>Add a cover image for this plan</Text>
+        <Text style={styles.subtitle}>Add a cover image (required)</Text>
 
         {/* Image Dropzone */}
         <Pressable
@@ -156,16 +159,16 @@ export default function PlanImageScreen() {
         </Pressable>
 
         <Text style={styles.helperText}>
-          This image will be the main visual for your activity plan
+          A cover image is required — it&apos;s the main visual for your sidequest
         </Text>
       </View>
 
-      {/* Continue Button - Always enabled (image is optional) */}
+      {/* Continue Button - requires an image */}
       <View style={styles.footer}>
         <Pressable
           onPress={handleContinue}
-          disabled={busy}
-          style={[styles.continueButton, busy && styles.continueButtonDisabled]}>
+          disabled={!canProceed}
+          style={[styles.continueButton, !canProceed && styles.continueButtonDisabled]}>
           <Text style={styles.continueButtonText}>{busy ? 'Processing...' : 'Continue'}</Text>
         </Pressable>
       </View>

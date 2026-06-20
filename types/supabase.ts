@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
@@ -289,6 +269,8 @@ export type Database = {
       events: {
         Row: {
           city: string | null
+          comfort: number | null
+          completed_at: string | null
           cost: number | null
           cost_currency: string | null
           country: string | null
@@ -305,13 +287,18 @@ export type Database = {
           is_all_day: boolean | null
           is_one_day: boolean | null
           is_private: boolean | null
+          kind: string
           location_name: string | null
           location_point: unknown
+          quest_catalog_id: number | null
+          status: string
           title: string
           user_id: string | null
         }
         Insert: {
           city?: string | null
+          comfort?: number | null
+          completed_at?: string | null
           cost?: number | null
           cost_currency?: string | null
           country?: string | null
@@ -328,13 +315,18 @@ export type Database = {
           is_all_day?: boolean | null
           is_one_day?: boolean | null
           is_private?: boolean | null
+          kind?: string
           location_name?: string | null
           location_point?: unknown
+          quest_catalog_id?: number | null
+          status?: string
           title: string
           user_id?: string | null
         }
         Update: {
           city?: string | null
+          comfort?: number | null
+          completed_at?: string | null
           cost?: number | null
           cost_currency?: string | null
           country?: string | null
@@ -351,12 +343,22 @@ export type Database = {
           is_all_day?: boolean | null
           is_one_day?: boolean | null
           is_private?: boolean | null
+          kind?: string
           location_name?: string | null
           location_point?: unknown
+          quest_catalog_id?: number | null
+          status?: string
           title?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "events_quest_catalog_id_fkey"
+            columns: ["quest_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "quest_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "events_user_id_fkey"
             columns: ["user_id"]
@@ -617,6 +619,212 @@ export type Database = {
         }
         Relationships: []
       }
+      quest_catalog: {
+        Row: {
+          budget_max: number | null
+          budget_min: number | null
+          category: string
+          cost_tier: number
+          created_at: string
+          currency: string
+          dare: string
+          duration_min: number
+          energy_level: number
+          id: number
+          interests: Json
+          is_active: boolean
+          is_solo_safe: boolean
+          proof: string | null
+          risk_tier: number
+          safety_note: string | null
+          slug: string
+          social_mode: string
+          title: string
+          vibe: string[]
+          why: string | null
+        }
+        Insert: {
+          budget_max?: number | null
+          budget_min?: number | null
+          category: string
+          cost_tier: number
+          created_at?: string
+          currency?: string
+          dare: string
+          duration_min: number
+          energy_level: number
+          id?: number
+          interests?: Json
+          is_active?: boolean
+          is_solo_safe?: boolean
+          proof?: string | null
+          risk_tier?: number
+          safety_note?: string | null
+          slug: string
+          social_mode: string
+          title: string
+          vibe?: string[]
+          why?: string | null
+        }
+        Update: {
+          budget_max?: number | null
+          budget_min?: number | null
+          category?: string
+          cost_tier?: number
+          created_at?: string
+          currency?: string
+          dare?: string
+          duration_min?: number
+          energy_level?: number
+          id?: number
+          interests?: Json
+          is_active?: boolean
+          is_solo_safe?: boolean
+          proof?: string | null
+          risk_tier?: number
+          safety_note?: string | null
+          slug?: string
+          social_mode?: string
+          title?: string
+          vibe?: string[]
+          why?: string | null
+        }
+        Relationships: []
+      }
+      quest_ledger: {
+        Row: {
+          first_quest_at: string | null
+          last_quest_at: string | null
+          quest_count: number
+          user_hi: string
+          user_lo: string
+        }
+        Insert: {
+          first_quest_at?: string | null
+          last_quest_at?: string | null
+          quest_count?: number
+          user_hi: string
+          user_lo: string
+        }
+        Update: {
+          first_quest_at?: string | null
+          last_quest_at?: string | null
+          quest_count?: number
+          user_hi?: string
+          user_lo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quest_ledger_user_hi_fkey"
+            columns: ["user_hi"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quest_ledger_user_lo_fkey"
+            columns: ["user_lo"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quest_tags: {
+        Row: {
+          created_at: string
+          duration_min: number | null
+          energy_level: number | null
+          event_id: number
+          is_seed: boolean
+          is_solo_safe: boolean
+          risk_tier: number
+          social_mode: string | null
+          vibe: string[]
+        }
+        Insert: {
+          created_at?: string
+          duration_min?: number | null
+          energy_level?: number | null
+          event_id: number
+          is_seed?: boolean
+          is_solo_safe?: boolean
+          risk_tier?: number
+          social_mode?: string | null
+          vibe?: string[]
+        }
+        Update: {
+          created_at?: string
+          duration_min?: number | null
+          energy_level?: number | null
+          event_id?: number
+          is_seed?: boolean
+          is_solo_safe?: boolean
+          risk_tier?: number
+          social_mode?: string | null
+          vibe?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quest_tags_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: number
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string | null
+          status: string
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: number
+          reason: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          status?: string
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: number
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_reported_user_id_fkey"
+            columns: ["reported_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       typing_indicators: {
         Row: {
           conversation_id: number | null
@@ -796,6 +1004,10 @@ export type Database = {
       }
       cleanup_old_typing_indicators: { Args: never; Returns: undefined }
       cleanup_typing_indicators: { Args: never; Returns: undefined }
+      complete_quest: {
+        Args: { p_event_id: number; p_partner_id?: string }
+        Returns: undefined
+      }
       delete_user_account: { Args: never; Returns: Json }
       get_city_meta_window: {
         Args: { city_name: string; window_from?: string; window_to?: string }
@@ -940,6 +1152,8 @@ export type Database = {
         Args: never
         Returns: {
           city: string | null
+          comfort: number | null
+          completed_at: string | null
           cost: number | null
           cost_currency: string | null
           country: string | null
@@ -956,8 +1170,11 @@ export type Database = {
           is_all_day: boolean | null
           is_one_day: boolean | null
           is_private: boolean | null
+          kind: string
           location_name: string | null
           location_point: unknown
+          quest_catalog_id: number | null
+          status: string
           title: string
           user_id: string | null
         }[]
@@ -1147,6 +1364,37 @@ export type Database = {
           username: string
         }[]
       }
+      suggest_quest: {
+        Args: {
+          p_budget?: number
+          p_categories?: string[]
+          p_comfort?: number
+          p_energy?: number
+          p_limit?: number
+          p_social?: string
+          p_time_max?: number
+        }
+        Returns: {
+          budget_max: number
+          budget_min: number
+          category: string
+          cost_tier: number
+          currency: string
+          dare: string
+          duration_min: number
+          energy_level: number
+          id: number
+          is_solo_safe: boolean
+          match_reasons: string[]
+          match_score: number
+          risk_tier: number
+          slug: string
+          social_mode: string
+          title: string
+          vibe: string[]
+          why: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1275,11 +1523,7 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
-

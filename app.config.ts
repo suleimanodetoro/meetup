@@ -95,6 +95,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'app.usewaypoint',
+    // Universal links: opens https://usewaypoint.app/event|profile/* in the app.
+    // Requires the apple-app-site-association file hosted on usewaypoint.app + a
+    // native rebuild (see TODO.md "Sharing / universal links").
+    associatedDomains: ['applinks:usewaypoint.app'],
     appStoreUrl: process.env.EXPO_PUBLIC_APP_STORE_URL,
     buildNumber: '10',
     usesAppleSignIn: true,
@@ -117,6 +121,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     playStoreUrl: process.env.EXPO_PUBLIC_PLAY_STORE_URL,
+    // App links: opens https://usewaypoint.app/event|profile/* in the app.
+    // Requires assetlinks.json hosted on usewaypoint.app + a native rebuild
+    // (see TODO.md "Sharing / universal links").
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        category: ['BROWSABLE', 'DEFAULT'],
+        data: [
+          { scheme: 'https', host: 'usewaypoint.app', pathPrefix: '/event' },
+          { scheme: 'https', host: 'usewaypoint.app', pathPrefix: '/profile' },
+        ],
+      },
+    ],
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#ffffff',

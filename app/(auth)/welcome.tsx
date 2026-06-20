@@ -210,7 +210,7 @@ export default function WelcomeScreen() {
         </View>
 
         <Text style={styles.headline} accessibilityRole="header">
-          Find your people in every city you visit.
+          Find sidequests to do solo or with others.
         </Text>
 
         <Text style={styles.disclaimer}>

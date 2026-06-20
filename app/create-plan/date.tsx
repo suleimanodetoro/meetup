@@ -1,5 +1,5 @@
 // app/create-plan/date.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   StyleSheet,
   Switch,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function DateScreen() {
@@ -28,11 +29,13 @@ export default function DateScreen() {
     updateField('endDate', isOneDay ? undefined : endDate);
     updateField('isOneDay', isOneDay);
     updateField('isAllDay', isAllDay);
-  }, [startDate, endDate, isOneDay, isAllDay]);
+  }, [startDate, endDate, isOneDay, isAllDay, updateField]);
 
-  useEffect(() => {
-  setStep(4);
-}, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(4);
+    }, [setStep]),
+  );
 
   const handleContinue = () => {
     if (canContinue()) {
@@ -60,13 +63,7 @@ export default function DateScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Create Plan</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={4} totalSteps={9} />
