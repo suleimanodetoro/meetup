@@ -15,6 +15,7 @@ import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
+import { GradientButton } from '~/components/GradientButton';
 import { router } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import { FriendRequest, Profile, Event } from '~/types/messaging';
@@ -42,10 +43,12 @@ export default function FriendRequestsScreen() {
       // Fetch pending friend requests
       const { data: friendshipData, error } = await supabase
         .from('friendships')
-        .select(`
+        .select(
+          `
           *,
           requester:profiles!friendships_requester_id_fkey(*)
-        `)
+        `
+        )
         .eq('addressee_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -60,22 +63,22 @@ export default function FriendRequestsScreen() {
           .map(async (friendship) => {
             const requesterId = friendship.requester_id as string;
 
-            const { data: mutualFriends } = await supabase
-              .rpc('get_mutual_friends', {
-                user1_id: userId,
-                user2_id: requesterId,
-              });
+            const { data: mutualFriends } = await supabase.rpc('get_mutual_friends', {
+              user1_id: userId,
+              user2_id: requesterId,
+            });
 
             const { data: mutualPlans } = await supabase
               .from('attendance')
               .select('event:events(*)')
               .eq('user_id', userId)
-              .in('event_id',
+              .in(
+                'event_id',
                 await supabase
                   .from('attendance')
                   .select('event_id')
                   .eq('user_id', requesterId)
-                  .then(res => res.data?.map(a => a.event_id) || [])
+                  .then((res) => res.data?.map((a) => a.event_id) || [])
               );
 
             return {
@@ -83,7 +86,7 @@ export default function FriendRequestsScreen() {
               from_user: friendship.requester,
               created_at: friendship.created_at,
               mutual_friends: mutualFriends || [],
-              mutual_plans: mutualPlans?.map(a => a.event) || [],
+              mutual_plans: mutualPlans?.map((a) => a.event) || [],
             } as unknown as FriendRequest;
           })
       );
@@ -98,28 +101,28 @@ export default function FriendRequestsScreen() {
   };
 
   const handleAccept = async (requestId: number, requesterId: string) => {
-    setProcessingIds(prev => new Set(prev).add(requestId));
+    setProcessingIds((prev) => new Set(prev).add(requestId));
 
     try {
       const { error } = await supabase
         .from('friendships')
-        .update({ 
+        .update({
           status: 'accepted',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', requestId);
 
       if (error) throw error;
 
       // Remove from list
-      setRequests(prev => prev.filter(r => r.id !== requestId));
-      
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+
       Alert.alert('Success', 'Friend request accepted!');
     } catch (error) {
       console.error('Error accepting friend request:', error);
       Alert.alert('Error', 'Failed to accept friend request');
     } finally {
-      setProcessingIds(prev => {
+      setProcessingIds((prev) => {
         const next = new Set(prev);
         next.delete(requestId);
         return next;
@@ -128,55 +131,50 @@ export default function FriendRequestsScreen() {
   };
 
   const handleDecline = async (requestId: number) => {
-    Alert.alert(
-      'Decline Request',
-      'Are you sure you want to decline this friend request?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingIds(prev => new Set(prev).add(requestId));
+    Alert.alert('Decline Request', 'Are you sure you want to decline this friend request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setProcessingIds((prev) => new Set(prev).add(requestId));
 
-            try {
-              const { error } = await supabase
-                .from('friendships')
-                .update({ 
-                  status: 'declined',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', requestId);
+          try {
+            const { error } = await supabase
+              .from('friendships')
+              .update({
+                status: 'declined',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', requestId);
 
-              if (error) throw error;
+            if (error) throw error;
 
-              // Remove from list
-              setRequests(prev => prev.filter(r => r.id !== requestId));
-            } catch (error) {
-              console.error('Error declining friend request:', error);
-              Alert.alert('Error', 'Failed to decline friend request');
-            } finally {
-              setProcessingIds(prev => {
-                const next = new Set(prev);
-                next.delete(requestId);
-                return next;
-              });
-            }
-          },
+            // Remove from list
+            setRequests((prev) => prev.filter((r) => r.id !== requestId));
+          } catch (error) {
+            console.error('Error declining friend request:', error);
+            Alert.alert('Error', 'Failed to decline friend request');
+          } finally {
+            setProcessingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(requestId);
+              return next;
+            });
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const renderRequest = ({ item }: { item: FriendRequest }) => {
     const isProcessing = processingIds.has(item.id);
-    
+
     return (
       <View style={styles.requestCard}>
-        <Pressable 
+        <Pressable
           style={styles.profileSection}
-          onPress={() => router.push(`/profile/${item.from_user.id}`)}
-        >
+          onPress={() => router.push(`/profile/${item.from_user.id}`)}>
           {item.from_user.avatar_url ? (
             <AppImage source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
           ) : (
@@ -194,7 +192,7 @@ export default function FriendRequestsScreen() {
             <Text style={styles.timeAgo}>
               {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
             </Text>
-            
+
             {/* Mutual connections */}
             {(() => {
               const friends = item.mutual_friends ?? [];
@@ -204,14 +202,14 @@ export default function FriendRequestsScreen() {
                 <View style={styles.mutualInfo}>
                   {friends.length > 0 && (
                     <Text style={styles.mutualText}>
-                      <Ionicons name="people-outline" size={12} color="#666" />
-                      {' '}{friends.length} mutual friend{friends.length > 1 ? 's' : ''}
+                      <Ionicons name="people-outline" size={12} color="#666" /> {friends.length}{' '}
+                      mutual friend{friends.length > 1 ? 's' : ''}
                     </Text>
                   )}
                   {plans.length > 0 && (
                     <Text style={styles.mutualText}>
-                      <Ionicons name="calendar-outline" size={12} color="#666" />
-                      {' '}{plans.length} mutual plan{plans.length > 1 ? 's' : ''}
+                      <Ionicons name="calendar-outline" size={12} color="#666" /> {plans.length}{' '}
+                      mutual plan{plans.length > 1 ? 's' : ''}
                     </Text>
                   )}
                 </View>
@@ -222,23 +220,18 @@ export default function FriendRequestsScreen() {
 
         {/* Action buttons */}
         <View style={styles.actionButtons}>
-          <Pressable
-            style={[styles.button, styles.acceptButton, isProcessing && styles.buttonDisabled]}
+          <GradientButton
+            label="Accept"
             onPress={() => handleAccept(item.id, item.from_user.id)}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.acceptButtonText}>Accept</Text>
-            )}
-          </Pressable>
-          
+            loading={isProcessing}
+            size="md"
+            style={{ flex: 1 }}
+          />
+
           <Pressable
             style={[styles.button, styles.declineButton, isProcessing && styles.buttonDisabled]}
             onPress={() => handleDecline(item.id)}
-            disabled={isProcessing}
-          >
+            disabled={isProcessing}>
             <Text style={styles.declineButtonText}>Decline</Text>
           </Pressable>
         </View>
