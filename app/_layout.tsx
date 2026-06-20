@@ -96,6 +96,8 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'create-plan', // covers create-plan/* steps
       'search-users',
       'friend-requests',
+      'friends',
+      'my-sidequests',
       'explore',
       'search',
       'report',
