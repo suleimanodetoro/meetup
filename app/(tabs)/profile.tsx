@@ -494,33 +494,26 @@ function ProfileSheetBody({ profile }: { profile: ProfilePageData }) {
         {profile.bio || 'Add a short bio so people know the kind of sidequests you like.'}
       </Text>
 
-      {(profile.instagramUrl || profile.tiktokUrl || profile.youtubeUrl) && (
-        <ProfileSection
-          title="Socials"
-          actionLabel="Edit"
-          onAction={() => router.push('/edit-profile')}>
-          <View style={styles.socialsRow}>
-            {profile.instagramUrl ? (
-              <View style={styles.socialPill}>
-                <Ionicons name="logo-instagram" size={18} color={authColors.textPrimary} />
-                <Text style={styles.socialText}>{socialHandle(profile.instagramUrl)}</Text>
-              </View>
-            ) : null}
-            {profile.tiktokUrl ? (
-              <View style={styles.socialPill}>
-                <Ionicons name="logo-tiktok" size={18} color={authColors.textPrimary} />
-                <Text style={styles.socialText}>{socialHandle(profile.tiktokUrl)}</Text>
-              </View>
-            ) : null}
-            {profile.youtubeUrl ? (
-              <View style={styles.socialPill}>
-                <Ionicons name="logo-youtube" size={18} color={authColors.textPrimary} />
-                <Text style={styles.socialText}>{socialHandle(profile.youtubeUrl)}</Text>
-              </View>
-            ) : null}
+      {/* Socials — always shown; each platform shows its handle or "Not set" */}
+      <ProfileSection
+        title="Socials"
+        actionLabel="Edit"
+        onAction={() => router.push('/edit-profile')}>
+        <View style={styles.socialsRow}>
+          <View style={styles.socialPill}>
+            <Ionicons name="logo-instagram" size={18} color={authColors.textPrimary} />
+            <Text style={styles.socialText}>{socialHandle(profile.instagramUrl) || 'Not set'}</Text>
           </View>
-        </ProfileSection>
-      )}
+          <View style={styles.socialPill}>
+            <Ionicons name="logo-tiktok" size={18} color={authColors.textPrimary} />
+            <Text style={styles.socialText}>{socialHandle(profile.tiktokUrl) || 'Not set'}</Text>
+          </View>
+          <View style={styles.socialPill}>
+            <Ionicons name="logo-youtube" size={18} color={authColors.textPrimary} />
+            <Text style={styles.socialText}>{socialHandle(profile.youtubeUrl) || 'Not set'}</Text>
+          </View>
+        </View>
+      </ProfileSection>
 
       <ProfileSection
         title="Sidequests you've joined"
