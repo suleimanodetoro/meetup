@@ -10,6 +10,7 @@ import { useCityOverview } from '~/hooks/useCityOverview';
 import { useSubscription } from '~/hooks/useSubscription';
 import { useUpsellTrigger } from '~/hooks/useUpsellTrigger';
 import { getCityCoordinates } from '~/utils/geographic';
+import { GradientButton } from '~/components/GradientButton';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? null);
 
@@ -66,7 +67,9 @@ export default function CityDetailScreen() {
   } = useCityOverview(cityName, window);
   const { hasSubscription, isLoading: subscriptionLoading } = useSubscription();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'plans'>(tab === 'plans' ? 'plans' : 'users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans'>(
+    tab === 'plans' ? 'plans' : 'users'
+  );
   const [cityCoordinates, setCityCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [coordsLoading, setCoordsLoading] = useState(false);
 
@@ -96,9 +99,11 @@ export default function CityDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Missing city name</Text>
-        <Pressable onPress={() => router.back()} style={styles.errorButton}>
-          <Text style={styles.errorButtonText}>Go Back</Text>
-        </Pressable>
+        <GradientButton
+          label="Go Back"
+          onPress={() => router.back()}
+          style={{ alignSelf: 'center' }}
+        />
       </View>
     );
   }
@@ -116,9 +121,11 @@ export default function CityDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error: {error}</Text>
-        <Pressable onPress={() => router.back()} style={styles.errorButton}>
-          <Text style={styles.errorButtonText}>Go Back</Text>
-        </Pressable>
+        <GradientButton
+          label="Go Back"
+          onPress={() => router.back()}
+          style={{ alignSelf: 'center' }}
+        />
       </View>
     );
   }

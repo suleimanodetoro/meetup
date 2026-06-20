@@ -22,6 +22,7 @@ import { FounderBadge } from '~/components/FounderBadge';
 import { PremiumBadge } from '~/components/PremiumBadge';
 import { TravelStatsCard } from '~/components/TravelStatsCard';
 import { SocialLinks } from '~/components/SocialLinks';
+import { GradientButton } from '~/components/GradientButton';
 import { display } from '~/utils/fonts';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
@@ -303,9 +304,11 @@ export default function UserProfileScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>User not found</Text>
-        <Pressable style={styles.errorButton} onPress={() => router.back()}>
-          <Text style={styles.errorButtonText}>Go Back</Text>
-        </Pressable>
+        <GradientButton
+          label="Go Back"
+          onPress={() => router.back()}
+          style={{ alignSelf: 'center' }}
+        />
       </View>
     );
   }
