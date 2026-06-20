@@ -55,18 +55,11 @@ export default function CreateOptionsModal({ visible, onClose }: CreateOptionsMo
     }
   }, [visible]);
 
-  const handleCreatePlan = () => {
+  const handleStartSidequest = () => {
     onClose();
     // Small delay to let modal close smoothly
     setTimeout(() => {
-      router.push('/create-plan/name');
-    }, 100);
-  };
-
-  const handleAddVisit = () => {
-    onClose();
-    setTimeout(() => {
-      router.push('/add-trip');
+      router.push('/create-plan/intent' as never);
     }, 100);
   };
 
@@ -114,30 +107,15 @@ export default function CreateOptionsModal({ visible, onClose }: CreateOptionsMo
         {/* Options */}
         <Pressable
           style={styles.option}
-          onPress={handleCreatePlan}
+          onPress={handleStartSidequest}
         >
           <View style={styles.optionIcon}>
-            <Ionicons name="chatbubbles" size={24} color="#333" />
+            <Ionicons name="compass" size={24} color="#333" />
           </View>
           <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>Create an Activity Plan</Text>
+            <Text style={styles.optionTitle}>Start a sidequest</Text>
             <Text style={styles.optionSubtitle}>
-              A group chat for your next hangout
-            </Text>
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={styles.option}
-          onPress={handleAddVisit}
-        >
-          <View style={styles.optionIcon}>
-            <Ionicons name="airplane" size={24} color="#333" />
-          </View>
-          <View style={styles.optionText}>
-            <Text style={styles.optionTitle}>Add a Future Visit</Text>
-            <Text style={styles.optionSubtitle}>
-              Match with people who'll be there
+              Do it solo or invite others to join
             </Text>
           </View>
         </Pressable>

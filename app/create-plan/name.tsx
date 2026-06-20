@@ -1,5 +1,5 @@
 // app/create-plan/name.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function PlanNameScreen() {
@@ -22,11 +23,13 @@ export default function PlanNameScreen() {
 
   useEffect(() => {
     updateField('title', localTitle);
-  }, [localTitle]);
+  }, [localTitle, updateField]);
 
-  useEffect(() => {
-  setStep(1); // This screen is step 1
-}, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(1); // re-assert on focus so back-nav restores the right step
+    }, [setStep]),
+  );
 
   const handleContinue = () => {
     if (canContinue()) {
@@ -42,13 +45,7 @@ export default function PlanNameScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={28} color="#333" />
-          </Pressable>
-          <Text style={styles.headerTitle}>Create Plan</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <CreatePlanHeader />
 
         {/* Progress */}
         <StepperProgress currentStep={1} totalSteps={9} />

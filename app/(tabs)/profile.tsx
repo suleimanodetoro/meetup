@@ -38,6 +38,7 @@ import type { Profile } from '~/types/db';
 import { getCountryFlag } from '~/utils/countryFlags';
 import { supabase } from '~/utils/supabase';
 import { authColors, authHitSlop } from '~/utils/authTheme';
+import { display } from '~/utils/fonts';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
 
@@ -57,6 +58,13 @@ const STARS = Array.from({ length: 62 }, (_, index) => ({
   size: 1 + (index % 3) * 0.7,
   opacity: 0.25 + (index % 5) * 0.13,
 }));
+
+// Pull the @handle out of a stored social URL for display.
+function socialHandle(url?: string | null): string | null {
+  if (!url) return null;
+  const seg = url.replace(/\/+$/, '').split('/').pop() || '';
+  return seg.replace(/^@/, '') || null;
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -137,28 +145,49 @@ export default function ProfileScreen() {
 
   const fetchJoinedPlans = useCallback(async () => {
     if (!session?.user?.id) return;
-    const { data } = await supabase
-      .from('attendance')
-      .select(
-        `
-        event_id,
-        events (
-          id,
-          title,
-          description,
-          date,
-          end_date,
-          city,
-          image_uri,
-          attendance (user_id, profiles (id, full_name, avatar_url))
-        )
-      `
-      )
-      .eq('user_id', session.user.id)
-      .limit(10);
+    const uid = session.user.id;
 
-    const plans = (data || []).map((plan) => plan.events).filter(Boolean);
-    setJoinedPlans(plans as any);
+    // A creator is a participant in their own sidequest, so "joined" covers
+    // both: the ones I joined (attendance roster) AND the ones I created (host).
+    // Merge + de-dupe by id. Created ones surface even if the attendance row is
+    // missing (e.g. an interrupted creation).
+    const eventCols = `
+      id,
+      title,
+      description,
+      date,
+      end_date,
+      city,
+      location_name,
+      image_uri,
+      cost,
+      cost_currency,
+      attendance (user_id, profiles (id, full_name, avatar_url))
+    `;
+
+    const [joinedRes, createdRes] = await Promise.all([
+      supabase
+        .from('attendance')
+        .select(`event_id, events (${eventCols})`)
+        .eq('user_id', uid)
+        .limit(20),
+      supabase
+        .from('events')
+        .select(eventCols)
+        .eq('user_id', uid)
+        .order('date', { ascending: false })
+        .limit(20),
+    ]);
+
+    const joined = ((joinedRes.data as any[]) || []).map((row) => row.events).filter(Boolean);
+    const created = (createdRes.data as any[]) || [];
+
+    // Created first so the user's own sidequests lead the list.
+    const byId = new Map<number, any>();
+    for (const plan of [...created, ...joined]) {
+      if (plan && !byId.has(plan.id)) byId.set(plan.id, plan);
+    }
+    setJoinedPlans(Array.from(byId.values()).slice(0, 10) as any);
   }, [session?.user?.id]);
 
   const fetchFriends = useCallback(async () => {
@@ -249,6 +278,9 @@ export default function ProfileScreen() {
       hasSubscription,
       joinedPlans,
       friends,
+      instagramUrl: profile?.instagram_url,
+      tiktokUrl: profile?.tiktok_url,
+      youtubeUrl: profile?.youtube_url,
     }),
     [
       countryCode,
@@ -262,6 +294,9 @@ export default function ProfileScreen() {
       joinedPlans,
       profile?.avatar_url,
       profile?.bio,
+      profile?.instagram_url,
+      profile?.tiktok_url,
+      profile?.youtube_url,
       tripCount,
       visitedCount,
       worldPercent,
@@ -321,6 +356,9 @@ type ProfilePageData = {
   hasSubscription: boolean;
   joinedPlans: any[];
   friends: any[];
+  instagramUrl?: string | null;
+  tiktokUrl?: string | null;
+  youtubeUrl?: string | null;
 };
 
 /**
@@ -364,7 +402,8 @@ function GlobeBackdrop({
         <View style={styles.worldStatsRow}>
           <View style={styles.worldStat}>
             <Text style={styles.worldStatValue}>
-              {profile.visitedCount} <Text style={styles.worldStatMuted}>/ {COUNTRIES_IN_WORLD}</Text>
+              {profile.visitedCount}{' '}
+              <Text style={styles.worldStatMuted}>/ {COUNTRIES_IN_WORLD}</Text>
             </Text>
             <Text style={styles.worldStatLabel}>countries been</Text>
           </View>
@@ -416,10 +455,19 @@ function FloatingHeader({ topInset }: { topInset: number }) {
  * at half, and the whole thing (incl. Friends) scrolls at full.
  */
 function ProfileSheetBody({ profile }: { profile: ProfilePageData }) {
+  const { session } = useAuth();
   return (
     <>
       <View style={styles.sheetIdentityRow}>
-        <Avatar avatarUrl={profile.avatarUrl} initials={profile.initials} size={80} />
+        <Pressable
+          onPress={() =>
+            session?.user?.id && router.push(`/profile/${session.user.id}?preview=1` as never)
+          }
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Preview your profile as others see it">
+          <Avatar avatarUrl={profile.avatarUrl} initials={profile.initials} size={80} />
+        </Pressable>
         <StatsStrip profile={profile} style={styles.sheetStatsStrip} />
       </View>
 
@@ -443,11 +491,39 @@ function ProfileSheetBody({ profile }: { profile: ProfilePageData }) {
       </View>
 
       <Text style={styles.bioText}>
-        {profile.bio || 'Add a short bio so travelers know what kind of plans you like.'}
+        {profile.bio || 'Add a short bio so people know the kind of sidequests you like.'}
       </Text>
 
+      {(profile.instagramUrl || profile.tiktokUrl || profile.youtubeUrl) && (
+        <ProfileSection
+          title="Socials"
+          actionLabel="Edit"
+          onAction={() => router.push('/edit-profile')}>
+          <View style={styles.socialsRow}>
+            {profile.instagramUrl ? (
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-instagram" size={18} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>{socialHandle(profile.instagramUrl)}</Text>
+              </View>
+            ) : null}
+            {profile.tiktokUrl ? (
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-tiktok" size={18} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>{socialHandle(profile.tiktokUrl)}</Text>
+              </View>
+            ) : null}
+            {profile.youtubeUrl ? (
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-youtube" size={18} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>{socialHandle(profile.youtubeUrl)}</Text>
+              </View>
+            ) : null}
+          </View>
+        </ProfileSection>
+      )}
+
       <ProfileSection
-        title="Groups you Joined"
+        title="Sidequests you've joined"
         actionLabel="See all"
         onAction={() => router.push('/explore')}>
         <GroupsContent groups={profile.joinedPlans} />
@@ -615,7 +691,9 @@ function SoftEmptyCard({ title, body }: { title: string; body: string }) {
 
 function SpaceBackground() {
   return (
-    <LinearGradient colors={['#071D32', '#04172A', '#02101C']} style={StyleSheet.absoluteFillObject}>
+    <LinearGradient
+      colors={['#071D32', '#04172A', '#02101C']}
+      style={StyleSheet.absoluteFillObject}>
       {STARS.map((star) => (
         <View
           key={star.id}
@@ -934,6 +1012,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   expandedName: {
+    fontFamily: display('700'),
     color: '#111111',
     fontSize: 26,
     lineHeight: 32,
@@ -991,5 +1070,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '500',
+  },
+  socialsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  socialPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexGrow: 1,
+    flexBasis: '46%',
+    backgroundColor: authColors.surface,
+    borderWidth: 1,
+    borderColor: authColors.borderSubtle,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  socialText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: authColors.textPrimary,
   },
 });

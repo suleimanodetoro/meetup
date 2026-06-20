@@ -1,5 +1,5 @@
 // app/contexts/CreatePlanContext.tsx
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
 
 // Define interfaces 
 interface VenueData {
@@ -72,40 +72,46 @@ const initialFormData: PlanFormData = {
 
 const CreatePlanContext = createContext<CreatePlanContextType | undefined>(undefined);
 
+const TOTAL_STEPS = 9; // Including review
+
 export function CreatePlanProvider({ children }: { children: ReactNode }) {
   const [formData, setFormData] = useState<PlanFormData>(initialFormData);
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 9; // Including review
 
-  const updateField = <K extends keyof PlanFormData>(field: K, value: PlanFormData[K]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  // Stable identity (useCallback + functional updates). Crucial: every consumer
+  // screen runs `useEffect(() => updateField(...))` / `setStep(N)` keyed on these
+  // fns, and the provider sits at the app root with many create-plan screens
+  // mounted at once. If these changed every render, those effects would re-fire
+  // forever ("Maximum update depth exceeded"). Bail when the value is unchanged
+  // so a mount-time `updateField('title', formData.title)` doesn't churn state.
+  const updateField = useCallback(
+    <K extends keyof PlanFormData>(field: K, value: PlanFormData[K]) => {
+      setFormData((prev) => (Object.is(prev[field], value) ? prev : { ...prev, [field]: value }));
+    },
+    [],
+  );
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(prev => prev + 1);
+  const nextStep = useCallback(() => {
+    setCurrentStep((prev) => (prev < TOTAL_STEPS ? prev + 1 : prev));
+  }, []);
+
+  const prevStep = useCallback(() => {
+    setCurrentStep((prev) => (prev > 1 ? prev - 1 : prev));
+  }, []);
+
+  // Explicitly set the current step (no-op if unchanged so it never loops).
+  const setStep = useCallback((step: number) => {
+    if (step >= 1 && step <= TOTAL_STEPS) {
+      setCurrentStep((prev) => (prev === step ? prev : step));
     }
-  };
+  }, []);
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-
-  // NEW: explicitly set the current step
-  const setStep = (step: number) => {
-    if (step >= 1 && step <= totalSteps) {
-      setCurrentStep(step);
-    }
-  };
-
-  const canContinue = (): boolean => {
+  const canContinue = useCallback((): boolean => {
     switch (currentStep) {
       case 1: // Plan Name
         return formData.title.trim().length > 0 && formData.title.length <= 60;
-      case 2: // Plan Image
-        return true; // Optional
+      case 2: // Plan Image (required)
+        return !!formData.imageUri || !!formData.imageBase64;
       case 3: // About Activity
         return formData.description.trim().length >= 30;
       case 4: // Date
@@ -122,30 +128,29 @@ export function CreatePlanProvider({ children }: { children: ReactNode }) {
       default:
         return true;
     }
-  };
+  }, [formData, currentStep]);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData(initialFormData);
     setCurrentStep(1);
-  };
+  }, []);
 
-  return (
-    <CreatePlanContext.Provider
-      value={{
-        formData,
-        currentStep,
-        totalSteps,
-        updateField,
-        nextStep,
-        prevStep,
-        setStep, // NEW: expose setStep
-        canContinue,
-        resetForm,
-      }}
-    >
-      {children}
-    </CreatePlanContext.Provider>
+  const value = useMemo<CreatePlanContextType>(
+    () => ({
+      formData,
+      currentStep,
+      totalSteps: TOTAL_STEPS,
+      updateField,
+      nextStep,
+      prevStep,
+      setStep,
+      canContinue,
+      resetForm,
+    }),
+    [formData, currentStep, updateField, nextStep, prevStep, setStep, canContinue, resetForm],
   );
+
+  return <CreatePlanContext.Provider value={value}>{children}</CreatePlanContext.Provider>;
 }
 
 export const useCreatePlan = () => {

@@ -15,6 +15,7 @@ import Animated, { FadeInUp, FadeOut } from 'react-native-reanimated';
 
 import PrimaryButton from '~/components/auth/PrimaryButton';
 import { authColors, authHitSlop, authSpace, authType } from '~/utils/authTheme';
+import { display } from '~/utils/fonts';
 import { triggerLightHaptic } from '~/utils/haptics';
 
 export interface OnboardingFrameProps {
@@ -251,6 +252,7 @@ const styles = StyleSheet.create({
     marginBottom: authSpace.xl,
   },
   title: {
+    fontFamily: display('700'),
     fontSize: authType.headline.fontSize,
     lineHeight: authType.headline.lineHeight,
     letterSpacing: authType.headline.letterSpacing,

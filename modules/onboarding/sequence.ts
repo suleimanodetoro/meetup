@@ -155,7 +155,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   {
     slug: 'pause',
     title: "you're almost\nthere!",
-    subtitle: "Just a few more steps and you'll be ready to start making connections.",
+    subtitle: "Just a few more steps and you'll be ready for your first sidequest.",
     Body: PauseBody,
     read: () => undefined,
     isValid: () => true,
@@ -205,8 +205,8 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'preferences',
-    title: 'how do you prefer to\nmeet people?',
-    subtitle: 'helps us suggest the right kind of plans',
+    title: 'how do you prefer to\nmeet up?',
+    subtitle: 'helps us suggest the right kind of sidequests',
     Body: PreferencesField,
     read: (p) => p.meeting_preference ?? undefined,
     isValid: (v: string | undefined) => !!v,
@@ -246,7 +246,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'location',
-    title: 'Find people near\nyour plans',
+    title: 'Find sidequests and\npeople near you',
     noScroll: true,
     Body: LocationField,
     read: (p): LocationValue | undefined =>

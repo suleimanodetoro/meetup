@@ -15,10 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router, useLocalSearchParams } from 'expo-router';
+import { shareContent } from '~/utils/share';
 import { LinearGradient } from 'expo-linear-gradient';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
 import { FounderBadge } from '~/components/FounderBadge';
 import { PremiumBadge } from '~/components/PremiumBadge';
+import { TravelStatsCard } from '~/components/TravelStatsCard';
+import { display } from '~/utils/fonts';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -60,7 +63,7 @@ interface UserProfile {
 }
 
 export default function UserProfileScreen() {
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { userId, preview } = useLocalSearchParams<{ userId: string; preview?: string }>();
   const { session } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -74,6 +77,7 @@ export default function UserProfileScreen() {
   const [travelStats, setTravelStats] = useState({
     totalTrips: 0,
     countriesVisited: 0,
+    countryCodes: [] as string[],
   });
 
   // User's events/plans
@@ -125,6 +129,7 @@ export default function UserProfileScreen() {
         setTravelStats({
           totalTrips: visits.length,
           countriesVisited: uniqueCountries.size,
+          countryCodes: Array.from(uniqueCountries) as string[],
         });
       }
 
@@ -330,6 +335,9 @@ export default function UserProfileScreen() {
   }
 
   const isOwnProfile = session?.user?.id === userId;
+  // Tapping your own avatar opens this screen with ?preview=1 so you can see
+  // your profile as a stranger would (action buttons shown, but inert).
+  const previewAsStranger = preview === '1' && isOwnProfile;
   const age = profile.birth_date ? calculateAge(profile.birth_date) : null;
 
   return (
@@ -339,21 +347,28 @@ export default function UserProfileScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        {!isOwnProfile && (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
-            onPress={() => {
-              if (!session?.user?.id || !userId) return;
-              presentUserSafetyActions({
-                currentUserId: session.user.id,
-                targetUserId: userId,
-                targetName: profile?.full_name,
-                onBlocked: () => router.back(),
-              });
-            }}
+            onPress={() => userId && shareContent('profile', userId, profile?.full_name)}
             style={styles.headerButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+            <Ionicons name="share-outline" size={24} color="#fff" />
           </Pressable>
-        )}
+          {!isOwnProfile && (
+            <Pressable
+              onPress={() => {
+                if (!session?.user?.id || !userId) return;
+                presentUserSafetyActions({
+                  currentUserId: session.user.id,
+                  targetUserId: userId,
+                  targetName: profile?.full_name,
+                  onBlocked: () => router.back(),
+                });
+              }}
+              style={styles.headerButton}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+            </Pressable>
+          )}
+        </View>
       </SafeAreaView>
 
       <ScrollView
@@ -415,166 +430,182 @@ export default function UserProfileScreen() {
             )}
           </View>
         </View>
-        {/* Action Buttons */}
-        {!isOwnProfile && (
-          <View style={styles.actionButtons}>
-            <Pressable
-              onPress={handleFriendRequest}
-              disabled={processingAction}
-              style={[
-                styles.actionButton,
-                friendshipStatus === 'accepted' && styles.actionButtonAccepted,
-              ]}>
-              <Ionicons
-                name={
-                  friendshipStatus === 'accepted'
-                    ? 'checkmark-circle'
-                    : friendshipStatus === 'pending' && !isRequester
-                      ? 'person-add'
-                      : 'person-add-outline'
-                }
-                size={20}
-                color={
-                  friendshipStatus === 'accepted' ? authColors.success : authColors.textPrimary
-                }
-              />
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  friendshipStatus === 'accepted' && styles.actionButtonTextAccepted,
-                ]}>
-                {getFriendButtonText()}
-              </Text>
-            </Pressable>
 
-            <Pressable
-              onPress={handleMessage}
-              disabled={processingAction}
-              style={[styles.actionButton, styles.messageButton]}>
-              <Ionicons name="chatbubble-outline" size={20} color={authColors.textPrimary} />
-              <Text style={styles.actionButtonText}>Message</Text>
-            </Pressable>
-          </View>
-        )}
+        {/* Content sheet — a rounded card that overlaps the photo, inspo-style */}
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
 
-        {/* About Me */}
-        {profile.bio && (
+          {/* Action Buttons (or a "viewing as a stranger" preview banner) */}
+          {(!isOwnProfile || previewAsStranger) && (
+            <>
+              {previewAsStranger && (
+                <View style={styles.previewBanner}>
+                  <Ionicons name="eye-outline" size={16} color={authColors.accent} />
+                  <Text style={styles.previewBannerText}>
+                    Preview — this is how others see your profile
+                  </Text>
+                </View>
+              )}
+              <View style={styles.actionButtons}>
+                <Pressable
+                  onPress={handleFriendRequest}
+                  disabled={processingAction || previewAsStranger}
+                  style={[
+                    styles.actionButton,
+                    friendshipStatus === 'accepted' && styles.actionButtonAccepted,
+                  ]}>
+                  <Ionicons
+                    name={
+                      friendshipStatus === 'accepted'
+                        ? 'checkmark-circle'
+                        : friendshipStatus === 'pending' && !isRequester
+                          ? 'person-add'
+                          : 'person-add-outline'
+                    }
+                    size={20}
+                    color={
+                      friendshipStatus === 'accepted' ? authColors.success : authColors.textPrimary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      friendshipStatus === 'accepted' && styles.actionButtonTextAccepted,
+                    ]}>
+                    {getFriendButtonText()}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleMessage}
+                  disabled={processingAction || previewAsStranger}
+                  style={[styles.actionButton, styles.messageButton]}>
+                  <Ionicons name="chatbubble-outline" size={20} color={authColors.textPrimary} />
+                  <Text style={styles.actionButtonText}>Message</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+
+          {/* About Me */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About Me</Text>
-            <Text style={styles.bioText}>{profile.bio}</Text>
+            <Text style={profile.bio ? styles.bioText : styles.bioPlaceholder}>
+              {profile.bio ||
+                `${profile.full_name?.split(' ')[0] || 'This user'} hasn't shared anything yet`}
+            </Text>
           </View>
-        )}
 
-        {/* Socials */}
-        {hasSocials && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Socials</Text>
-            <View style={styles.socialsContainer}>
-              {profile.instagram_url && (
-                <View style={styles.socialPill}>
-                  <Ionicons name="logo-instagram" size={20} color={authColors.textPrimary} />
-                  <Text style={styles.socialText}>
-                    {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not Set'}
-                  </Text>
-                </View>
-              )}
-              {profile.tiktok_url && (
-                <View style={styles.socialPill}>
-                  <Ionicons name="logo-tiktok" size={20} color={authColors.textPrimary} />
-                  <Text style={styles.socialText}>
-                    {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not Set'}
-                  </Text>
-                </View>
-              )}
-              {profile.youtube_url && (
-                <View style={styles.socialPill}>
-                  <Ionicons name="logo-youtube" size={20} color={authColors.textPrimary} />
-                  <Text style={styles.socialText}>
-                    {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not Set'}
-                  </Text>
-                </View>
-              )}
+          {/* Socials */}
+          {hasSocials && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Socials</Text>
+              <View style={styles.socialsContainer}>
+                {profile.instagram_url && (
+                  <View style={styles.socialPill}>
+                    <Ionicons name="logo-instagram" size={20} color={authColors.textPrimary} />
+                    <Text style={styles.socialText}>
+                      {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not Set'}
+                    </Text>
+                  </View>
+                )}
+                {profile.tiktok_url && (
+                  <View style={styles.socialPill}>
+                    <Ionicons name="logo-tiktok" size={20} color={authColors.textPrimary} />
+                    <Text style={styles.socialText}>
+                      {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not Set'}
+                    </Text>
+                  </View>
+                )}
+                {profile.youtube_url && (
+                  <View style={styles.socialPill}>
+                    <Ionicons name="logo-youtube" size={20} color={authColors.textPrimary} />
+                    <Text style={styles.socialText}>
+                      {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not Set'}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Travel Stats */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          {/* Travel Stats */}
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Travel Stats</Text>
+            <TravelStatsCard
+              visitedCodes={travelStats.countryCodes}
+              width={SCREEN_WIDTH - authSpace.xl * 2}
+              accent={authColors.accent}
+            />
           </View>
-          <Text style={styles.travelStatsText}>
-            <Text style={styles.travelStatsNumber}>{travelStats.totalTrips}</Text> Trips •{' '}
-            <Text style={styles.travelStatsNumber}>{travelStats.countriesVisited}</Text> Countries
-          </Text>
-        </View>
 
-        {/* Plans */}
-        {userEvents.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Plans</Text>
-            <View style={styles.plansContainer}>
-              {userEvents.map((event) => (
-                <Pressable
-                  key={event.id}
-                  onPress={() => router.push(`/event/${event.id}`)}
-                  style={styles.planCard}>
-                  <AppImage
-                    source={{ uri: event.image_uri || getCityImageUrl(event.city) }}
-                    style={styles.planImage}
-                  />
-                  <View style={styles.planContent}>
-                    <Text style={styles.planTitle} numberOfLines={1}>
-                      {event.title}
-                    </Text>
-                    <Text style={styles.planLocation} numberOfLines={1}>
-                      📍 {event.city}
-                    </Text>
-                    {event.date && (
-                      <Text style={styles.planDate}>
-                        {new Date(event.date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+          {/* Plans */}
+          {userEvents.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Plans</Text>
+              <View style={styles.plansContainer}>
+                {userEvents.map((event) => (
+                  <Pressable
+                    key={event.id}
+                    onPress={() => router.push(`/event/${event.id}`)}
+                    style={styles.planCard}>
+                    <AppImage
+                      source={{ uri: event.image_uri || getCityImageUrl(event.city) }}
+                      style={styles.planImage}
+                    />
+                    <View style={styles.planContent}>
+                      <Text style={styles.planTitle} numberOfLines={1}>
+                        {event.title}
                       </Text>
-                    )}
-                  </View>
-                </Pressable>
-              ))}
+                      <Text style={styles.planLocation} numberOfLines={1}>
+                        📍 {event.city}
+                      </Text>
+                      {event.date && (
+                        <Text style={styles.planDate}>
+                          {new Date(event.date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </Text>
+                      )}
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Interests */}
-        {profile.interests && profile.interests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <View style={styles.interestsContainer}>
-              {profile.interests.map((interestId, index) => {
-                const interest = getInterestDetails(interestId);
-                return (
-                  <View key={index} style={styles.interestPill}>
-                    <Text style={styles.interestEmoji}>{interest.emoji}</Text>
-                    <Text style={styles.interestLabel}>{interest.label}</Text>
-                  </View>
-                );
-              })}
+          {/* Interests */}
+          {profile.interests && profile.interests.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Interests</Text>
+              <View style={styles.interestsContainer}>
+                {profile.interests.map((interestId, index) => {
+                  const interest = getInterestDetails(interestId);
+                  return (
+                    <View key={index} style={styles.interestPill}>
+                      <Text style={styles.interestEmoji}>{interest.emoji}</Text>
+                      <Text style={styles.interestLabel}>{interest.label}</Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Languages */}
-        {profile.languages && profile.languages.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Languages</Text>
-            <View style={styles.languagesPill}>
-              <Text style={styles.languagesIcon}>aA</Text>
-              <Text style={styles.languagesText}>{formatLanguages(profile.languages)}</Text>
+          {/* Languages */}
+          {profile.languages && profile.languages.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Languages</Text>
+              <View style={styles.languagesPill}>
+                <Text style={styles.languagesIcon}>aA</Text>
+                <Text style={styles.languagesText}>{formatLanguages(profile.languages)}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        <View style={{ height: 40 }} />
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -639,6 +670,22 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     paddingBottom: 40,
   },
+  sheet: {
+    backgroundColor: authColors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingTop: authSpace.xs,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#D7DBE0',
+    marginTop: authSpace.md,
+    marginBottom: authSpace.sm,
+  },
   headerImageContainer: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.6,
@@ -667,8 +714,10 @@ const styles = StyleSheet.create({
     right: 20,
   },
   profileName: {
-    fontSize: 36,
+    fontFamily: display('700'),
+    fontSize: 32,
     fontWeight: '700',
+    letterSpacing: -0.5,
     color: authColors.ctaPrimaryText,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -680,24 +729,45 @@ const styles = StyleSheet.create({
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   locationFlag: {
-    fontSize: 24,
+    fontSize: 18,
     marginRight: 8,
   },
   locationText: {
-    fontSize: 18,
-    color: authColors.ctaPrimaryText,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.92)',
     fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  previewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: authSpace.sm,
+    backgroundColor: authColors.accentSoft,
+    borderColor: authColors.accentBorder,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.md,
+    marginHorizontal: authSpace.xl,
+    marginBottom: authSpace.md,
+  },
+  previewBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: authColors.accent,
+  },
   actionButtons: {
     flexDirection: 'row',
     paddingHorizontal: authSpace.xl,
-    paddingVertical: authSpace.xl,
+    paddingTop: authSpace.sm,
+    paddingBottom: authSpace.xl,
     gap: authSpace.md,
   },
   actionButton: {
@@ -706,7 +776,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: authColors.surface,
-    paddingVertical: 14,
+    paddingVertical: 15,
     borderRadius: authRadius.pill,
     borderWidth: 1,
     borderColor: authColors.borderSubtle,
@@ -729,7 +799,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: authSpace.xl,
-    marginBottom: authSpace.xl,
+    marginBottom: authSpace.xxl,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -738,16 +808,23 @@ const styles = StyleSheet.create({
     marginBottom: authSpace.md,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 19,
+    fontWeight: '700',
     color: authColors.textPrimary,
-    marginBottom: authSpace.md,
-    letterSpacing: -0.3,
+    marginBottom: authSpace.lg,
+    letterSpacing: -0.2,
   },
   bioText: {
     fontSize: authType.body.fontSize,
     lineHeight: authType.body.lineHeight,
     color: authColors.textSecondary,
+  },
+  bioPlaceholder: {
+    fontSize: authType.body.fontSize,
+    lineHeight: authType.body.lineHeight,
+    color: authColors.textSecondary,
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
   travelStatsText: {
     fontSize: 16,
@@ -768,12 +845,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: authColors.surface,
-    paddingHorizontal: authSpace.lg,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: authColors.borderSubtle,
-    gap: 6,
+    gap: 8,
   },
   interestEmoji: {
     fontSize: 16,
@@ -781,28 +858,29 @@ const styles = StyleSheet.create({
   interestLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: authColors.textSecondary,
+    color: authColors.textPrimary,
   },
   languagesPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: authColors.accentSoft,
+    alignSelf: 'flex-start',
+    backgroundColor: authColors.surface,
     paddingHorizontal: authSpace.lg,
-    paddingVertical: authSpace.lg,
-    borderRadius: 22,
+    paddingVertical: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: authColors.accentBorder,
-    gap: authSpace.md,
+    borderColor: authColors.borderSubtle,
+    gap: authSpace.sm,
   },
   languagesIcon: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: authColors.accent,
+    fontSize: 16,
+    fontWeight: '700',
+    color: authColors.textPrimary,
   },
   languagesText: {
-    fontSize: 16,
-    color: authColors.textSecondary,
-    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: authColors.textPrimary,
   },
   socialsContainer: {
     flexDirection: 'row',
@@ -812,10 +890,12 @@ const styles = StyleSheet.create({
   socialPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexGrow: 1,
+    flexBasis: '46%',
     backgroundColor: authColors.surface,
     paddingHorizontal: authSpace.lg,
-    paddingVertical: authSpace.md,
-    borderRadius: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: authColors.borderSubtle,
     gap: authSpace.sm,

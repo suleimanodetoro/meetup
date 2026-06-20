@@ -1,5 +1,5 @@
 // app/create-plan/review.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
@@ -30,9 +31,11 @@ export default function ReviewScreen() {
     }
   }, [formData.imageBase64]);
 
-  useEffect(() => {
-  setStep(9);
-}, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(9);
+    }, [setStep]),
+  );
 
   const handleCreatePlan = async () => {
     if (!session?.user?.id) {
@@ -224,13 +227,7 @@ export default function ReviewScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       {/* Header */}
-      <View className="flex-row items-center px-5 py-4">
-        <Pressable onPress={() => router.back()} className="p-1">
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text className="flex-1 text-center text-lg font-semibold">Create Plan</Text>
-        <View className="w-8" />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={9} totalSteps={9} />

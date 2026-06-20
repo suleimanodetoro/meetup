@@ -1,18 +1,21 @@
 // app/create-plan/guidelines.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, SafeAreaView, Linking } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
+import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 
 export default function GuidelinesScreen() {
-  const { formData, updateField, nextStep, prevStep, setStep } = useCreatePlan();
+  const { formData, updateField, nextStep, setStep } = useCreatePlan();
   const [accepted, setAccepted] = useState(formData.guidelinesAccepted || false);
 
-  useEffect(() => {
-    setStep(8);
-  }, [setStep]);
+  useFocusEffect(
+    useCallback(() => {
+      setStep(8);
+    }, [setStep]),
+  );
   const handleContinue = () => {
     updateField('guidelinesAccepted', true);
     nextStep();
@@ -22,13 +25,7 @@ export default function GuidelinesScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       {/* Header */}
-      <View className="flex-row items-center px-5 py-4">
-        <Pressable onPress={prevStep} className="p-1">
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </Pressable>
-        <Text className="flex-1 text-center text-lg font-semibold">Create Plan</Text>
-        <View className="w-8" />
-      </View>
+      <CreatePlanHeader />
 
       {/* Progress */}
       <StepperProgress currentStep={8} totalSteps={9} />

@@ -1,0 +1,6 @@
+# Generated / vendored data — not hand-edited
+components/worldMapData.ts
+dist/
+.expo/
+ios/
+android/
