@@ -39,6 +39,7 @@ import { getCountryFlag } from '~/utils/countryFlags';
 import { supabase } from '~/utils/supabase';
 import { authColors, authHitSlop } from '~/utils/authTheme';
 import { display } from '~/utils/fonts';
+import { SocialLinks } from '~/components/SocialLinks';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
 
@@ -58,13 +59,6 @@ const STARS = Array.from({ length: 62 }, (_, index) => ({
   size: 1 + (index % 3) * 0.7,
   opacity: 0.25 + (index % 5) * 0.13,
 }));
-
-// Pull the @handle out of a stored social URL for display.
-function socialHandle(url?: string | null): string | null {
-  if (!url) return null;
-  const seg = url.replace(/\/+$/, '').split('/').pop() || '';
-  return seg.replace(/^@/, '') || null;
-}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -494,25 +488,16 @@ function ProfileSheetBody({ profile }: { profile: ProfilePageData }) {
         {profile.bio || 'Add a short bio so people know the kind of sidequests you like.'}
       </Text>
 
-      {/* Socials — always shown; each platform shows its handle or "Not set" */}
+      {/* Socials — always shown; tap to open the app/browser when set */}
       <ProfileSection
         title="Socials"
         actionLabel="Edit"
         onAction={() => router.push('/edit-profile')}>
-        <View style={styles.socialsRow}>
-          <View style={styles.socialPill}>
-            <Ionicons name="logo-instagram" size={18} color={authColors.textPrimary} />
-            <Text style={styles.socialText}>{socialHandle(profile.instagramUrl) || 'Not set'}</Text>
-          </View>
-          <View style={styles.socialPill}>
-            <Ionicons name="logo-tiktok" size={18} color={authColors.textPrimary} />
-            <Text style={styles.socialText}>{socialHandle(profile.tiktokUrl) || 'Not set'}</Text>
-          </View>
-          <View style={styles.socialPill}>
-            <Ionicons name="logo-youtube" size={18} color={authColors.textPrimary} />
-            <Text style={styles.socialText}>{socialHandle(profile.youtubeUrl) || 'Not set'}</Text>
-          </View>
-        </View>
+        <SocialLinks
+          instagram={profile.instagramUrl}
+          tiktok={profile.tiktokUrl}
+          youtube={profile.youtubeUrl}
+        />
       </ProfileSection>
 
       <ProfileSection
