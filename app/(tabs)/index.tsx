@@ -254,17 +254,16 @@ export default function HomeScreen() {
       {/* Top bar + filter chips */}
       <SafeAreaView pointerEvents="box-none" style={styles.topOverlay}>
         <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
-          <View style={styles.brandPill}>
-            <View style={styles.brandLogo}>
-              <AppImage
-                source={require('../../assets/ios-light.png')}
-                style={styles.brandLogoImg}
-                contentFit="cover"
-                transition={0}
-              />
-            </View>
-            <Text style={styles.brandTitle}>Waypoint</Text>
-          </View>
+          <Pressable
+            style={styles.searchBar}
+            onPress={() => router.push('/search')}
+            accessibilityRole="button"
+            accessibilityLabel="Search cities">
+            <Ionicons name="search" size={18} color={authColors.textTertiary} />
+            <Text style={styles.searchBarText} numberOfLines={1}>
+              Search a city
+            </Text>
+          </Pressable>
           <View style={styles.topActions}>
             <Pressable
               style={styles.iconButton}
@@ -490,6 +489,24 @@ const styles = StyleSheet.create({
     color: authColors.textPrimary,
     letterSpacing: -0.2,
     paddingRight: 4,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 24,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginRight: 10,
+    ...SHADOW,
+  },
+  searchBarText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: authColors.textTertiary,
   },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconButton: {

@@ -153,6 +153,14 @@ export default function CityDetailScreen() {
         <Ionicons name="arrow-back" size={24} color="#000" />
       </Pressable>
 
+      <Pressable
+        onPress={() => router.push('/search')}
+        style={[styles.searchButton, { top: insets.top + 10 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Search another city">
+        <Ionicons name="search" size={22} color="#000" />
+      </Pressable>
+
       <VisitDetailsBottomSheet
         visit={headerVisit}
         windowLabel={windowLabel}
@@ -202,6 +210,22 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchButton: {
+    position: 'absolute',
+    right: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
