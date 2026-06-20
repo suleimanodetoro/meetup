@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
+import { GradientButton } from '~/components/GradientButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
@@ -112,9 +113,11 @@ export function ChatShell(props: ChatShellProps) {
               ? 'Conversation not found'
               : "Couldn't load this chat"}
           </Text>
-          <Pressable style={styles.retryButton} onPress={chat.status.retry}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </Pressable>
+          <GradientButton
+            label="Retry"
+            onPress={chat.status.retry}
+            style={{ alignSelf: 'center' }}
+          />
         </View>
       )}
 

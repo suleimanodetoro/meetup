@@ -1,6 +1,7 @@
 // components/ErrorBoundary.tsx
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { GradientButton } from '~/components/GradientButton';
 
 type Props = { children: React.ReactNode };
 type State = { hasError: boolean };
@@ -37,9 +38,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         <Text style={styles.body}>
           The app hit an unexpected error. Try again — if it keeps happening, restart the app.
         </Text>
-        <Pressable style={styles.button} onPress={this.reset}>
-          <Text style={styles.buttonText}>Try again</Text>
-        </Pressable>
+        <GradientButton label="Try again" onPress={this.reset} style={{ alignSelf: 'center' }} />
       </View>
     );
   }

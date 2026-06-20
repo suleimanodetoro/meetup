@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppImage } from '~/components/AppImage';
+import { GradientButton } from '~/components/GradientButton';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCityImageUrl } from '~/utils/cityImages';
@@ -113,11 +114,11 @@ export default function MySidequestsScreen() {
               <Text style={styles.emptyBody}>
                 Start one solo, dare a friend, or join people near you.
               </Text>
-              <Pressable
-                style={styles.cta}
-                onPress={() => router.push('/create-plan/intent' as never)}>
-                <Text style={styles.ctaText}>Start a sidequest</Text>
-              </Pressable>
+              <GradientButton
+                label="Start a sidequest"
+                onPress={() => router.push('/create-plan/intent' as never)}
+                style={{ alignSelf: 'center' }}
+              />
             </View>
           }
         />

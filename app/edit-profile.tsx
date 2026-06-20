@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
+import { GradientButton } from '~/components/GradientButton';
 import { router, useNavigation } from 'expo-router';
 import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
@@ -423,9 +424,7 @@ export default function EditProfile() {
       const orphanedOriginals = originalPhotosRef.current.filter(
         (orig) => orig && !savedPhotos.includes(orig)
       );
-      const unsavedUploads = [...sessionUploadsRef.current].filter(
-        (u) => !savedPhotos.includes(u)
-      );
+      const unsavedUploads = [...sessionUploadsRef.current].filter((u) => !savedPhotos.includes(u));
       const toDelete = [...orphanedOriginals, ...unsavedUploads];
       if (toDelete.length) void removeStorageObjectsByUrl(toDelete);
       // Re-baseline so a second save in the same session won't re-delete, and the
@@ -482,20 +481,12 @@ export default function EditProfile() {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </Pressable>
         <Text style={{ fontSize: 20, fontWeight: '700' }}>Edit Profile</Text>
-        <Pressable
+        <GradientButton
+          label="Update"
           onPress={saveProfile}
-          disabled={saving}
-          style={{
-            backgroundColor: '#007AFF',
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            borderRadius: 20,
-            opacity: saving ? 0.6 : 1,
-          }}>
-          <Text style={{ color: 'white', fontWeight: '600', fontSize: 15 }}>
-            {saving ? 'Saving...' : 'Update'}
-          </Text>
-        </Pressable>
+          loading={saving}
+          style={{ alignSelf: 'center' }}
+        />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
@@ -1036,17 +1027,11 @@ export default function EditProfile() {
               onDateChange={setDob as any}
               maximumDate={new Date()}
             />
-            <Pressable
+            <GradientButton
+              label="Done"
               onPress={() => setShowDatePicker(false)}
-              style={{
-                marginTop: 12,
-                backgroundColor: '#007AFF',
-                borderRadius: 10,
-                paddingVertical: 12,
-                alignItems: 'center',
-              }}>
-              <Text style={{ color: 'white', fontWeight: '600' }}>Done</Text>
-            </Pressable>
+              style={{ marginTop: 12 }}
+            />
           </View>
         </SafeAreaView>
       </Modal>

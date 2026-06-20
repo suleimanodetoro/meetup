@@ -20,6 +20,7 @@ import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { getSuggestions, retrieveDetails } from '~/utils/AddressAutocomplete';
 import { useAuth } from '~/contexts/AuthProvider';
+import { GradientButton } from '~/components/GradientButton';
 
 interface VenueData {
   name: string;
@@ -59,7 +60,7 @@ export default function DestinationsScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(5);
-    }, [setStep]),
+    }, [setStep])
   );
 
   // 2) Updated handleSearch with type filtering + better result handling
@@ -80,9 +81,7 @@ export default function DestinationsScreen() {
       );
 
       const results = (data?.suggestions || [])
-        .filter((s: any) =>
-          ['place', 'poi', 'address', 'locality'].includes(s.feature_type)
-        )
+        .filter((s: any) => ['place', 'poi', 'address', 'locality'].includes(s.feature_type))
         .sort((a: any, b: any) => {
           const queryLower = searchQuery.toLowerCase();
           const aNameMatch = a.name?.toLowerCase().includes(queryLower) ? 1 : 0;
@@ -148,12 +147,8 @@ export default function DestinationsScreen() {
       const newVenue: VenueData = {
         name: venue.name || feature.properties?.name,
         address: venue.place_formatted || feature.properties?.place_formatted,
-        city:
-          venue.context?.place?.name ||
-          feature.properties?.context?.place?.name,
-        country:
-          venue.context?.country?.name ||
-          feature.properties?.context?.country?.name,
+        city: venue.context?.place?.name || feature.properties?.context?.place?.name,
+        country: venue.context?.country?.name || feature.properties?.context?.country?.name,
         country_code:
           venue.context?.country?.country_code ||
           feature.properties?.context?.country?.country_code,
@@ -215,11 +210,7 @@ export default function DestinationsScreen() {
           <Pressable
             onPress={() => setShowSearch(true)}
             disabled={venues.length >= 3}
-            style={[
-              styles.addButton,
-              venues.length >= 3 && styles.addButtonDisabled,
-            ]}
-          >
+            style={[styles.addButton, venues.length >= 3 && styles.addButtonDisabled]}>
             <View style={styles.addIcon}>
               <Text style={styles.addIconText}>+</Text>
             </View>
@@ -230,22 +221,15 @@ export default function DestinationsScreen() {
           {venues.map((venue, index) => (
             <View key={index} style={styles.venueCard}>
               <View style={styles.venueFlag}>
-                <Text style={styles.flagEmoji}>
-                  {getCountryFlag(venue.country_code)}
-                </Text>
+                <Text style={styles.flagEmoji}>{getCountryFlag(venue.country_code)}</Text>
               </View>
               <View style={styles.venueInfo}>
                 <Text style={styles.venueName}>{venue.name}</Text>
                 <Text style={styles.venueAddress}>
-                  {venue.city && venue.country
-                    ? `${venue.city}, ${venue.country}`
-                    : venue.address}
+                  {venue.city && venue.country ? `${venue.city}, ${venue.country}` : venue.address}
                 </Text>
               </View>
-              <Pressable
-                onPress={() => removeVenue(index)}
-                style={styles.removeButton}
-              >
+              <Pressable onPress={() => removeVenue(index)} style={styles.removeButton}>
                 <Ionicons name="close" size={20} color="#666" />
               </Pressable>
             </View>
@@ -255,16 +239,7 @@ export default function DestinationsScreen() {
 
       {/* Continue Button */}
       <View style={styles.footer}>
-        <Pressable
-          onPress={handleContinue}
-          disabled={venues.length === 0}
-          style={[
-            styles.continueButton,
-            venues.length === 0 && styles.continueButtonDisabled,
-          ]}
-        >
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </Pressable>
+        <GradientButton label="Continue" onPress={handleContinue} disabled={venues.length === 0} />
       </View>
 
       {/* Search Modal */}
@@ -307,16 +282,13 @@ export default function DestinationsScreen() {
                 <Pressable
                   onPress={() => addVenue(item)}
                   style={styles.searchResult}
-                  disabled={searching}
-                >
+                  disabled={searching}>
                   <View style={styles.resultIcon}>
                     <Ionicons name="location" size={20} color="#666" />
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultName}>{item.name}</Text>
-                    <Text style={styles.resultAddress}>
-                      {item.place_formatted}
-                    </Text>
+                    <Text style={styles.resultAddress}>{item.place_formatted}</Text>
                   </View>
                 </Pressable>
               )}
@@ -449,6 +421,11 @@ const styles = StyleSheet.create({
   resultAddress: { fontSize: 14, color: '#666' },
   emptyState: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#999' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 100 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
   loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
 });

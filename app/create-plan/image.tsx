@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function PlanImageScreen() {
   const { formData, updateField, nextStep, setStep } = useCreatePlan();
@@ -32,7 +33,7 @@ export default function PlanImageScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(2);
-    }, [setStep]),
+    }, [setStep])
   );
 
   const canProceed = !busy && !!previewUri;
@@ -165,12 +166,12 @@ export default function PlanImageScreen() {
 
       {/* Continue Button - requires an image */}
       <View style={styles.footer}>
-        <Pressable
+        <GradientButton
+          label="Continue"
           onPress={handleContinue}
-          disabled={!canProceed}
-          style={[styles.continueButton, !canProceed && styles.continueButtonDisabled]}>
-          <Text style={styles.continueButtonText}>{busy ? 'Processing...' : 'Continue'}</Text>
-        </Pressable>
+          disabled={!previewUri}
+          loading={busy}
+        />
       </View>
     </SafeAreaView>
   );

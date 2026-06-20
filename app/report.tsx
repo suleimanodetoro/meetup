@@ -6,7 +6,6 @@
 
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { GradientButton } from '~/components/GradientButton';
 import { useAuth } from '~/contexts/AuthProvider';
 import {
   REPORT_REASONS,
@@ -163,16 +163,12 @@ export default function ReportScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable
-            style={[styles.submit, (!reason || submitting) && styles.submitDisabled]}
+          <GradientButton
+            label="Submit report"
             onPress={handleSubmit}
-            disabled={!reason || submitting}>
-            {submitting ? (
-              <ActivityIndicator color={authColors.ctaPrimaryText} />
-            ) : (
-              <Text style={styles.submitText}>Submit report</Text>
-            )}
-          </Pressable>
+            disabled={!reason}
+            loading={submitting}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

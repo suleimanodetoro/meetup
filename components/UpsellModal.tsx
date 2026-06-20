@@ -16,10 +16,10 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Purchases, { type PurchasesPackage, PURCHASES_ERROR_CODE } from 'react-native-purchases';
 import { FounderBadge } from '~/components/FounderBadge';
+import { GradientButton } from '~/components/GradientButton';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
 import { authColors, authSpace } from '~/utils/authTheme';
 
@@ -335,26 +335,16 @@ export default function UpsellModal({
                   );
                 })}
               </View>
-              <Pressable
+              <GradientButton
+                label={
+                  selectedPackage
+                    ? `${activePageConfig.ctaIdle} - ${selectedPackage.product.priceString}`
+                    : 'purchase unavailable'
+                }
                 onPress={() => selectedPackage && purchasePackage(selectedPackage)}
                 disabled={anyPending || !selectedPackage}
-                style={[styles.ctaButton, (anyPending || !selectedPackage) && styles.ctaDisabled]}>
-                {isPurchasingSelected ? (
-                  <ActivityIndicator color={authColors.ctaPrimaryText} />
-                ) : (
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0.08)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.ctaSheen}>
-                    <Text style={styles.ctaText}>
-                      {selectedPackage
-                        ? `${activePageConfig.ctaIdle} - ${selectedPackage.product.priceString}`
-                        : 'purchase unavailable'}
-                    </Text>
-                  </LinearGradient>
-                )}
-              </Pressable>
+                loading={isPurchasingSelected}
+              />
             </>
           )}
 
