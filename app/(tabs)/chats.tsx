@@ -7,7 +7,6 @@ import {
   FlatList,
   Pressable,
   TextInput,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
@@ -19,6 +18,7 @@ import { format } from 'date-fns';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { EmptyChats, ChatSkeletons } from '~/components/EmptyChats';
 
 type ChatItem = {
   conversation_id: number;
@@ -43,6 +43,8 @@ export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  // Dev-only: force the empty state even when the account has active chats.
+  const [previewEmpty, setPreviewEmpty] = useState(false);
 
   // Fetch conversations with proper error handling
   const fetchConversations = useCallback(async () => {
@@ -53,12 +55,11 @@ export default function ChatsScreen() {
       if (!refreshing) {
         setLoading(true);
       }
-      
+
       // Use the RPC function to get all conversations
-      const { data, error } = await supabase
-        .rpc('get_user_conversations', {
-          p_user_id: session.user.id
-        });
+      const { data, error } = await supabase.rpc('get_user_conversations', {
+        p_user_id: session.user.id,
+      });
 
       if (error) {
         console.error('Error fetching conversations:', error);
@@ -112,10 +113,8 @@ export default function ChatsScreen() {
 
       const channel = supabase
         .channel(`chat-list-${session.user.id}`)
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'conversations' },
-          () => fetchConversations(),
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () =>
+          fetchConversations()
         )
         .on(
           'postgres_changes',
@@ -125,7 +124,7 @@ export default function ChatsScreen() {
             table: 'conversation_participants',
             filter: `user_id=eq.${session.user.id}`,
           },
-          () => fetchConversations(),
+          () => fetchConversations()
         )
         .subscribe();
 
@@ -149,11 +148,11 @@ export default function ChatsScreen() {
   // Format time helper
   const formatTime = (dateString: string) => {
     if (!dateString) return '';
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return format(date, 'HH:mm');
     } else if (diffInHours < 48) {
@@ -168,28 +167,29 @@ export default function ChatsScreen() {
   // Filter chats based on active tab and search query
   const getFilteredChats = useCallback(() => {
     if (!chats) return [];
-    
+
     let filtered = chats;
-    
+
     // Filter by tab
     switch (activeTab) {
       case 'dms':
-        filtered = chats.filter(item => item.conversation_type === 'dm');
+        filtered = chats.filter((item) => item.conversation_type === 'dm');
         break;
       case 'plans':
-        filtered = chats.filter(item => item.conversation_type === 'group');
+        filtered = chats.filter((item) => item.conversation_type === 'group');
         break;
     }
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => 
-        item.conversation_name?.toLowerCase().includes(query) ||
-        item.last_message_content?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (item) =>
+          item.conversation_name?.toLowerCase().includes(query) ||
+          item.last_message_content?.toLowerCase().includes(query)
       );
     }
-    
+
     return filtered;
   }, [chats, activeTab, searchQuery]);
 
@@ -209,11 +209,9 @@ export default function ChatsScreen() {
     const lastMessageTime = item.last_message_at;
     const lastMessageContent = item.last_message_content || '';
     const unreadCount = item.unread_count || 0;
-    
+
     return (
-      <Pressable
-        style={styles.chatItem}
-        onPress={() => navigateToChat(item)}>
+      <Pressable style={styles.chatItem} onPress={() => navigateToChat(item)}>
         {avatarUrl ? (
           <AppImage source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
@@ -229,26 +227,20 @@ export default function ChatsScreen() {
             <Text style={styles.chatName} numberOfLines={1}>
               {chatName}
             </Text>
-            {lastMessageTime && (
-              <Text style={styles.timestamp}>{formatTime(lastMessageTime)}</Text>
-            )}
+            {lastMessageTime && <Text style={styles.timestamp}>{formatTime(lastMessageTime)}</Text>}
           </View>
           <View style={styles.messagePreview}>
-            <Text 
-              style={[
-                styles.lastMessage,
-                unreadCount > 0 && styles.unreadMessage
-              ]} 
+            <Text
+              style={[styles.lastMessage, unreadCount > 0 && styles.unreadMessage]}
               numberOfLines={1}>
-              {item.last_message_user_name && item.conversation_type === 'group' && 
+              {item.last_message_user_name &&
+                item.conversation_type === 'group' &&
                 `${item.last_message_user_name}: `}
               {lastMessageContent}
             </Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
+                <Text style={styles.unreadCount}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
               </View>
             )}
           </View>
@@ -260,18 +252,14 @@ export default function ChatsScreen() {
   // Get filtered data
   const filteredChats = getFilteredChats();
 
-  // Simplified empty state component
-  const renderEmptyState = () => {
-    return null;
-  };
+  // Empty state: invite CTA + skeleton preview of future conversations.
+  const renderEmptyState = () => <EmptyChats />;
 
   // Header component with friend request badge
   const renderHeader = () => (
     <>
       {pendingRequestsCount > 0 && filteredChats.length > 0 && !searchQuery.trim() && (
-        <Pressable 
-          style={styles.friendRequestCard}
-          onPress={() => router.push('/friend-requests')}>
+        <Pressable style={styles.friendRequestCard} onPress={() => router.push('/friend-requests')}>
           <View style={styles.friendRequestIcon}>
             <Ionicons name="person-add" size={24} color="#007AFF" />
             {pendingRequestsCount > 0 && (
@@ -295,8 +283,11 @@ export default function ChatsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Chats</Text>
+        </View>
+        <View style={styles.skeletonWrap}>
+          <ChatSkeletons />
         </View>
       </SafeAreaView>
     );
@@ -308,24 +299,23 @@ export default function ChatsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
         <View style={styles.headerActions}>
+          {/* Dev-only: preview the empty state on an account that has chats */}
+          {__DEV__ && (
+            <Pressable
+              style={styles.headerButton}
+              onPress={() => setPreviewEmpty((v) => !v)}
+              accessibilityLabel="Preview empty chats">
+              <Ionicons name="flask-outline" size={22} color={previewEmpty ? '#007AFF' : '#999'} />
+            </Pressable>
+          )}
           {/* Friend requests indicator */}
-          <Pressable 
-            style={styles.requestsButton}
-            onPress={() => router.push('/friend-requests')}>
-            <Text style={styles.requestsButtonText}>
-              {pendingRequestsCount} Requests
-            </Text>
+          <Pressable style={styles.requestsButton} onPress={() => router.push('/friend-requests')}>
+            <Text style={styles.requestsButtonText}>{pendingRequestsCount} Requests</Text>
           </Pressable>
-          
+
           {/* Search button */}
-          <Pressable 
-            style={styles.headerButton}
-            onPress={() => setShowSearch(!showSearch)}>
-            <Ionicons 
-              name={showSearch ? 'close' : 'search'} 
-              size={24} 
-              color="#007AFF" 
-            />
+          <Pressable style={styles.headerButton} onPress={() => setShowSearch(!showSearch)}>
+            <Ionicons name={showSearch ? 'close' : 'search'} size={24} color="#007AFF" />
           </Pressable>
         </View>
       </View>
@@ -350,16 +340,12 @@ export default function ChatsScreen() {
           <Pressable
             style={[styles.tab, activeTab === 'all' && styles.activeTab]}
             onPress={() => setActiveTab('all')}>
-            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-              All
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
           </Pressable>
           <Pressable
             style={[styles.tab, activeTab === 'dms' && styles.activeTab]}
             onPress={() => setActiveTab('dms')}>
-            <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>
-              DMs
-            </Text>
+            <Text style={[styles.tabText, activeTab === 'dms' && styles.activeTabText]}>DMs</Text>
           </Pressable>
           <Pressable
             style={[styles.tab, activeTab === 'plans' && styles.activeTab]}
@@ -373,18 +359,16 @@ export default function ChatsScreen() {
 
       {/* Chat list */}
       <FlatList
-        data={filteredChats}
+        data={previewEmpty ? [] : filteredChats}
         renderItem={renderChatItem}
-        keyExtractor={item => item.conversation_id.toString()}
-        contentContainerStyle={filteredChats.length === 0 ? styles.emptyListContent : undefined}
+        keyExtractor={(item) => item.conversation_id.toString()}
+        contentContainerStyle={
+          previewEmpty || filteredChats.length === 0 ? styles.emptyListContent : undefined
+        }
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#007AFF"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#007AFF" />
         }
       />
     </SafeAreaView>
@@ -400,6 +384,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  skeletonWrap: {
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
