@@ -291,7 +291,7 @@ export default function UserProfileScreen() {
   };
 
   const extractSocialUsername = (
-    url: string,
+    url: string | null | undefined,
     platform: 'instagram' | 'tiktok' | 'youtube'
   ): string => {
     if (!url) return '';
@@ -312,8 +312,6 @@ export default function UserProfileScreen() {
     }
     return '';
   };
-
-  const hasSocials = profile?.instagram_url || profile?.tiktok_url || profile?.youtube_url;
 
   if (loading) {
     return (
@@ -496,38 +494,30 @@ export default function UserProfileScreen() {
             </Text>
           </View>
 
-          {/* Socials */}
-          {hasSocials && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Socials</Text>
-              <View style={styles.socialsContainer}>
-                {profile.instagram_url && (
-                  <View style={styles.socialPill}>
-                    <Ionicons name="logo-instagram" size={20} color={authColors.textPrimary} />
-                    <Text style={styles.socialText}>
-                      {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not Set'}
-                    </Text>
-                  </View>
-                )}
-                {profile.tiktok_url && (
-                  <View style={styles.socialPill}>
-                    <Ionicons name="logo-tiktok" size={20} color={authColors.textPrimary} />
-                    <Text style={styles.socialText}>
-                      {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not Set'}
-                    </Text>
-                  </View>
-                )}
-                {profile.youtube_url && (
-                  <View style={styles.socialPill}>
-                    <Ionicons name="logo-youtube" size={20} color={authColors.textPrimary} />
-                    <Text style={styles.socialText}>
-                      {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not Set'}
-                    </Text>
-                  </View>
-                )}
+          {/* Socials — always shown; each platform shows its handle or "Not set" */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Socials</Text>
+            <View style={styles.socialsContainer}>
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-instagram" size={20} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>
+                  {extractSocialUsername(profile.instagram_url, 'instagram') || 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-tiktok" size={20} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>
+                  {extractSocialUsername(profile.tiktok_url, 'tiktok') || 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.socialPill}>
+                <Ionicons name="logo-youtube" size={20} color={authColors.textPrimary} />
+                <Text style={styles.socialText}>
+                  {extractSocialUsername(profile.youtube_url, 'youtube') || 'Not set'}
+                </Text>
               </View>
             </View>
-          )}
+          </View>
 
           {/* Travel Stats */}
           <View style={styles.section}>
