@@ -1,9 +1,10 @@
 // components/EmptyChats.tsx
-// Empty / loading state for the Chats tab: pulsing skeleton rows that preview
-// what conversations look like, plus an invite CTA so a brand-new user has an
-// obvious next step (go do cool sidequests with people).
+// Empty / loading state for the Chats tab. The skeleton preview is sandwiched
+// between two CTAs: invite friends (primary, glossy gradient) above, start a
+// sidequest (secondary) below — both lead to having conversations.
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Share } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authColors, authSpace } from '~/utils/authTheme';
@@ -44,7 +45,7 @@ function SkeletonRow({ pulse }: { pulse: Animated.Value }) {
 export function ChatSkeletons({ count = 6 }: { count?: number }) {
   const pulse = usePulse();
   return (
-    <View style={styles.skelSection}>
+    <View style={styles.skelSectionPlain}>
       {Array.from({ length: count }, (_, i) => (
         <SkeletonRow key={i} pulse={pulse} />
       ))}
@@ -52,7 +53,38 @@ export function ChatSkeletons({ count = 6 }: { count?: number }) {
   );
 }
 
-/** Empty state: invite CTA + a skeleton preview of future conversations. */
+// Primary CTA with a diagonal gradient + a top sheen for a glassy, refractive look.
+function GradientCTA({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.ctaShadow} accessibilityRole="button">
+      <LinearGradient
+        colors={['#3D9BFF', '#0A5CE0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.cta}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.ctaSheen}
+          pointerEvents="none"
+        />
+        <Ionicons name={icon} size={18} color="#fff" />
+        <Text style={styles.ctaText}>{label}</Text>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+/** Empty state: invite CTA → skeleton preview → start-a-sidequest CTA. */
 export function EmptyChats() {
   const pulse = usePulse();
 
@@ -67,22 +99,27 @@ export function EmptyChats() {
       </View>
       <Text style={styles.title}>No chats yet</Text>
       <Text style={styles.subtitle}>
-        Invite friends to do cool sidequests together — your conversations show up here.
+        Invite friends or start a sidequest — your conversations show up here.
       </Text>
 
-      <Pressable style={styles.cta} onPress={invite} accessibilityRole="button">
-        <Ionicons name="person-add" size={18} color={authColors.ctaPrimaryText} />
-        <Text style={styles.ctaText}>Invite friends</Text>
-      </Pressable>
-      <Pressable onPress={() => router.push('/search-users')} hitSlop={8} style={styles.secondary}>
-        <Text style={styles.secondaryText}>or find people nearby</Text>
-      </Pressable>
+      {/* Top CTA */}
+      <GradientCTA icon="person-add" label="Invite friends" onPress={invite} />
 
+      {/* Sandwiched skeleton preview */}
       <View style={styles.skelSection}>
-        {[0, 1, 2, 3].map((i) => (
+        {[0, 1, 2].map((i) => (
           <SkeletonRow key={i} pulse={pulse} />
         ))}
       </View>
+
+      {/* Bottom CTA */}
+      <Pressable
+        style={styles.secondaryCta}
+        onPress={() => router.push('/create-plan/intent' as never)}
+        accessibilityRole="button">
+        <Ionicons name="compass-outline" size={18} color={authColors.accent} />
+        <Text style={styles.secondaryCtaText}>Start a sidequest</Text>
+      </Pressable>
     </View>
   );
 }
@@ -90,8 +127,9 @@ export function EmptyChats() {
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-    paddingTop: authSpace.xxl,
+    justifyContent: 'center',
     paddingHorizontal: authSpace.xl,
+    paddingVertical: authSpace.xl,
   },
   iconCircle: {
     alignSelf: 'center',
@@ -119,34 +157,57 @@ const styles = StyleSheet.create({
     marginBottom: authSpace.xl,
     paddingHorizontal: authSpace.md,
   },
+  ctaShadow: {
+    alignSelf: 'stretch',
+    borderRadius: 30,
+    shadowColor: '#0A5CE0',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    elevation: 6,
+  },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: authSpace.sm,
-    alignSelf: 'center',
-    backgroundColor: authColors.ctaPrimaryBg,
-    paddingHorizontal: authSpace.xl,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 30,
+    overflow: 'hidden',
+  },
+  ctaSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '55%',
   },
   ctaText: {
-    color: authColors.ctaPrimaryText,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  secondaryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: authSpace.sm,
+    alignSelf: 'stretch',
+    paddingVertical: 15,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: authColors.accentBorder,
+    backgroundColor: authColors.accentSoft,
+  },
+  secondaryCtaText: {
+    color: authColors.accent,
     fontSize: 16,
     fontWeight: '600',
   },
-  secondary: {
-    alignSelf: 'center',
-    marginTop: authSpace.md,
-  },
-  secondaryText: {
-    color: authColors.accent,
-    fontSize: 15,
-    fontWeight: '600',
-  },
   skelSection: {
-    marginTop: authSpace.xxl,
+    marginVertical: authSpace.xl,
   },
+  skelSectionPlain: {},
   skelRow: {
     flexDirection: 'row',
     alignItems: 'center',
