@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function GuidelinesScreen() {
   const { formData, updateField, nextStep, setStep } = useCreatePlan();
@@ -14,7 +15,7 @@ export default function GuidelinesScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(8);
-    }, [setStep]),
+    }, [setStep])
   );
   const handleContinue = () => {
     updateField('guidelinesAccepted', true);
@@ -90,14 +91,7 @@ export default function GuidelinesScreen() {
 
       {/* Continue Button */}
       <View className="border-t border-gray-200 bg-white px-5 pb-8 pt-4">
-        <Pressable
-          onPress={handleContinue}
-          disabled={!accepted}
-          className={`items-center justify-center rounded-2xl py-4 ${
-            accepted ? 'bg-indigo-600' : 'bg-gray-300'
-          }`}>
-          <Text className="text-center text-lg font-semibold text-white">Continue</Text>
-        </Pressable>
+        <GradientButton label="Continue" onPress={handleContinue} disabled={!accepted} />
       </View>
     </SafeAreaView>
   );

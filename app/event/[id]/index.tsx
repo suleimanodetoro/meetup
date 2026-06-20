@@ -15,13 +15,13 @@ import {
 import { AppImage } from '~/components/AppImage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { shareContent } from '~/utils/share';
+import { GradientButton } from '~/components/GradientButton';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { Platform, ToastAndroid } from 'react-native';
 import { getInterestEmoji } from '~/utils/constants';
-
 
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
@@ -31,9 +31,22 @@ import { openReport } from '~/modules/safety';
 const { width, height } = Dimensions.get('window');
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$',
-  CHF: 'CHF', CNY: '¥', SEK: 'kr', NOK: 'kr', DKK: 'kr',
-  INR: '₹', NGN: '₦', ZAR: 'R', BRL: 'R$', MXN: 'MX$',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AUD: 'A$',
+  CAD: 'C$',
+  CHF: 'CHF',
+  CNY: '¥',
+  SEK: 'kr',
+  NOK: 'kr',
+  DKK: 'kr',
+  INR: '₹',
+  NGN: '₦',
+  ZAR: 'R',
+  BRL: 'R$',
+  MXN: 'MX$',
 };
 
 interface EventDetails {
@@ -81,8 +94,6 @@ interface EventDetails {
   }>;
 }
 
-
-
 export default function PlanDetailsScreen() {
   const { id, fromCreation } = useLocalSearchParams<{ id: string; fromCreation?: string }>();
   const { session } = useAuth();
@@ -90,10 +101,10 @@ export default function PlanDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [isAttending, setIsAttending] = useState(false);
-  
+
   // Check if we came from plan creation
   const isFromCreation = fromCreation === 'true';
-  
+
   const [expandedSections, setExpandedSections] = useState({
     about: true,
     interests: true,
@@ -114,7 +125,8 @@ export default function PlanDetailsScreen() {
     try {
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select(`
+        .select(
+          `
           *,
           creator:profiles!events_user_id_fkey(
             id,
@@ -140,7 +152,8 @@ export default function PlanDetailsScreen() {
             amount,
             is_optional
           )
-        `)
+        `
+        )
         .eq('id', Number(id))
         .single();
 
@@ -148,9 +161,7 @@ export default function PlanDetailsScreen() {
       setEvent(eventData as unknown as EventDetails);
 
       if (session?.user?.id) {
-        const isUserAttending = eventData.attendees?.some(
-          a => a.user.id === session.user.id
-        );
+        const isUserAttending = eventData.attendees?.some((a) => a.user.id === session.user.id);
         // The creator is the host of their own sidequest — always a member,
         // even if the attendance row never landed (e.g. an interrupted
         // creation), so they see the host state, not a "Join" button.
@@ -178,12 +189,10 @@ export default function PlanDetailsScreen() {
 
     setJoining(true);
     try {
-      const { error } = await supabase
-        .from('attendance')
-        .insert({
-          event_id: eventId,
-          user_id: session.user.id,
-        });
+      const { error } = await supabase.from('attendance').insert({
+        event_id: eventId,
+        user_id: session.user.id,
+      });
 
       if (error) throw error;
       router.push(`/chat/${id}` as never);
@@ -243,13 +252,11 @@ export default function PlanDetailsScreen() {
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({
+    setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
     }));
   };
-
-
 
   // FIXED: Handle back navigation properly
   const handleBack = () => {
@@ -266,14 +273,14 @@ export default function PlanDetailsScreen() {
     if (event?.cost !== undefined && event?.cost !== null) {
       return event.cost;
     }
-    
+
     if (event?.costs && event.costs.length > 0) {
       const total = event.costs
-        .filter(c => !c.is_optional && c.amount)
+        .filter((c) => !c.is_optional && c.amount)
         .reduce((sum, c) => sum + (c.amount || 0), 0);
       return total;
     }
-    
+
     return null;
   };
 
@@ -323,25 +330,15 @@ export default function PlanDetailsScreen() {
           ) : (
             <LinearGradient
               colors={['#3A4A63', '#243044']}
-              style={[styles.headerImage, styles.headerPlaceholder]}
-            >
+              style={[styles.headerImage, styles.headerPlaceholder]}>
               <Ionicons name="location" size={44} color="rgba(255,255,255,0.45)" />
-              {event.city ? (
-                <Text style={styles.headerPlaceholderText}>{event.city}</Text>
-              ) : null}
+              {event.city ? <Text style={styles.headerPlaceholderText}>{event.city}</Text> : null}
             </LinearGradient>
           )}
-          
+
           {/* FIXED: Back/Close Button - changes icon based on fromCreation */}
-          <Pressable 
-            style={styles.headerBackButton}
-            onPress={handleBack}
-          >
-            <Ionicons 
-              name={isFromCreation ? "close" : "arrow-back"} 
-              size={24} 
-              color="#000" 
-            />
+          <Pressable style={styles.headerBackButton} onPress={handleBack}>
+            <Ionicons name={isFromCreation ? 'close' : 'arrow-back'} size={24} color="#000" />
           </Pressable>
 
           {/* Share Button */}
@@ -368,11 +365,8 @@ export default function PlanDetailsScreen() {
               style={styles.locationRow}
               disabled={!event.city}
               onPress={() => openCityDetail(event.city)}
-              hitSlop={6}
-            >
-              <Text style={styles.locationFlag}>
-                {getCountryFlag(event.country_code)}
-              </Text>
+              hitSlop={6}>
+              <Text style={styles.locationFlag}>{getCountryFlag(event.country_code)}</Text>
               <Text style={styles.locationText}>
                 {/* Venue + city reads naturally ("Firewater, Dundee"); the flag
                     already conveys the country and the map pin shows the city.
@@ -380,9 +374,11 @@ export default function PlanDetailsScreen() {
                 {[event.location_name, event.city]
                   .filter(
                     (p, i, a) =>
-                      !!p && a.findIndex((x) => x?.toLowerCase() === p?.toLowerCase()) === i,
+                      !!p && a.findIndex((x) => x?.toLowerCase() === p?.toLowerCase()) === i
                   )
-                  .join(', ') || event.country || 'Location'}
+                  .join(', ') ||
+                  event.country ||
+                  'Location'}
               </Text>
               {event.city ? (
                 <Ionicons
@@ -398,120 +394,97 @@ export default function PlanDetailsScreen() {
           {/* Date */}
           <View style={styles.dateRow}>
             <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-            <Text style={styles.dateText}>
-              {formatDate(event.date, event.end_date)}
-            </Text>
+            <Text style={styles.dateText}>{formatDate(event.date, event.end_date)}</Text>
           </View>
 
           {/* Attendees */}
           <View style={styles.attendeesSection}>
             <View style={styles.avatarStack}>
-              {event.attendees?.slice(0, 5).map((attendee, index) => (
-                attendee.user.avatar_url ? (
-                  <AppImage
-                    key={attendee.user.id}
-                    source={{ uri: attendee.user.avatar_url }}
-                    style={[
-                      styles.attendeeAvatar,
-                      { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
-                    ]}
-                  />
-                ) : (
-                  <InitialsAvatar
-                    key={attendee.user.id}
-                    name={attendee.user.full_name}
-                    id={attendee.user.id}
-                    size={44}
-                    style={[
-                      styles.attendeeAvatar,
-                      { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
-                    ]}
-                  />
-                )
-              ))}
+              {event.attendees
+                ?.slice(0, 5)
+                .map((attendee, index) =>
+                  attendee.user.avatar_url ? (
+                    <AppImage
+                      key={attendee.user.id}
+                      source={{ uri: attendee.user.avatar_url }}
+                      style={[
+                        styles.attendeeAvatar,
+                        { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
+                      ]}
+                    />
+                  ) : (
+                    <InitialsAvatar
+                      key={attendee.user.id}
+                      name={attendee.user.full_name}
+                      id={attendee.user.id}
+                      size={44}
+                      style={[
+                        styles.attendeeAvatar,
+                        { marginLeft: index > 0 ? -15 : 0, zIndex: 5 - index },
+                      ]}
+                    />
+                  )
+                )}
               {attendeeCount > 5 && (
                 <View style={[styles.moreAttendees, { marginLeft: -15, zIndex: 0 }]}>
-                  <Text style={styles.moreAttendeesText}>
-                    +{attendeeCount - 5}
-                  </Text>
+                  <Text style={styles.moreAttendeesText}>+{attendeeCount - 5}</Text>
                 </View>
               )}
             </View>
           </View>
 
           {/* Join Button */}
-          <Pressable
+          <GradientButton
+            label={isAttending ? 'Open Chat' : 'Join Chat'}
             onPress={isAttending ? () => router.push(`/chat/${id}`) : handleJoinPlan}
-            disabled={joining}
-          >
-            <LinearGradient
-              colors={['#007AFF', '#0051D5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.joinButton}
-            >
-              {joining ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.joinButtonText}>
-                  {isAttending ? 'Open Chat' : 'Join Chat'}
-                </Text>
-              )}
-            </LinearGradient>
-          </Pressable>
+            loading={joining}
+            style={{ marginBottom: 32 }}
+          />
 
           {/* About Section */}
-          <Pressable 
-            style={styles.section}
-            onPress={() => toggleSection('about')}
-          >
+          <Pressable style={styles.section} onPress={() => toggleSection('about')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>About Trip</Text>
-              <Ionicons 
-                name={expandedSections.about ? 'chevron-down' : 'chevron-forward'} 
-                size={20} 
-                color="#000" 
+              <Ionicons
+                name={expandedSections.about ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color="#000"
               />
             </View>
-            {expandedSections.about && (
-              <Text style={styles.description}>{event.description}</Text>
-            )}
+            {expandedSections.about && <Text style={styles.description}>{event.description}</Text>}
           </Pressable>
 
           {/* Cost Section */}
           {(costDisplay || (event.costs && event.costs.length > 0)) && (
-            <Pressable 
-              style={styles.section}
-              onPress={() => toggleSection('cost')}
-            >
+            <Pressable style={styles.section} onPress={() => toggleSection('cost')}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Cost Details</Text>
-                <Ionicons 
-                  name={expandedSections.cost ? 'chevron-down' : 'chevron-forward'} 
-                  size={20} 
-                  color="#000" 
+                <Ionicons
+                  name={expandedSections.cost ? 'chevron-down' : 'chevron-forward'}
+                  size={20}
+                  color="#000"
                 />
               </View>
               {expandedSections.cost && (
                 <View>
-                  {event.costs && event.costs.length > 0 && !event.costs.some(c => c.item_name === 'No expected cost') && (
-                    <View style={styles.costBreakdown}>
-                      {event.costs.map((cost, index) => (
-                        <View key={index} style={styles.costItem}>
-                          <Text style={styles.costItemName}>
-                            {cost.item_name}
-                            {cost.is_optional && ' (optional)'}
-                          </Text>
-                          {cost.amount !== undefined && cost.amount !== null && (
-                            <Text style={styles.costItemAmount}>
-                              {formatCost(cost.amount)}
+                  {event.costs &&
+                    event.costs.length > 0 &&
+                    !event.costs.some((c) => c.item_name === 'No expected cost') && (
+                      <View style={styles.costBreakdown}>
+                        {event.costs.map((cost, index) => (
+                          <View key={index} style={styles.costItem}>
+                            <Text style={styles.costItemName}>
+                              {cost.item_name}
+                              {cost.is_optional && ' (optional)'}
                             </Text>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  
+                            {cost.amount !== undefined && cost.amount !== null && (
+                              <Text style={styles.costItemAmount}>{formatCost(cost.amount)}</Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
                   <View style={styles.costTotalContainer}>
                     <Text style={styles.costTotalLabel}>Estimated Total</Text>
                     <Text style={styles.costTotalAmount}>{costDisplay || 'Free'}</Text>
@@ -523,16 +496,13 @@ export default function PlanDetailsScreen() {
 
           {/* Interests Section */}
           {event.interests && event.interests.length > 0 && (
-            <Pressable 
-              style={styles.section}
-              onPress={() => toggleSection('interests')}
-            >
+            <Pressable style={styles.section} onPress={() => toggleSection('interests')}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Interests</Text>
-                <Ionicons 
-                  name={expandedSections.interests ? 'chevron-down' : 'chevron-forward'} 
-                  size={20} 
-                  color="#000" 
+                <Ionicons
+                  name={expandedSections.interests ? 'chevron-down' : 'chevron-forward'}
+                  size={20}
+                  color="#000"
                 />
               </View>
               {expandedSections.interests && (
@@ -540,9 +510,7 @@ export default function PlanDetailsScreen() {
                   {event.interests.map((interest, index) => (
                     <View key={index} style={styles.interestItem}>
                       <View style={styles.interestIconContainer}>
-                        <Text style={styles.interestEmoji}>
-                          {getInterestEmoji(interest)}
-                        </Text>
+                        <Text style={styles.interestEmoji}>{getInterestEmoji(interest)}</Text>
                       </View>
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
@@ -555,10 +523,7 @@ export default function PlanDetailsScreen() {
           {/* Venues/Destinations Section */}
           {event.venues && event.venues.length > 0 && (
             <View style={styles.section}>
-              <Pressable
-                style={styles.sectionHeader}
-                onPress={() => toggleSection('destinations')}
-              >
+              <Pressable style={styles.sectionHeader} onPress={() => toggleSection('destinations')}>
                 <Text style={styles.sectionTitle}>Destinations</Text>
                 <Ionicons
                   name={expandedSections.destinations ? 'chevron-down' : 'chevron-forward'}
@@ -579,15 +544,13 @@ export default function PlanDetailsScreen() {
                           `${venue.venue_name}${venue.venue_city ? `, ${venue.venue_city}` : ''}`
                         )
                       }
-                      android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
-                    >
+                      android_ripple={{ color: 'rgba(0,0,0,0.05)' }}>
                       {/* Local solid behind the gradient/label — venues have no
                           photo, so the old random picsum was wasted egress + flicker. */}
                       <View style={[styles.destinationImage, { backgroundColor: '#3A4A63' }]} />
                       <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.8)']}
-                        style={styles.destinationGradient}
-                      >
+                        style={styles.destinationGradient}>
                         <Text style={styles.destinationName}>{venue.venue_name}</Text>
                         {venue.venue_address && (
                           <Text style={styles.destinationAddress}>{venue.venue_address}</Text>
@@ -601,23 +564,19 @@ export default function PlanDetailsScreen() {
           )}
 
           {/* Managed By Section */}
-          <Pressable 
-            style={styles.section}
-            onPress={() => toggleSection('managedBy')}
-          >
+          <Pressable style={styles.section} onPress={() => toggleSection('managedBy')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Managed By</Text>
-              <Ionicons 
-                name={expandedSections.managedBy ? 'chevron-down' : 'chevron-forward'} 
-                size={20} 
-                color="#000" 
+              <Ionicons
+                name={expandedSections.managedBy ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color="#000"
               />
             </View>
             {expandedSections.managedBy && event.creator && (
               <Pressable
                 style={styles.organizerRow}
-                onPress={() => router.push(`/profile/${event.creator!.id}`)}
-              >
+                onPress={() => router.push(`/profile/${event.creator!.id}`)}>
                 {event.creator.avatar_url ? (
                   <AppImage
                     source={{ uri: event.creator.avatar_url }}
@@ -652,8 +611,7 @@ export default function PlanDetailsScreen() {
                 reportedUserId: event.creator?.id ?? null,
                 name: event.title,
               })
-            }
-          >
+            }>
             <Text style={styles.reportText}>Report Group</Text>
           </Pressable>
         </View>

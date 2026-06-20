@@ -1,14 +1,6 @@
 // app/create-plan/review.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  SafeAreaView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, SafeAreaView, Alert } from 'react-native';
 import { AppImage } from '~/components/AppImage';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +10,7 @@ import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { decode } from 'base64-arraybuffer';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function ReviewScreen() {
   const { formData, resetForm, setStep } = useCreatePlan();
@@ -34,7 +27,7 @@ export default function ReviewScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(9);
-    }, [setStep]),
+    }, [setStep])
   );
 
   const handleCreatePlan = async () => {
@@ -60,9 +53,7 @@ export default function ReviewScreen() {
 
         if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
 
-        const { data: publicData } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
+        const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(fileName);
         imageUrl = publicData.publicUrl;
       }
 
@@ -71,7 +62,7 @@ export default function ReviewScreen() {
       const destinations = formData.destinations || [];
       const costs = formData.costs || [];
       const interests = formData.interests || [];
-      
+
       const eventData = {
         title: formData.title,
         description: formData.description,
@@ -97,7 +88,7 @@ export default function ReviewScreen() {
         console.error('Event creation error:', eventError);
         throw new Error(`Failed to create event: ${eventError.message}`);
       }
-      
+
       if (!event) {
         throw new Error('No event data returned from database');
       }
@@ -119,10 +110,10 @@ export default function ReviewScreen() {
       }
 
       // Step 4: Add costs
-      if (costs.length > 0 && !costs.some(c => c.name === 'No expected cost')) {
+      if (costs.length > 0 && !costs.some((c) => c.name === 'No expected cost')) {
         const costsData = costs
-          .filter(c => c.name && c.name.trim())
-          .map(cost => ({
+          .filter((c) => c.name && c.name.trim())
+          .map((cost) => ({
             event_id: event.id,
             item_name: cost.name,
             amount: cost.amount || 0,
@@ -135,14 +126,13 @@ export default function ReviewScreen() {
       }
 
       // Step 5: IMPORTANT - Add creator as attendee (this triggers conversation creation)
-      const { error: attendanceError } = await supabase
-        .from('attendance')
-        .insert({
-          event_id: event.id,
-          user_id: session.user.id,
-        });
+      const { error: attendanceError } = await supabase.from('attendance').insert({
+        event_id: event.id,
+        user_id: session.user.id,
+      });
 
-      if (attendanceError && attendanceError.code !== '23505') { // Ignore if already exists
+      if (attendanceError && attendanceError.code !== '23505') {
+        // Ignore if already exists
         console.error('Failed to join event:', attendanceError);
       }
 
@@ -162,64 +152,64 @@ export default function ReviewScreen() {
             type: 'group',
             name: formData.title,
             event_id: event.id,
-            avatar_url: imageUrl
+            avatar_url: imageUrl,
           })
           .select()
           .single();
 
         if (!convError && newConv) {
           // Add creator as participant
-          await supabase
-            .from('conversation_participants')
-            .insert({
-              conversation_id: newConv.id,
-              user_id: session.user.id,
-            });
+          await supabase.from('conversation_participants').insert({
+            conversation_id: newConv.id,
+            user_id: session.user.id,
+          });
         }
       }
 
       // Step 7: Navigate WITHOUT resetting form immediately
       const eventId = event.id;
 
-    // Pass fromCreation=true to show X button
-    router.replace({
-      pathname: '/event/[id]',
-      params: { id: String(eventId), fromCreation: 'true' }
-    });
-    
-    // Optional: Reset form after a delay to ensure navigation completes
-    setTimeout(() => {
-      resetForm();
-    }, 500);
+      // Pass fromCreation=true to show X button
+      router.replace({
+        pathname: '/event/[id]',
+        params: { id: String(eventId), fromCreation: 'true' },
+      });
 
-  } catch (error: any) {
-    Alert.alert('Creation Failed', error?.message || 'An unexpected error occurred. Please try again.');
-  } finally {
-    setCreating(false);
-  }
-};
+      // Optional: Reset form after a delay to ensure navigation completes
+      setTimeout(() => {
+        resetForm();
+      }, 500);
+    } catch (error: any) {
+      Alert.alert(
+        'Creation Failed',
+        error?.message || 'An unexpected error occurred. Please try again.'
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const calculateTotalCost = () => {
     const costs = formData.costs || [];
-    if (costs.length === 0 || costs.some(c => c.name === 'No expected cost')) {
+    if (costs.length === 0 || costs.some((c) => c.name === 'No expected cost')) {
       return 'Free';
     }
-    
+
     const total = costs
-      .filter(c => !c.isOptional && c.amount)
+      .filter((c) => !c.isOptional && c.amount)
       .reduce((sum, c) => sum + (c.amount || 0), 0);
-    
-    const optionalCount = costs.filter(c => c.isOptional).length;
-    
+
+    const optionalCount = costs.filter((c) => c.isOptional).length;
+
     if (total === 0 && optionalCount > 0) {
       return 'Optional costs only';
     }
-    
+
     return `$${total.toFixed(2)}${optionalCount > 0 ? ' + optional' : ''}`;
   };
 
   const EditButton = ({ onPress }: { onPress: () => void }) => (
-    <Pressable onPress={onPress} className="py-1 px-3">
+    <Pressable onPress={onPress} className="px-3 py-1">
       <Text className="text-sm font-medium text-indigo-600">Edit</Text>
     </Pressable>
   );
@@ -233,7 +223,7 @@ export default function ReviewScreen() {
       <StepperProgress currentStep={9} totalSteps={9} />
 
       <ScrollView className="flex-1">
-        <View className="px-6 pt-8 pb-6">
+        <View className="px-6 pb-6 pt-8">
           <Text className="text-3xl font-bold">Review</Text>
           <Text className="mt-1 text-base text-gray-600">Check everything looks good</Text>
 
@@ -312,7 +302,7 @@ export default function ReviewScreen() {
               </View>
               {formData.venues.map((venue, index) => (
                 <View key={index} className="mb-2">
-                  <Text className="text-gray-900 font-medium">{venue.name}</Text>
+                  <Text className="font-medium text-gray-900">{venue.name}</Text>
                   {venue.address && <Text className="text-sm text-gray-600">{venue.address}</Text>}
                   {venue.city && <Text className="text-sm text-gray-600">{venue.city}</Text>}
                 </View>
@@ -349,21 +339,25 @@ export default function ReviewScreen() {
             </View>
             <Text className="text-lg font-semibold text-gray-900">{calculateTotalCost()}</Text>
 
-            {formData.costs && formData.costs.length > 0 && !formData.costs.some(c => c.name === 'No expected cost') && (
-              <View className="mt-3 border-t border-gray-200 pt-3">
-                {formData.costs.map((cost, index) => (
-                  <View key={index} className="mb-2 flex-row items-baseline justify-between">
-                    <Text className="text-[15px] text-gray-900">
-                      {cost.name}
-                      {cost.isOptional ? ' (optional)' : ''}
-                    </Text>
-                    {typeof cost.amount === 'number' && (
-                      <Text className="text-sm font-medium text-gray-700">${cost.amount.toFixed(2)}</Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
+            {formData.costs &&
+              formData.costs.length > 0 &&
+              !formData.costs.some((c) => c.name === 'No expected cost') && (
+                <View className="mt-3 border-t border-gray-200 pt-3">
+                  {formData.costs.map((cost, index) => (
+                    <View key={index} className="mb-2 flex-row items-baseline justify-between">
+                      <Text className="text-[15px] text-gray-900">
+                        {cost.name}
+                        {cost.isOptional ? ' (optional)' : ''}
+                      </Text>
+                      {typeof cost.amount === 'number' && (
+                        <Text className="text-sm font-medium text-gray-700">
+                          ${cost.amount.toFixed(2)}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
           </View>
 
           {/* Guidelines */}
@@ -391,17 +385,7 @@ export default function ReviewScreen() {
 
       {/* Create Button */}
       <View className="border-t border-gray-200 bg-white px-5 pb-8 pt-4">
-        <Pressable
-          onPress={handleCreatePlan}
-          disabled={creating}
-          className={`items-center justify-center rounded-2xl py-4 ${creating ? 'bg-indigo-400' : 'bg-indigo-600'}`}
-        >
-          {creating ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text className="text-center text-lg font-semibold text-white">Create Plan</Text>
-          )}
-        </Pressable>
+        <GradientButton label="Create Plan" onPress={handleCreatePlan} loading={creating} />
       </View>
     </SafeAreaView>
   );

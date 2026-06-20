@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 import { SORTED_INTERESTS as INTERESTS, type InterestId } from '~/utils/constants';
 
 export default function InterestsScreen() {
@@ -20,9 +21,8 @@ export default function InterestsScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(6);
-    }, [setStep]),
+    }, [setStep])
   );
-
 
   const toggleInterest = (id: InterestId) => {
     if (selectedInterests.includes(id)) {
@@ -80,15 +80,11 @@ export default function InterestsScreen() {
 
       {/* Continue Button */}
       <View style={styles.footer}>
-        <Pressable
+        <GradientButton
+          label="Continue"
           onPress={handleContinue}
           disabled={selectedInterests.length === 0}
-          style={[
-            styles.continueButton,
-            selectedInterests.length === 0 && styles.continueButtonDisabled,
-          ]}>
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </Pressable>
+        />
       </View>
     </SafeAreaView>
   );

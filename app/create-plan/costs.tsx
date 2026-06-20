@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 interface CostItem {
   name: string;
@@ -40,7 +41,7 @@ export default function CostsScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(7);
-    }, [setStep]),
+    }, [setStep])
   );
 
   const addCostItem = () => {
@@ -163,12 +164,7 @@ export default function CostsScreen() {
 
       {/* Continue Button */}
       <View style={styles.footer}>
-        <Pressable
-          onPress={handleContinue}
-          disabled={!canContinue}
-          style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}>
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </Pressable>
+        <GradientButton label="Continue" onPress={handleContinue} disabled={!canContinue} />
       </View>
     </SafeAreaView>
   );

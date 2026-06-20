@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function PlanNameScreen() {
   const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
@@ -28,7 +28,7 @@ export default function PlanNameScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(1); // re-assert on focus so back-nav restores the right step
-    }, [setStep]),
+    }, [setStep])
   );
 
   const handleContinue = () => {
@@ -42,8 +42,7 @@ export default function PlanNameScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* Header */}
         <CreatePlanHeader />
 
@@ -65,9 +64,7 @@ export default function PlanNameScreen() {
           />
 
           <View style={styles.helperRow}>
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-            )}
+            {isValid && <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />}
             <Text style={[styles.helperText, isValid && styles.helperTextValid]}>
               No more than 60 characters
             </Text>
@@ -76,16 +73,7 @@ export default function PlanNameScreen() {
 
         {/* Continue Button */}
         <View style={styles.footer}>
-          <Pressable
-            onPress={handleContinue}
-            disabled={!isValid}
-            style={[
-              styles.continueButton,
-              !isValid && styles.continueButtonDisabled,
-            ]}
-          >
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </Pressable>
+          <GradientButton label="Continue" onPress={handleContinue} disabled={!isValid} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

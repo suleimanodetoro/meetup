@@ -1,19 +1,13 @@
 // app/create-plan/date.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Switch,
-} from 'react-native';
+import { View, Text, Pressable, SafeAreaView, StyleSheet, Switch } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function DateScreen() {
   const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
@@ -34,7 +28,7 @@ export default function DateScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(4);
-    }, [setStep]),
+    }, [setStep])
   );
 
   const handleContinue = () => {
@@ -96,15 +90,10 @@ export default function DateScreen() {
         </View>
 
         {/* Date Fields */}
-        <Pressable
-          onPress={() => setShowStartPicker(true)}
-          style={styles.dateField}
-        >
+        <Pressable onPress={() => setShowStartPicker(true)} style={styles.dateField}>
           <Ionicons name="calendar-outline" size={20} color="#666" />
           <View style={styles.dateContent}>
-            <Text style={styles.dateLabel}>
-              {isOneDay ? 'Date' : 'Start Date'}
-            </Text>
+            <Text style={styles.dateLabel}>{isOneDay ? 'Date' : 'Start Date'}</Text>
             <Text style={styles.dateValue}>
               {formatDate(startDate)}
               {!isAllDay && ` at ${formatTime(startDate)}`}
@@ -113,10 +102,7 @@ export default function DateScreen() {
         </Pressable>
 
         {!isOneDay && (
-          <Pressable
-            onPress={() => setShowEndPicker(true)}
-            style={styles.dateField}
-          >
+          <Pressable onPress={() => setShowEndPicker(true)} style={styles.dateField}>
             <Ionicons name="calendar-outline" size={20} color="#666" />
             <View style={styles.dateContent}>
               <Text style={styles.dateLabel}>End Date</Text>
@@ -131,12 +117,7 @@ export default function DateScreen() {
 
       {/* Continue Button */}
       <View style={styles.footer}>
-        <Pressable
-          onPress={handleContinue}
-          style={styles.continueButton}
-        >
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </Pressable>
+        <GradientButton label="Continue" onPress={handleContinue} />
       </View>
 
       {/* Date Pickers */}

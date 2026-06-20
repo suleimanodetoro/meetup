@@ -4,9 +4,9 @@
 // sidequest (secondary) below — both lead to having conversations.
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Share } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { GradientButton } from '~/components/GradientButton';
 import { authColors, authSpace } from '~/utils/authTheme';
 import { display } from '~/utils/fonts';
 
@@ -53,37 +53,6 @@ export function ChatSkeletons({ count = 6 }: { count?: number }) {
   );
 }
 
-// Primary CTA with a diagonal gradient + a top sheen for a glassy, refractive look.
-function GradientCTA({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.ctaShadow} accessibilityRole="button">
-      <LinearGradient
-        colors={['#3D9BFF', '#0A5CE0']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.cta}>
-        <LinearGradient
-          colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.ctaSheen}
-          pointerEvents="none"
-        />
-        <Ionicons name={icon} size={18} color="#fff" />
-        <Text style={styles.ctaText}>{label}</Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
 /** Empty state: invite CTA → skeleton preview → start-a-sidequest CTA. */
 export function EmptyChats() {
   const pulse = usePulse();
@@ -103,7 +72,7 @@ export function EmptyChats() {
       </Text>
 
       {/* Top CTA */}
-      <GradientCTA icon="person-add" label="Invite friends" onPress={invite} />
+      <GradientButton icon="person-add" label="Invite friends" onPress={invite} />
 
       {/* Sandwiched skeleton preview */}
       <View style={styles.skelSection}>

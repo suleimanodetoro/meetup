@@ -4,19 +4,12 @@
 // pre-fill the create form, or skip straight to a blank custom sidequest.
 // Optional and skippable — never forced.
 import React, { useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, Pressable, SafeAreaView, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 interface Suggestion {
   id: number;
@@ -172,15 +165,12 @@ export default function CreateIntentScreen() {
           })}
         </View>
 
-        <Pressable onPress={suggest} disabled={loading} style={styles.suggestButton}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.suggestText}>
-              {results ? 'Suggest again' : 'Suggest sidequests'}
-            </Text>
-          )}
-        </Pressable>
+        <GradientButton
+          label={results ? 'Suggest again' : 'Suggest sidequests'}
+          onPress={suggest}
+          loading={loading}
+          style={{ marginTop: 28 }}
+        />
 
         {results !== null && !loading && (
           <View style={styles.results}>
@@ -295,7 +285,13 @@ const styles = StyleSheet.create({
   },
   suggestText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   results: { marginTop: 20, gap: 12 },
-  emptyText: { fontSize: 15, color: '#666', textAlign: 'center', paddingVertical: 12, lineHeight: 21 },
+  emptyText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    paddingVertical: 12,
+    lineHeight: 21,
+  },
   card: {
     backgroundColor: '#F8F9FA',
     borderRadius: 16,
@@ -305,7 +301,13 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 4 },
   cardDare: { fontSize: 14, color: '#555', lineHeight: 20 },
-  cardMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6, flexWrap: 'wrap' },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
+    flexWrap: 'wrap',
+  },
   cardMeta: { fontSize: 13, color: '#777', fontWeight: '600' },
   cardMetaDot: { fontSize: 13, color: '#bbb' },
   cardReason: { fontSize: 13, color: '#007AFF', fontWeight: '600' },

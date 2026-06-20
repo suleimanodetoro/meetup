@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { GradientButton } from '~/components/GradientButton';
 
 export default function AboutActivityScreen() {
   const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
@@ -27,7 +27,7 @@ export default function AboutActivityScreen() {
   useFocusEffect(
     useCallback(() => {
       setStep(3);
-    }, [setStep]),
+    }, [setStep])
   );
 
   const handleContinue = () => {
@@ -82,12 +82,7 @@ export default function AboutActivityScreen() {
 
         {/* Continue Button */}
         <View style={styles.footer}>
-          <Pressable
-            onPress={handleContinue}
-            disabled={!isValid}
-            style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}>
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </Pressable>
+          <GradientButton label="Continue" onPress={handleContinue} disabled={!isValid} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

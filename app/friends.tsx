@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppImage } from '~/components/AppImage';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
+import { GradientButton } from '~/components/GradientButton';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -100,9 +101,11 @@ export default function FriendsScreen() {
               <Text style={styles.emptyBody}>
                 Find people doing sidequests near you and add them to your crew.
               </Text>
-              <Pressable style={styles.cta} onPress={() => router.push('/search-users')}>
-                <Text style={styles.ctaText}>Find people</Text>
-              </Pressable>
+              <GradientButton
+                label="Find people"
+                onPress={() => router.push('/search-users')}
+                style={{ alignSelf: 'center' }}
+              />
             </View>
           }
         />
