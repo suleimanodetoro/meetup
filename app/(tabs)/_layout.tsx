@@ -22,10 +22,6 @@ const C = {
   badge: '#007AFF',
 };
 
-// The people-only Map tab is folded into the home (now a unified sidequests +
-// people map). The route file stays for now but is hidden from the bar.
-const HIDDEN_TABS = new Set(['map']);
-
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -45,7 +41,6 @@ export default function TabLayout() {
           headerShown: false,
         }}>
         <Tabs.Screen name="index" options={{ title: 'Home' }} />
-        <Tabs.Screen name="map" options={{ title: 'Map' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
         <Tabs.Screen name="chats" options={{ title: 'Chats' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
@@ -91,7 +86,8 @@ function WaypointTabBar({
     };
   }, [session?.user?.id, state.index]);
 
-  const visibleRoutes = state.routes.filter((r: any) => !HIDDEN_TABS.has(r.name));
+  // The home is the unified map now; every registered tab is shown.
+  const visibleRoutes = state.routes;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(bottomInset, 12) }]}>

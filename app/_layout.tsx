@@ -98,7 +98,6 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'friend-requests',
       'friends',
       'my-sidequests',
-      'explore',
       'search',
       'report',
     ];
@@ -225,7 +224,6 @@ export default function RootLayout() {
                 <Stack.Screen name="settings/privacy" />
                 <Stack.Screen name="search-users" />
                 <Stack.Screen name="friend-requests" />
-                <Stack.Screen name="explore" />
                 <Stack.Screen name="search" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="report" options={{ presentation: 'modal' }} />
 
