@@ -1,6 +1,6 @@
 // app/(tabs)/profile.tsx
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,7 +15,7 @@ import { AppImage } from '~/components/AppImage';
 import Mapbox, { Camera, MapView } from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
@@ -242,9 +242,17 @@ export default function ProfileScreen() {
     session?.user?.id,
   ]);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  // Refetch on focus (not just mount) so values edited elsewhere — e.g. saving
+  // in edit-profile then router.back() — render fresh instead of showing this
+  // screen's stale local `profile` state. useFocusEffect fires on the initial
+  // mount-focus AND every time the tab is re-revealed, so it doubles as the
+  // first load; `loading` is only flipped false in fetchAll's finally, so
+  // refocus refreshes in the background without a spinner flash.
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll])
+  );
 
   const countryCode = profile?.location_country_code || profile?.nationality_code || 'GB';
   const countryLabel = profile?.location_country || profile?.nationality || 'United Kingdom';

@@ -121,7 +121,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'nationality',
-    title: 'Where are you from?',
+    title: 'What is your nationality?',
     subtitle: 'This is about your background, not where you are right now.',
     Body: NationalityField,
     read: (p): NationalityValue | undefined =>
@@ -134,7 +134,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'gender',
-    title: 'Tell us who you are',
+    title: 'How do you identify yourself?',
     Body: GenderField,
     read: (p) => p.gender ?? undefined,
     isValid: (v: string | undefined) => !!v,
@@ -163,7 +163,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'picture',
-    title: 'add a picture',
+    title: 'Add a picture',
     subtitle: 'let others know what you look like 📸',
     skippable: true,
     Body: PictureField,
@@ -181,7 +181,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'languages',
-    title: 'languages you speak',
+    title: 'Languages you speak',
     subtitle: 'select all that apply 🌍',
     skippable: true,
     Body: LanguagesField,
@@ -193,7 +193,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'bio',
-    title: 'tell us about yourself',
+    title: 'Tell us a bit about you',
     subtitle: 'what should people know 👀',
     skippable: true,
     Body: BioField,
@@ -205,7 +205,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'preferences',
-    title: 'how do you prefer to\nmeet up?',
+    title: 'How do you prefer to\nmeet up?',
     subtitle: 'helps us suggest the right kind of sidequests',
     Body: PreferencesField,
     read: (p) => p.meeting_preference ?? undefined,
@@ -216,7 +216,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'gender-preference',
-    title: 'who do you want to\nmeet?',
+    title: 'Who would you like to\nmeet?',
     subtitle: 'this helps keep your suggestions relevant',
     Body: GenderPreferenceField,
     read: (p) => p.gender_preference ?? undefined,
@@ -299,7 +299,7 @@ export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
   },
   {
     slug: 'rating',
-    title: 'ENJOYING THE APP?',
+    title: 'Enjoying the app?',
     hideHeader: true,
     noScroll: true,
     Body: RatingBody,

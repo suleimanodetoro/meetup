@@ -95,10 +95,16 @@ export const MEETING_PREFERENCES = [
 export type MeetingPreferenceId = (typeof MEETING_PREFERENCES)[number]['id'];
 
 // ============= GENDER OPTIONS =============
+// Canonical gender set. Must stay in sync with the profiles.gender CHECK
+// constraint (see migration 20260626120000_widen_profiles_gender_check.sql) and
+// the onboarding selector (modules/onboarding/fields/GenderField.tsx, which
+// labels 'male'/'female' as Man/Woman and hides the last three behind "+ More").
 export const GENDER_OPTIONS = [
-  { id: 'male', label: 'Male', emoji: '🙋‍♂️' },
-  { id: 'female', label: 'Female', emoji: '🙋‍♀️' },
+  { id: 'male', label: 'Man', emoji: '🙋‍♂️' },
+  { id: 'female', label: 'Woman', emoji: '🙋‍♀️' },
+  { id: 'non-binary', label: 'Non-binary', emoji: '🌈' },
   { id: 'other', label: 'Other', emoji: '🦄' },
+  { id: 'prefer-not-to-say', label: 'Prefer not to say', emoji: '🤐' },
 ] as const;
 
 export type GenderId = (typeof GENDER_OPTIONS)[number]['id'];

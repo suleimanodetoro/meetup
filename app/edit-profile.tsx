@@ -19,7 +19,7 @@ import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import { COUNTRIES } from '~/utils/countryFlags';
-import { LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
+import { GENDER_OPTIONS, type GenderId, LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
 import { useAuth } from '~/contexts/AuthProvider';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
 import { removeStorageObjectsByUrl } from '~/utils/storage';
@@ -142,10 +142,10 @@ export default function EditProfile() {
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
 
-  // Gender & Preferences. The values mirror onboarding-gender's options
-  // (male / female / other) — using a wider union here silently dropped
-  // any onboarding-written 'other' into a state with no rendered option.
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | null>(null);
+  // Gender & Preferences. Full canonical set (GENDER_OPTIONS) so an
+  // onboarding-written 'non-binary' / 'prefer-not-to-say' round-trips through an
+  // edit instead of being silently downgraded to 'other'.
+  const [gender, setGender] = useState<GenderId | null>(null);
   const [genderPreference, setGenderPreference] = useState<'everyone' | 'guys' | 'girls'>(
     'everyone'
   );
@@ -272,12 +272,11 @@ export default function EditProfile() {
           const foundCountry = byCode ?? byName ?? null;
           setCountry(foundCountry);
 
-          // gender / gender_preference. Normalize any legacy values to the
-          // onboarding-aligned set; everything else falls through to 'other'.
+          // gender / gender_preference. Keep the stored value if it's one of the
+          // canonical ids; only truly unknown legacy junk falls back to 'other'.
           if (profile.gender) {
-            const normalised: 'male' | 'female' | 'other' =
-              profile.gender === 'male' || profile.gender === 'female' ? profile.gender : 'other';
-            setGender(normalised);
+            const known = GENDER_OPTIONS.some((g) => g.id === profile.gender);
+            setGender(known ? (profile.gender as GenderId) : 'other');
           }
           if (profile.gender_preference) {
             const gp = profile.gender_preference as 'everyone' | 'guys' | 'girls';
@@ -720,35 +719,36 @@ export default function EditProfile() {
 
         {/* Gender */}
         <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>Gender</Text>
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-          {(['male', 'female', 'other'] as const).map((opt) => (
-            <Pressable
-              key={opt}
-              onPress={() => setGender(opt)}
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: gender === opt ? '#007AFF' : '#E0E0E0',
-                backgroundColor: gender === opt ? '#EAF3FF' : 'white',
-              }}>
-              <Text style={{ fontSize: 18, marginRight: 6 }}>
-                {opt === 'male' ? '👨' : opt === 'female' ? '👩' : '✨'}
-              </Text>
-              <Text
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+          {GENDER_OPTIONS.map((opt) => {
+            const selected = gender === opt.id;
+            return (
+              <Pressable
+                key={opt.id}
+                onPress={() => setGender(opt.id)}
                 style={{
-                  fontSize: 14,
-                  fontWeight: gender === opt ? '600' : '400',
-                  color: gender === opt ? '#007AFF' : '#666',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: selected ? '#007AFF' : '#E0E0E0',
+                  backgroundColor: selected ? '#EAF3FF' : 'white',
                 }}>
-                {opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </Text>
-            </Pressable>
-          ))}
+                <Text style={{ fontSize: 18, marginRight: 6 }}>{opt.emoji}</Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: selected ? '600' : '400',
+                    color: selected ? '#007AFF' : '#666',
+                  }}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* Gender Preference */}

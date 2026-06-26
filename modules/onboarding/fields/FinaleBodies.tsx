@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   Linking,
   Platform,
   StyleSheet,
@@ -12,6 +13,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
+
+// Survey "social proof" bubbles + the founder-note headshot on the rating step.
+const REVIEW_AVATARS = [
+  require('~/assets/onboarding/review_avatar_1.png'),
+  require('~/assets/onboarding/review_avatar_2.png'),
+  require('~/assets/onboarding/review_avatar_3.png'),
+];
+const FOUNDER_AVATAR = require('~/assets/onboarding/founder.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONFETTI_COLORS = [
@@ -242,7 +251,7 @@ export function RatingBody() {
   return (
     <View style={styles.ratingContainer}>
       <View style={styles.ratingTop}>
-        <Text style={styles.ratingTitle}>ENJOYING THE APP?</Text>
+        <Text style={styles.ratingTitle}>Enjoying the app?</Text>
       </View>
 
       <View style={styles.ratingScoreCard}>
@@ -262,13 +271,13 @@ export function RatingBody() {
       </View>
 
       <View style={styles.ratingSocialProof}>
-        <Text style={styles.ratingSocialTitle}>Waypoint was made for travelers like you</Text>
+        <Text style={styles.ratingSocialTitle}>Waypoint was made for people like you</Text>
         <View style={styles.avatarStack}>
-          {['S', 'W', 'O'].map((initial, index) => (
+          {REVIEW_AVATARS.map((src, index) => (
             <View
-              key={`${initial}-${index}`}
+              key={index}
               style={[styles.surveyAvatar, index > 0 && styles.avatarOverlap]}>
-              <Text style={styles.surveyAvatarText}>{initial}</Text>
+              <Image source={src} style={styles.surveyAvatarImage} resizeMode="cover" />
             </View>
           ))}
         </View>
@@ -280,10 +289,10 @@ export function RatingBody() {
       <View style={styles.reviewCard}>
         <View style={styles.reviewHeader}>
           <View style={styles.reviewerAvatar}>
-            <Text style={styles.reviewerAvatarText}>S</Text>
+            <Image source={FOUNDER_AVATAR} style={styles.reviewerAvatarImage} resizeMode="cover" />
           </View>
           <View style={styles.reviewerTextBlock}>
-            <Text style={styles.reviewerName}>Suleiman O</Text>
+            <Text style={styles.reviewerName}>S.O</Text>
             <Text style={styles.reviewerRole}>Founder note</Text>
           </View>
           <View style={styles.reviewStars}>
@@ -293,7 +302,7 @@ export function RatingBody() {
           </View>
         </View>
         <Text style={styles.reviewQuote}>
-          Waypoint is for people who want travel to feel social before they even land.
+          Waypoint started from a simple feeling: life is better when it gives you people, not just places and things to do. I hope it helps you find the kind of moments you could never have planned.
         </Text>
       </View>
 
@@ -306,10 +315,33 @@ function MyLaurelWreathLeft({ size = 24, color = '#000000' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M12 3C9.5 5 8 8 8 12C8 16 9.5 19 12 21M9 5C6.5 7 5.5 10 5.5 13C5.5 15.5 6 17.5 7.5 19M6 8C4 10 3.5 12 3.5 14"
+        d="M9.24601 6.61105C9.03276 8.25332 10.35 9.77729 10.35 9.77729C10.35 9.77729 12.013 8.6386 12.2262 6.99633C12.4395 5.35405 11.1223 3.83008 11.1223 3.83008C11.1223 3.83008 9.45927 4.96877 9.24601 6.61105Z"
         stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7.68301 12.1301C8.37906 13.6334 10.3074 14.2234 10.3074 14.2234C10.3074 14.2234 11.1071 12.3759 10.4111 10.8726C9.71504 9.36923 7.78674 8.7793 7.78674 8.7793C7.78674 8.7793 6.98696 10.6267 7.68301 12.1301Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M8.50364 17.4151C9.83175 18.4083 11.8095 18.0136 11.8095 18.0136C11.8095 18.0136 11.634 16.0089 10.3059 15.0157C8.97775 14.0226 7 14.4172 7 14.4172C7 14.4172 7.17554 16.422 8.50364 17.4151Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M12.1131 21.7134C13.6181 22.4115 15.4716 21.6181 15.4716 21.6181C15.4716 21.6181 14.8851 19.6926 13.3801 18.9944C11.8751 18.2962 10.0216 19.0897 10.0216 19.0897C10.0216 19.0897 10.6081 21.0152 12.1131 21.7134Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M13.7813 2.96764C12.5708 4.10058 12.6174 6.11247 12.6174 6.11247C12.6174 6.11247 14.6267 6.28752 15.8372 5.15458C17.0477 4.02165 17.001 2.00975 17.001 2.00975C17.001 2.00975 14.9918 1.83471 13.7813 2.96764Z"
+        stroke={color}
+        strokeWidth={1.5}
         strokeLinejoin="round"
       />
     </Svg>
@@ -320,10 +352,33 @@ function MyLaurelWreathRight({ size = 24, color = '#000000' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M12 3C14.5 5 16 8 16 12C16 16 14.5 19 12 21M15 5C17.5 7 18.5 10 18.5 13C18.5 15.5 18 17.5 16.5 19M18 8C20 10 20.5 12 20.5 14"
+        d="M16.7555 6.61105C16.9688 8.25332 15.6516 9.77729 15.6516 9.77729C15.6516 9.77729 13.9886 8.6386 13.7753 6.99633C13.5621 5.35405 14.8793 3.83008 14.8793 3.83008C14.8793 3.83008 16.5423 4.96877 16.7555 6.61105Z"
         stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M18.3173 12.1301C17.6213 13.6334 15.693 14.2234 15.693 14.2234C15.693 14.2234 14.8932 12.3759 15.5893 10.8726C16.2853 9.36923 18.2136 8.7793 18.2136 8.7793C18.2136 8.7793 19.0134 10.6267 18.3173 12.1301Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M17.4973 17.4151C16.1692 18.4083 14.1914 18.0136 14.1914 18.0136C14.1914 18.0136 14.3669 16.0089 15.6951 15.0157C17.0232 14.0226 19.0009 14.4172 19.0009 14.4172C19.0009 14.4172 18.8254 16.422 17.4973 17.4151Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M13.8878 21.7134C12.3828 22.4115 10.5293 21.6181 10.5293 21.6181C10.5293 21.6181 11.1158 19.6926 12.6208 18.9944C14.1258 18.2962 15.9793 19.0897 15.9793 19.0897C15.9793 19.0897 15.3927 21.0152 13.8878 21.7134Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M12.22 2.96764C13.4305 4.10058 13.3838 6.11247 13.3838 6.11247C13.3838 6.11247 11.3746 6.28752 10.1641 5.15458C8.95358 4.02165 9.00024 2.00975 9.00024 2.00975C9.00024 2.00975 11.0095 1.83471 12.22 2.96764Z"
+        stroke={color}
+        strokeWidth={1.5}
         strokeLinejoin="round"
       />
     </Svg>
@@ -496,14 +551,14 @@ const styles = StyleSheet.create({
     backgroundColor: authColors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   avatarOverlap: {
     marginLeft: -13,
   },
-  surveyAvatarText: {
-    color: authColors.accent,
-    fontSize: 22,
-    fontWeight: '900',
+  surveyAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   ratingSocialCaption: {
     color: authColors.textPrimary,
@@ -537,11 +592,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: authSpace.md,
+    overflow: 'hidden',
   },
-  reviewerAvatarText: {
-    color: authColors.ctaPrimaryText,
-    fontSize: 17,
-    fontWeight: '900',
+  reviewerAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   reviewerTextBlock: {
     flex: 1,
