@@ -126,6 +126,11 @@ export default function UpsellModal({
   const activeMode = PAYWALL_PAGES[activePage]?.mode ?? mode;
   const activePackages = packagesByMode[activeMode];
   const sortedActivePackages = useMemo(() => sortPackages(activePackages), [activePackages]);
+  // Only the top two packages render, and at most one carries the "best value"
+  // badge (the founder page lists both Yearly and Lifetime, which previously both
+  // qualified — see bestValuePackageId).
+  const shownPackages = useMemo(() => sortedActivePackages.slice(0, 2), [sortedActivePackages]);
+  const bestValueId = useMemo(() => bestValuePackageId(shownPackages), [shownPackages]);
   const selectedPackage =
     sortedActivePackages.find((pkg) => pkg.identifier === selectedPackageIdByMode[activeMode]) ??
     sortedActivePackages[0] ??
@@ -314,7 +319,7 @@ export default function UpsellModal({
           ) : (
             <>
               <View style={styles.packageGrid}>
-                {sortedActivePackages.slice(0, 2).map((pkg) => {
+                {shownPackages.map((pkg) => {
                   const selected = selectedPackage?.identifier === pkg.identifier;
                   return (
                     <PackageCard
@@ -322,7 +327,7 @@ export default function UpsellModal({
                       pkg={pkg}
                       selected={selected}
                       label={packageLabel(pkg)}
-                      badge={isBestValuePackage(pkg) ? 'best value' : undefined}
+                      badge={pkg.identifier === bestValueId ? 'best value' : undefined}
                       subprice={packageSubprice(pkg)}
                       disabled={anyPending}
                       onPress={() =>
@@ -395,8 +400,15 @@ function packageRank(pkg: PurchasesPackage) {
   }
 }
 
-function isBestValuePackage(pkg: PurchasesPackage) {
-  return pkg.packageType === 'ANNUAL' || pkg.packageType === 'LIFETIME';
+// The single best-value package among those rendered. A one-time Lifetime (e.g.
+// Founder Forever) is the headline value and wins outright; otherwise the annual
+// plan is the best value versus monthly. Returns at most one id so the "best
+// value" badge is never shown on two cards at once.
+function bestValuePackageId(packages: PurchasesPackage[]): string | null {
+  const lifetime = packages.find((pkg) => pkg.packageType === 'LIFETIME');
+  if (lifetime) return lifetime.identifier;
+  const annual = packages.find((pkg) => pkg.packageType === 'ANNUAL');
+  return annual?.identifier ?? null;
 }
 
 function packageSubprice(pkg: PurchasesPackage) {
