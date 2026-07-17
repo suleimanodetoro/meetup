@@ -79,6 +79,7 @@ export default function ProfileScreen() {
     totalTrips: 0,
     countriesVisited: 0,
     plansCount: 0,
+    completedQuests: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -117,10 +118,30 @@ export default function ProfileScreen() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', session.user.id);
 
+    // Completed sidequests = distinct events with status 'completed' that the
+    // user is on the roster of (attendance) OR hosted. Union + de-dupe so a host
+    // who is also an attendee isn't double-counted.
+    const [attendedCompleted, hostedCompleted] = await Promise.all([
+      supabase
+        .from('attendance')
+        .select('event_id, events!inner(status)')
+        .eq('user_id', session.user.id)
+        .eq('events.status', 'completed'),
+      supabase
+        .from('events')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('status', 'completed'),
+    ]);
+    const completedIds = new Set<number>();
+    ((attendedCompleted.data as any[]) || []).forEach((row) => completedIds.add(row.event_id));
+    ((hostedCompleted.data as any[]) || []).forEach((row) => completedIds.add(row.id));
+
     setStats({
       totalTrips: visitsData?.length || 0,
       countriesVisited: uniqueCountries.size,
       plansCount: plansCount || 0,
+      completedQuests: completedIds.size,
     });
   }, [session?.user?.id]);
 
@@ -260,6 +281,7 @@ export default function ProfileScreen() {
   const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'Traveler';
   const groupCount = joinedPlans.length || stats.plansCount;
   const tripCount = upcomingVisits.length;
+  const completedCount = stats.completedQuests;
   const visitedCount = Math.max(stats.countriesVisited, 0);
   const worldPercent = Math.round((visitedCount / COUNTRIES_IN_WORLD) * 100);
   const bottomInset = Math.max(insets.bottom, 12);
@@ -274,6 +296,7 @@ export default function ProfileScreen() {
       bio: profile?.bio,
       groupCount,
       tripCount,
+      completedCount,
       visitedCount,
       worldPercent,
       isFounder,
@@ -300,6 +323,7 @@ export default function ProfileScreen() {
       profile?.tiktok_url,
       profile?.youtube_url,
       tripCount,
+      completedCount,
       visitedCount,
       worldPercent,
     ]
@@ -352,6 +376,7 @@ type ProfilePageData = {
   bio?: string | null;
   groupCount: number;
   tripCount: number;
+  completedCount: number;
   visitedCount: number;
   worldPercent: number;
   isFounder: boolean;
@@ -555,6 +580,7 @@ function StatsStrip({ profile, style }: { profile: ProfilePageData; style?: any 
   return (
     <View style={[styles.statsStrip, style]}>
       <MiniStat value={profile.groupCount} label="Groups" />
+      <MiniStat value={profile.completedCount} label="Done" />
       <MiniStat value={profile.tripCount} label="Trips" />
       <MiniStat value={profile.visitedCount} label="Visited" />
     </View>
@@ -966,7 +992,8 @@ const styles = StyleSheet.create({
   },
   miniStat: {
     alignItems: 'center',
-    minWidth: 68,
+    flexShrink: 1,
+    minWidth: 54,
   },
   miniStatValue: {
     color: '#111111',

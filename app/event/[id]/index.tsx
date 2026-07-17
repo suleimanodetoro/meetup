@@ -1,5 +1,5 @@
 // app/event/[id]/index.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,11 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import BottomSheet, {
+  BottomSheetScrollView,
+  BottomSheetBackdrop,
+  type BottomSheetBackdropProps,
+} from '@gorhom/bottom-sheet';
 import { AppImage } from '~/components/AppImage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { shareContent } from '~/utils/share';
@@ -67,6 +72,9 @@ interface EventDetails {
   cost_currency?: string;
   is_all_day?: boolean;
   is_one_day?: boolean;
+  // Quest lifecycle — 'active' | 'completed' | 'cancelled' (see events.status).
+  status?: string;
+  completed_at?: string | null;
   user_id: string;
   creator?: {
     id: string;
@@ -101,6 +109,24 @@ export default function PlanDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [isAttending, setIsAttending] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
+  // Partner picker ("Who did you do it with?") — a flowing bottom sheet that
+  // opens on demand (index -1 = closed) when a completed quest has other people
+  // on its roster to credit. Solo quests skip it and complete directly.
+  const partnerSheetRef = useRef<BottomSheet>(null);
+  const partnerSnapPoints = useMemo(() => ['50%', '85%'], []);
+  const renderPartnerBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
 
   // Check if we came from plan creation
   const isFromCreation = fromCreation === 'true';
@@ -205,6 +231,57 @@ export default function PlanDetailsScreen() {
       }
     } finally {
       setJoining(false);
+    }
+  };
+
+  // Mark this quest completed via the complete_quest RPC and, when a partner is
+  // chosen, credit the pairwise ledger. The RPC is idempotent (only the first
+  // completion transition writes), so a race against another roster member just
+  // no-ops server-side. `partnerId` is null for a solo / skipped completion.
+  const completeWith = async (partnerId: string | null) => {
+    if (completing) return;
+    const eventId = Number(id);
+    if (!Number.isFinite(eventId)) {
+      Alert.alert('Error', 'Invalid plan id');
+      return;
+    }
+
+    setCompleting(true);
+    try {
+      const args: { p_event_id: number; p_partner_id?: string } = { p_event_id: eventId };
+      if (partnerId) args.p_partner_id = partnerId;
+
+      const { error } = await supabase.rpc('complete_quest', args);
+      if (error) throw error;
+
+      partnerSheetRef.current?.close();
+      // Reflect the completion locally so the CTA flips to the "Completed" chip
+      // without a refetch.
+      setEvent((prev) =>
+        prev ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev
+      );
+    } catch (error: any) {
+      console.error('Error completing quest:', error);
+      const message: string = error?.message || '';
+      Alert.alert(
+        'Could not complete',
+        /participant/i.test(message)
+          ? 'Only people on this sidequest can mark it completed.'
+          : 'Something went wrong marking this completed. Please try again.'
+      );
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  // Tap "Mark completed": if the roster has other people, ask who it was done
+  // with (the ledger pairing); otherwise complete solo straight away.
+  const handleMarkCompleted = () => {
+    const others = (event?.attendees ?? []).filter((a) => a.user.id !== session?.user?.id);
+    if (others.length === 0) {
+      completeWith(null);
+    } else {
+      partnerSheetRef.current?.snapToIndex(0);
     }
   };
 
@@ -319,6 +396,17 @@ export default function PlanDetailsScreen() {
   const attendeeCount = event.attendees?.length || 0;
   const totalCost = calculateTotalCost();
   const costDisplay = formatCost(totalCost);
+
+  // Completion CTA gating: a "Completed" status chip is public (anyone viewing a
+  // finished quest sees it); the "Mark completed" action only shows to people on
+  // the roster (attendee or host) while the quest is still active. Early
+  // completion is allowed — a roster member can close the loop any time.
+  const isCompleted = event.status === 'completed';
+  const showMarkCompleted = !isCompleted && isAttending;
+  const showCompletionBlock = isCompleted || showMarkCompleted;
+  const partnerCandidates = (event.attendees ?? []).filter(
+    (a) => a.user.id !== session?.user?.id
+  );
 
   return (
     <View style={styles.container}>
@@ -438,8 +526,30 @@ export default function PlanDetailsScreen() {
             label={isAttending ? 'Open Chat' : 'Join Chat'}
             onPress={isAttending ? () => router.push(`/chat/${id}`) : handleJoinPlan}
             loading={joining}
-            style={{ marginBottom: 32 }}
+            style={{ marginBottom: showCompletionBlock ? 14 : 32 }}
           />
+
+          {/* Completion state — a green refraction CTA while active, a status
+              chip once done. */}
+          {isCompleted ? (
+            <View style={styles.completedChip}>
+              <Ionicons name="checkmark-circle" size={16} color="#059669" />
+              <Text style={styles.completedChipText}>
+                {event.completed_at
+                  ? `Completed · ${formatDate(event.completed_at)}`
+                  : 'Completed'}
+              </Text>
+            </View>
+          ) : showMarkCompleted ? (
+            <GradientButton
+              label="Mark completed"
+              icon="checkmark-done"
+              colors={['#34D399', '#0F9D6B']}
+              onPress={handleMarkCompleted}
+              loading={completing}
+              style={{ marginBottom: 32 }}
+            />
+          ) : null}
 
           {/* About Section */}
           <Pressable style={styles.section} onPress={() => toggleSection('about')}>
@@ -616,6 +726,66 @@ export default function PlanDetailsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* "Who did you do it with?" — flowing partner picker. Closed (index -1)
+          until handleMarkCompleted opens it for quests with a shared roster. */}
+      <BottomSheet
+        ref={partnerSheetRef}
+        index={-1}
+        snapPoints={partnerSnapPoints}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        backdropComponent={renderPartnerBackdrop}
+        backgroundStyle={styles.partnerSheetBackground}
+        handleIndicatorStyle={styles.partnerSheetHandle}>
+        <BottomSheetScrollView contentContainerStyle={styles.partnerSheetContent}>
+          <Text style={styles.partnerSheetTitle}>Who did you do it with?</Text>
+          <Text style={styles.partnerSheetSubtitle}>
+            Tag someone to log this sidequest together, or skip if you went solo.
+          </Text>
+
+          <Pressable
+            style={styles.partnerRow}
+            onPress={() => completeWith(null)}
+            disabled={completing}>
+            <View style={[styles.partnerAvatarFallback, styles.partnerSoloIcon]}>
+              <Ionicons name="person-outline" size={20} color="#6B7280" />
+            </View>
+            <Text style={styles.partnerName}>Solo / skip</Text>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+          </Pressable>
+
+          {partnerCandidates.map((attendee) => (
+            <Pressable
+              key={attendee.user.id}
+              style={styles.partnerRow}
+              onPress={() => completeWith(attendee.user.id)}
+              disabled={completing}>
+              {attendee.user.avatar_url ? (
+                <AppImage
+                  source={{ uri: attendee.user.avatar_url }}
+                  style={styles.partnerAvatar}
+                />
+              ) : (
+                <InitialsAvatar
+                  name={attendee.user.full_name || attendee.user.username}
+                  id={attendee.user.id}
+                  size={40}
+                  style={styles.partnerAvatar}
+                />
+              )}
+              <Text style={styles.partnerName} numberOfLines={1}>
+                {attendee.user.full_name || attendee.user.username || 'Someone'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </Pressable>
+          ))}
+
+          {completing ? (
+            <ActivityIndicator color="#0F9D6B" style={{ marginTop: 16 }} />
+          ) : null}
+        </BottomSheetScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -793,6 +963,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4B5563',
+  },
+  completedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 32,
+  },
+  completedChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  partnerSheetBackground: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  partnerSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+  },
+  partnerSheetContent: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  partnerSheetTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -0.3,
+  },
+  partnerSheetSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginTop: 6,
+    marginBottom: 16,
+    lineHeight: 21,
+  },
+  partnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  partnerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  partnerAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  partnerSoloIcon: {
+    backgroundColor: '#F3F4F6',
+  },
+  partnerName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
   },
   joinButton: {
     borderRadius: 30,

@@ -30,9 +30,10 @@ type Quest = {
   location_name: string | null;
   image_uri: string | null;
   date: string | null;
+  status: string | null;
 };
 
-const EVENT_COLS = 'id, title, city, location_name, image_uri, date';
+const EVENT_COLS = 'id, title, city, location_name, image_uri, date, status';
 
 function formatDate(date: string | null): string | null {
   if (!date) return null;
@@ -129,20 +130,31 @@ export default function MySidequestsScreen() {
 
 function QuestRow({ quest }: { quest: Quest }) {
   const when = formatDate(quest.date);
+  const isCompleted = quest.status === 'completed';
   return (
     <Pressable
       style={styles.row}
       onPress={() => router.push(`/event/${quest.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${quest.title ?? 'sidequest'}`}>
+      accessibilityLabel={`Open ${quest.title ?? 'sidequest'}${isCompleted ? ', completed' : ''}`}>
       <AppImage
         source={{ uri: quest.image_uri || getCityImageUrl(quest.city || '') }}
-        style={styles.thumb}
+        style={[styles.thumb, isCompleted && styles.thumbCompleted]}
       />
       <View style={styles.rowText}>
-        <Text style={styles.title} numberOfLines={1}>
-          {quest.title || 'Sidequest'}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text
+            style={[styles.title, isCompleted && styles.titleCompleted]}
+            numberOfLines={1}>
+            {quest.title || 'Sidequest'}
+          </Text>
+          {isCompleted ? (
+            <View style={styles.completedChip}>
+              <Ionicons name="checkmark-circle" size={13} color="#059669" />
+              <Text style={styles.completedChipText}>Completed</Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.sub} numberOfLines={1}>
           📍 {quest.location_name || quest.city || 'Somewhere'}
         </Text>
@@ -181,8 +193,23 @@ const styles = StyleSheet.create({
     gap: authSpace.lg,
   },
   thumb: { width: 64, height: 64, borderRadius: 14, backgroundColor: authColors.borderMuted },
+  thumbCompleted: { opacity: 0.55 },
   rowText: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '600', color: authColors.textPrimary },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: authColors.textPrimary },
+  titleCompleted: { color: authColors.textSecondary },
+  completedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  completedChipText: { fontSize: 11, fontWeight: '700', color: '#059669' },
   sub: { marginTop: 2, fontSize: 14, color: authColors.textSecondary },
   date: { marginTop: 2, fontSize: 13, color: authColors.accent, fontWeight: '500' },
   empty: {

@@ -85,6 +85,9 @@ export default function UserProfileScreen() {
   // User's events/plans
   const [userEvents, setUserEvents] = useState<any[]>([]);
 
+  // Pairwise "sidequests together" count from quest_ledger (0 = hidden).
+  const [questsTogether, setQuestsTogether] = useState(0);
+
   useEffect(() => {
     if (userId) {
       fetchUserData();
@@ -168,6 +171,22 @@ export default function UserProfileScreen() {
           setFriendshipStatus(friendship.status as FriendshipStatus);
           setIsRequester(friendship.is_requester);
         }
+
+        // Pairwise sidequest ledger. quest_ledger is keyed on the canonical
+        // unordered pair (user_lo < user_hi), matching the RPC's LEAST/GREATEST
+        // — so order the two ids the same way here. Lowercase UUID strings sort
+        // identically to Postgres' uuid ordering. RLS only exposes pairs the
+        // viewer is in, so this read is scoped to us + them. Silent on error/0.
+        const me = session.user.id;
+        const lo = me < userId ? me : userId;
+        const hi = me < userId ? userId : me;
+        const { data: ledger } = await supabase
+          .from('quest_ledger')
+          .select('quest_count')
+          .eq('user_lo', lo)
+          .eq('user_hi', hi)
+          .maybeSingle();
+        setQuestsTogether(ledger?.quest_count ?? 0);
       }
     } catch (err) {
       console.error('Error fetching user data:', err);
@@ -466,6 +485,19 @@ export default function UserProfileScreen() {
             </>
           )}
 
+          {/* Pairwise sidequest count — the "you two, together" retention hook.
+              Hidden at 0 / on your own profile. */}
+          {questsTogether > 0 && (
+            <View style={styles.questsTogetherRow}>
+              <View style={styles.questsTogetherChip}>
+                <Text style={styles.questsTogetherEmoji}>⚡</Text>
+                <Text style={styles.questsTogetherText}>
+                  {questsTogether} sidequest{questsTogether === 1 ? '' : 's'} together
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* About Me */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About Me</Text>
@@ -700,6 +732,30 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  questsTogetherRow: {
+    paddingHorizontal: authSpace.xl,
+    marginBottom: authSpace.xl,
+  },
+  questsTogetherChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    backgroundColor: authColors.accentSoft,
+    borderColor: authColors.accentBorder,
+    borderWidth: 1,
+    borderRadius: authRadius.pill,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.sm,
+  },
+  questsTogetherEmoji: {
+    fontSize: 15,
+  },
+  questsTogetherText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: authColors.accent,
   },
   previewBanner: {
     flexDirection: 'row',

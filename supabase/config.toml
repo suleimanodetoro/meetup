@@ -319,3 +319,15 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # itself), so the Supabase JWT check has to be off for this endpoint.
 [functions.revenuecat-webhook]
 verify_jwt = false
+
+# Stripe webhook receives unauthenticated POSTs from Stripe's servers. Auth is
+# the Stripe-Signature HMAC, verified inside the function against
+# STRIPE_WEBHOOK_SECRET, so the Supabase JWT check must be off here as well.
+[functions.stripe-webhook]
+verify_jwt = false
+
+# Lifecycle runner is triggered by pg_cron / a manual curl, not by an
+# authenticated Supabase user. Auth is a shared-secret Bearer header
+# (LIFECYCLE_RUNNER_AUTH) checked inside the function, so the JWT check is off.
+[functions.lifecycle-runner]
+verify_jwt = false

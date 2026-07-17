@@ -29,6 +29,9 @@ android
 # Session scratch docs (continuity notes between Claude sessions)
 HANDOFF.md
 CONTINUE-PROMPT.md
+
+# Account-teardown audit logs (contain deleted-user PII — never commit)
+scripts/admin/logs/
 # >>> security-audit 2026-06-13 (added by Claude) >>>
 .env
 .env.*

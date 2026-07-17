@@ -117,6 +117,24 @@ serve(async (req) => {
       case 'PRODUCT_CHANGE':
       case 'UNCANCELLATION':
       case 'NON_RENEWING_PURCHASE': {
+        // Founder is a lifetime entitlement and may have been granted on
+        // the web via Stripe, which writes this SAME row. A non-founder RC
+        // event — a premium renewal, a stale INITIAL_PURCHASE, or an event
+        // that carries no entitlement (subscription_type 'free') — must
+        // never downgrade an existing founder row. Mirrors stripe-webhook's
+        // "founder always wins over premium" guard.
+        if (!hasFounder) {
+          const { data: existing } = await admin
+            .from('user_subscriptions')
+            .select('subscription_type, entitlement_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (existing?.subscription_type === 'founder' || existing?.entitlement_id === 'founder') {
+            console.log('[rc-webhook] skipping grant: existing founder row wins over non-founder RC event');
+            break;
+          }
+        }
+
         // Either the user just bought something or RC reaffirmed an
         // existing active subscription. Either way: write the active
         // shape. The row may have been auto-created as 'free' by the
@@ -158,9 +176,32 @@ serve(async (req) => {
         // was once a subscriber (useful for win-back campaigns).
         const { data: previous } = await admin
           .from('user_subscriptions')
-          .select('entitlement_id')
+          .select('entitlement_id, provider, original_transaction_id')
           .eq('user_id', userId)
           .maybeSingle();
+
+        // Do-not-clobber guard. Web (Stripe) purchases now write this
+        // SAME row. A user can cancel their mobile (RC) subscription, buy
+        // Premium on the web while the mobile period is still running, and
+        // then have RC fire EXPIRATION when the mobile period ends. That
+        // event must NOT wipe the active, paid Stripe row (or a row owned
+        // by a different RC transaction) back to free — only clear the row
+        // this event actually owns. Mirrors stripe-webhook's expirePremium.
+        if (previous?.provider === 'stripe') {
+          console.log('[rc-webhook] skipping EXPIRATION: row is owned by stripe, not RevenueCat');
+          break;
+        }
+        if (
+          event.original_transaction_id &&
+          previous?.original_transaction_id &&
+          previous.original_transaction_id !== event.original_transaction_id
+        ) {
+          console.log(
+            '[rc-webhook] skipping EXPIRATION: row belongs to a different transaction',
+            event.original_transaction_id
+          );
+          break;
+        }
 
         const wasFounder = previous?.entitlement_id === 'founder';
 
