@@ -816,6 +816,56 @@ export type Database = {
         }
         Relationships: []
       }
+      quest_intents: {
+        Row: {
+          budget: number | null
+          categories: string[] | null
+          city: string | null
+          comfort: number | null
+          country_code: string | null
+          created_at: string
+          energy: number | null
+          id: number
+          social: string | null
+          time_max: number | null
+          user_id: string
+        }
+        Insert: {
+          budget?: number | null
+          categories?: string[] | null
+          city?: string | null
+          comfort?: number | null
+          country_code?: string | null
+          created_at?: string
+          energy?: number | null
+          id?: never
+          social?: string | null
+          time_max?: number | null
+          user_id: string
+        }
+        Update: {
+          budget?: number | null
+          categories?: string[] | null
+          city?: string | null
+          comfort?: number | null
+          country_code?: string | null
+          created_at?: string
+          energy?: number | null
+          id?: never
+          social?: string | null
+          time_max?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quest_intents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quest_ledger: {
         Row: {
           first_quest_at: string | null
@@ -1130,6 +1180,13 @@ export type Database = {
         Args: { receiver_id: string; sender_id: string }
         Returns: boolean
       }
+      chemistry_score: {
+        Args: { p_a: string; p_b: string }
+        Returns: {
+          reasons: string[]
+          score: number
+        }[]
+      }
       cleanup_old_typing_indicators: { Args: never; Returns: undefined }
       cleanup_typing_indicators: { Args: never; Returns: undefined }
       complete_quest: {
@@ -1182,6 +1239,7 @@ export type Database = {
         Returns: {
           avatar_url: string
           bio: string
+          chemistry: number
           full_name: string
           is_premium: boolean
           is_verified: boolean

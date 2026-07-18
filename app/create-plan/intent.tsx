@@ -8,6 +8,7 @@ import { View, Text, Pressable, SafeAreaView, StyleSheet, ScrollView } from 'rea
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '~/utils/supabase';
+import { useAuth } from '~/contexts/AuthProvider';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
 import { GradientButton } from '~/components/GradientButton';
 
@@ -74,6 +75,7 @@ function durLabel(min: number): string {
 }
 
 export default function CreateIntentScreen() {
+  const { session } = useAuth();
   const { updateField, resetForm } = useCreatePlan();
   const [energy, setEnergy] = useState<number | null>(null);
   const [time, setTime] = useState<number | null>(null);
@@ -96,9 +98,44 @@ export default function CreateIntentScreen() {
   const toggleVibe = (v: string) =>
     setVibes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
+  // Persist the stated intent so it becomes behavioural signal for chemistry
+  // matching: one quest_intents row + one engine event per suggestion REQUEST
+  // (this runs from suggest(), never on slider moves). Fire-and-forget — a
+  // failure here must never block or break the suggestion flow.
+  const persistIntent = () => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    void (async () => {
+      try {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('location, location_country_code')
+          .eq('id', uid)
+          .maybeSingle();
+        await supabase.from('quest_intents').insert({
+          user_id: uid,
+          city: prof?.location ?? null,
+          country_code: prof?.location_country_code ?? null,
+          energy,
+          social: who,
+          time_max: time,
+          budget: spend,
+          categories: vibes.length ? vibes : null,
+        });
+        await supabase.rpc('log_engine_event', {
+          p_event_key: 'intent.submitted',
+          p_payload: { energy, social: who, time_max: time, budget: spend, categories: vibes },
+        });
+      } catch (e) {
+        console.warn('intent capture failed (non-blocking):', e);
+      }
+    })();
+  };
+
   const suggest = async () => {
     setLoading(true);
     setErrored(false);
+    persistIntent();
     try {
       const { data, error } = await (supabase.rpc as any)('suggest_quest', {
         p_energy: energy,
