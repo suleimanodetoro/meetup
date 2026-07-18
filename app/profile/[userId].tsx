@@ -1,5 +1,5 @@
 // app/profile/[userId].tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
 import { presentUserSafetyActions } from '~/modules/safety';
+import { sendFriendRequest } from '~/utils/friendRequests';
 
 const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
   LANGUAGES.map((l) => [l.code, l])
@@ -92,6 +93,13 @@ export default function UserProfileScreen() {
   // Pulse Monitor state for the pair. Only hot/warm/cooling are kept — cold
   // (or no row) is the default state of strangers and stays hidden.
   const [pulseState, setPulseState] = useState<'hot' | 'warm' | 'cooling' | null>(null);
+
+  // Confidence Layer graduation prompt: set when get_graduation_prompts lists
+  // this profile as a warm_pair_add target (post_quest_add has its own moment
+  // in the completion sheet). The ref keeps prompt_shown at one emission per
+  // screen visit even though fetchUserData re-runs after friend actions.
+  const [warmPrompt, setWarmPrompt] = useState<{ context: string } | null>(null);
+  const warmShownLogged = useRef(false);
 
   useEffect(() => {
     if (userId) {
@@ -205,6 +213,23 @@ export default function UserProfileScreen() {
             ? pulse.state
             : null
         );
+
+        // Confidence Layer: is this pair suggested for graduation? The RPC
+        // applies every gate server-side (blocks, privacy, dismissals,
+        // any existing friendship row). Silent on error — the profile
+        // renders fine without a prompt.
+        const { data: prompts } = await supabase.rpc('get_graduation_prompts', { p_limit: 12 });
+        const warm = prompts?.find(
+          (pr) => pr.prompt_type === 'warm_pair_add' && pr.target_id === userId
+        );
+        setWarmPrompt(warm ? { context: warm.context } : null);
+        if (warm && !warmShownLogged.current) {
+          warmShownLogged.current = true;
+          void supabase.rpc('log_engine_event', {
+            p_event_key: 'confidence.prompt_shown',
+            p_payload: { type: 'warm_pair_add', target_id: userId },
+          });
+        }
       }
     } catch (err) {
       console.error('Error fetching user data:', err);
@@ -221,14 +246,8 @@ export default function UserProfileScreen() {
       setProcessingAction(true);
 
       if (!friendshipStatus) {
-        // Send friend request
-        const { error } = await supabase.from('friendships').insert({
-          requester_id: session.user.id,
-          addressee_id: userId,
-          status: 'pending',
-        });
-
-        if (error) throw error;
+        // Send friend request (shared write path — utils/friendRequests)
+        await sendFriendRequest(session.user.id, userId);
         setFriendshipStatus('pending');
         setIsRequester(true);
         Alert.alert('Success', 'Friend request sent!');
@@ -266,6 +285,49 @@ export default function UserProfileScreen() {
       Alert.alert('Error', 'Failed to process request');
     } finally {
       setProcessingAction(false);
+    }
+  };
+
+  // Warm-pair graduation prompt — accept: the normal request flow plus the
+  // accepted engine event. The card disappears because a pending friendship
+  // row now exists (and the RPC stops suggesting the pair).
+  const acceptWarmPrompt = async () => {
+    if (!session?.user?.id || !userId || processingAction) return;
+    try {
+      setProcessingAction(true);
+      await sendFriendRequest(session.user.id, userId);
+      setWarmPrompt(null);
+      setFriendshipStatus('pending');
+      setIsRequester(true);
+      void supabase.rpc('log_engine_event', {
+        p_event_key: 'confidence.prompt_accepted',
+        p_payload: { type: 'warm_pair_add', target_id: userId },
+      });
+      Alert.alert('Success', 'Friend request sent!');
+    } catch (error) {
+      console.error('Error accepting warm-pair prompt:', error);
+      Alert.alert('Error', 'Failed to process request');
+    } finally {
+      setProcessingAction(false);
+    }
+  };
+
+  // Dismiss: hide immediately, then record it so the engine never re-asks
+  // this pairing. Both writes are non-blocking best-effort.
+  const dismissWarmPrompt = async () => {
+    if (!session?.user?.id || !userId) return;
+    setWarmPrompt(null);
+    try {
+      await supabase.from('prompt_dismissals').upsert(
+        { user_id: session.user.id, target_id: userId, prompt_type: 'warm_pair_add' },
+        { onConflict: 'user_id,target_id,prompt_type', ignoreDuplicates: true }
+      );
+      void supabase.rpc('log_engine_event', {
+        p_event_key: 'confidence.prompt_dismissed',
+        p_payload: { type: 'warm_pair_add', target_id: userId },
+      });
+    } catch (error) {
+      console.warn('prompt dismissal failed (non-blocking):', error);
     }
   };
 
@@ -516,6 +578,29 @@ export default function UserProfileScreen() {
                 </View>
               )}
               <PulseChip state={pulseState} />
+            </View>
+          )}
+
+          {/* Warm-pair graduation prompt (Confidence Layer) — a quiet,
+              dismissible one-liner: the engine noticed real momentum with
+              this person and suggests making it official. The X writes a
+              dismissal so this pairing is never suggested again. */}
+          {warmPrompt && (
+            <View style={styles.warmPromptCard}>
+              <Ionicons name="sparkles" size={15} color={authColors.accent} />
+              <Text style={styles.warmPromptText} numberOfLines={2}>
+                {warmPrompt.context}
+              </Text>
+              <Pressable
+                onPress={acceptWarmPrompt}
+                disabled={processingAction}
+                hitSlop={6}
+                style={styles.warmPromptAdd}>
+                <Text style={styles.warmPromptAddText}>Add friend</Text>
+              </Pressable>
+              <Pressable onPress={dismissWarmPrompt} hitSlop={10} style={styles.warmPromptClose}>
+                <Ionicons name="close" size={16} color={authColors.textSecondary} />
+              </Pressable>
             </View>
           )}
 
@@ -781,6 +866,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: authColors.accent,
+  },
+  warmPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: authSpace.sm,
+    backgroundColor: authColors.accentSoft,
+    borderColor: authColors.accentBorder,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: authSpace.lg,
+    paddingVertical: authSpace.md,
+    marginHorizontal: authSpace.xl,
+    marginBottom: authSpace.xl,
+  },
+  warmPromptText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: authColors.textPrimary,
+  },
+  warmPromptAddText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: authColors.accent,
+  },
+  warmPromptAdd: {
+    paddingVertical: 2,
+  },
+  warmPromptClose: {
+    padding: 2,
   },
   previewBanner: {
     flexDirection: 'row',

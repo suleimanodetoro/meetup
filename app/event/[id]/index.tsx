@@ -32,6 +32,7 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/geographic';
 import { openReport } from '~/modules/safety';
+import { sendFriendRequest } from '~/utils/friendRequests';
 
 const { width, height } = Dimensions.get('window');
 
@@ -110,6 +111,14 @@ export default function PlanDetailsScreen() {
   const [joining, setJoining] = useState(false);
   const [isAttending, setIsAttending] = useState(false);
   const [completing, setCompleting] = useState(false);
+
+  // Confidence Layer graduation prompt: after a completion credited to a
+  // partner who isn't already a friend, the partner sheet swaps to an
+  // "Add {name} as a friend?" follow-up instead of closing.
+  const [addFriendPrompt, setAddFriendPrompt] = useState<{ id: string; name: string } | null>(
+    null
+  );
+  const [promptBusy, setPromptBusy] = useState(false);
 
   // Partner picker ("Who did you do it with?") — a flowing bottom sheet that
   // opens on demand (index -1 = closed) when a completed quest has other people
@@ -234,6 +243,79 @@ export default function PlanDetailsScreen() {
     }
   };
 
+  // Should the completion sheet graduate into "add them as a friend?" Only
+  // when NO friendships row exists in either direction (accepted = already
+  // friends, pending = already asked, declined/blocked = respect the no) and
+  // this exact prompt wasn't dismissed for this person before. Errs on the
+  // side of not prompting.
+  const shouldPromptAddFriend = async (partnerId: string): Promise<boolean> => {
+    const me = session?.user?.id;
+    if (!me) return false;
+    const [{ data: existing, error: fErr }, { data: dismissed, error: dErr }] = await Promise.all([
+      supabase
+        .from('friendships')
+        .select('id')
+        .or(
+          `and(requester_id.eq.${me},addressee_id.eq.${partnerId}),and(requester_id.eq.${partnerId},addressee_id.eq.${me})`
+        )
+        .limit(1),
+      supabase
+        .from('prompt_dismissals')
+        .select('created_at')
+        .eq('user_id', me)
+        .eq('target_id', partnerId)
+        .eq('prompt_type', 'post_quest_add')
+        .limit(1),
+    ]);
+    if (fErr || dErr) return false;
+    return (existing?.length ?? 0) === 0 && (dismissed?.length ?? 0) === 0;
+  };
+
+  // Accept the graduation prompt: the shared friend-request write path plus
+  // the accepted engine event, then the sheet closes.
+  const acceptAddFriend = async () => {
+    const me = session?.user?.id;
+    if (!addFriendPrompt || !me || promptBusy) return;
+    setPromptBusy(true);
+    try {
+      await sendFriendRequest(me, addFriendPrompt.id);
+      void supabase.rpc('log_engine_event', {
+        p_event_key: 'confidence.prompt_accepted',
+        p_payload: { type: 'post_quest_add', target_id: addFriendPrompt.id },
+        p_event_id: Number(id) || undefined,
+      });
+      Alert.alert('Request sent', `${addFriendPrompt.name} will be asked to confirm.`);
+    } catch (error) {
+      console.error('Error sending friend request from prompt:', error);
+      Alert.alert('Error', 'Could not send the request. You can add them from their profile.');
+    } finally {
+      setPromptBusy(false);
+      partnerSheetRef.current?.close();
+    }
+  };
+
+  // "Not now": close, then record the dismissal so this pairing is never
+  // re-prompted post-quest. Best-effort — never blocks the flow.
+  const dismissAddFriend = async () => {
+    const me = session?.user?.id;
+    const target = addFriendPrompt?.id;
+    partnerSheetRef.current?.close();
+    if (!me || !target) return;
+    try {
+      await supabase.from('prompt_dismissals').upsert(
+        { user_id: me, target_id: target, prompt_type: 'post_quest_add' },
+        { onConflict: 'user_id,target_id,prompt_type', ignoreDuplicates: true }
+      );
+      void supabase.rpc('log_engine_event', {
+        p_event_key: 'confidence.prompt_dismissed',
+        p_payload: { type: 'post_quest_add', target_id: target },
+        p_event_id: Number(id) || undefined,
+      });
+    } catch (error) {
+      console.warn('prompt dismissal failed (non-blocking):', error);
+    }
+  };
+
   // Mark this quest completed via the complete_quest RPC and, when a partner is
   // chosen, credit the pairwise ledger. The RPC is idempotent (only the first
   // completion transition writes), so a race against another roster member just
@@ -254,12 +336,32 @@ export default function PlanDetailsScreen() {
       const { error } = await supabase.rpc('complete_quest', args);
       if (error) throw error;
 
-      partnerSheetRef.current?.close();
       // Reflect the completion locally so the CTA flips to the "Completed" chip
       // without a refetch.
       setEvent((prev) =>
         prev ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev
       );
+
+      // Confidence Layer: if the tagged partner isn't already a friend (and
+      // this pairing wasn't dismissed before), the sheet graduates into an
+      // add-friend follow-up instead of closing.
+      const partner = partnerId
+        ? (event?.attendees ?? []).find((a) => a.user.id === partnerId)
+        : undefined;
+      if (partner && (await shouldPromptAddFriend(partner.user.id))) {
+        setAddFriendPrompt({
+          id: partner.user.id,
+          name: partner.user.full_name || partner.user.username || 'them',
+        });
+        void supabase.rpc('log_engine_event', {
+          p_event_key: 'confidence.prompt_shown',
+          p_payload: { type: 'post_quest_add', target_id: partner.user.id },
+          p_event_id: eventId,
+        });
+        partnerSheetRef.current?.snapToIndex(0);
+      } else {
+        partnerSheetRef.current?.close();
+      }
     } catch (error: any) {
       console.error('Error completing quest:', error);
       const message: string = error?.message || '';
@@ -735,55 +837,88 @@ export default function PlanDetailsScreen() {
         snapPoints={partnerSnapPoints}
         enableDynamicSizing={false}
         enablePanDownToClose
+        onClose={() => setAddFriendPrompt(null)}
         backdropComponent={renderPartnerBackdrop}
         backgroundStyle={styles.partnerSheetBackground}
         handleIndicatorStyle={styles.partnerSheetHandle}>
         <BottomSheetScrollView contentContainerStyle={styles.partnerSheetContent}>
-          <Text style={styles.partnerSheetTitle}>Who did you do it with?</Text>
-          <Text style={styles.partnerSheetSubtitle}>
-            Tag someone to log this sidequest together, or skip if you went solo.
-          </Text>
-
-          <Pressable
-            style={styles.partnerRow}
-            onPress={() => completeWith(null)}
-            disabled={completing}>
-            <View style={[styles.partnerAvatarFallback, styles.partnerSoloIcon]}>
-              <Ionicons name="person-outline" size={20} color="#6B7280" />
-            </View>
-            <Text style={styles.partnerName}>Solo / skip</Text>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-          </Pressable>
-
-          {partnerCandidates.map((attendee) => (
-            <Pressable
-              key={attendee.user.id}
-              style={styles.partnerRow}
-              onPress={() => completeWith(attendee.user.id)}
-              disabled={completing}>
-              {attendee.user.avatar_url ? (
-                <AppImage
-                  source={{ uri: attendee.user.avatar_url }}
-                  style={styles.partnerAvatar}
-                />
-              ) : (
-                <InitialsAvatar
-                  name={attendee.user.full_name || attendee.user.username}
-                  id={attendee.user.id}
-                  size={40}
-                  style={styles.partnerAvatar}
-                />
-              )}
-              <Text style={styles.partnerName} numberOfLines={1}>
-                {attendee.user.full_name || attendee.user.username || 'Someone'}
+          {addFriendPrompt ? (
+            /* Post-completion graduation prompt (Confidence Layer): same
+               sheet, new content — the quest is logged, so suggest making
+               the pairing official. Plain-text dismiss writes a dismissal
+               so this pairing is never re-prompted. */
+            <>
+              <Text style={styles.partnerSheetTitle}>
+                Add {addFriendPrompt.name} as a friend?
               </Text>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </Pressable>
-          ))}
+              <Text style={styles.partnerSheetSubtitle}>
+                Sidequest logged. Friends can message each other directly — keep this one
+                going.
+              </Text>
+              <GradientButton
+                label="Add friend"
+                icon="person-add-outline"
+                onPress={acceptAddFriend}
+                loading={promptBusy}
+                style={styles.promptAddButton}
+              />
+              <Pressable
+                onPress={dismissAddFriend}
+                disabled={promptBusy}
+                hitSlop={8}
+                style={styles.promptDismiss}>
+                <Text style={styles.promptDismissText}>Not now</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.partnerSheetTitle}>Who did you do it with?</Text>
+              <Text style={styles.partnerSheetSubtitle}>
+                Tag someone to log this sidequest together, or skip if you went solo.
+              </Text>
 
-          {completing ? (
-            <ActivityIndicator color="#0F9D6B" style={{ marginTop: 16 }} />
-          ) : null}
+              <Pressable
+                style={styles.partnerRow}
+                onPress={() => completeWith(null)}
+                disabled={completing}>
+                <View style={[styles.partnerAvatarFallback, styles.partnerSoloIcon]}>
+                  <Ionicons name="person-outline" size={20} color="#6B7280" />
+                </View>
+                <Text style={styles.partnerName}>Solo / skip</Text>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </Pressable>
+
+              {partnerCandidates.map((attendee) => (
+                <Pressable
+                  key={attendee.user.id}
+                  style={styles.partnerRow}
+                  onPress={() => completeWith(attendee.user.id)}
+                  disabled={completing}>
+                  {attendee.user.avatar_url ? (
+                    <AppImage
+                      source={{ uri: attendee.user.avatar_url }}
+                      style={styles.partnerAvatar}
+                    />
+                  ) : (
+                    <InitialsAvatar
+                      name={attendee.user.full_name || attendee.user.username}
+                      id={attendee.user.id}
+                      size={40}
+                      style={styles.partnerAvatar}
+                    />
+                  )}
+                  <Text style={styles.partnerName} numberOfLines={1}>
+                    {attendee.user.full_name || attendee.user.username || 'Someone'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                </Pressable>
+              ))}
+
+              {completing ? (
+                <ActivityIndicator color="#0F9D6B" style={{ marginTop: 16 }} />
+              ) : null}
+            </>
+          )}
         </BottomSheetScrollView>
       </BottomSheet>
     </View>
@@ -1216,5 +1351,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#9CA3AF',
     fontWeight: '500',
+  },
+  promptAddButton: {
+    marginTop: 20,
+  },
+  promptDismiss: {
+    alignSelf: 'center',
+    marginTop: 14,
+    padding: 6,
+  },
+  promptDismissText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
   },
 });

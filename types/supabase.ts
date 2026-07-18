@@ -744,6 +744,42 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_dismissals: {
+        Row: {
+          created_at: string
+          prompt_type: string
+          target_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          prompt_type: string
+          target_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          prompt_type?: string
+          target_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_dismissals_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prompt_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quest_catalog: {
         Row: {
           budget_max: number | null
@@ -1256,6 +1292,17 @@ export type Database = {
         Returns: {
           is_requester: boolean
           status: string
+        }[]
+      }
+      get_graduation_prompts: {
+        Args: { p_limit?: number }
+        Returns: {
+          context: string
+          prompt_type: string
+          rank: number
+          target_avatar_url: string
+          target_id: string
+          target_name: string
         }[]
       }
       get_mutual_friends: {
