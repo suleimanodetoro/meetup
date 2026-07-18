@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { INTERESTS, LANGUAGES } from '~/utils/constants';
 import { FounderBadge } from '~/components/FounderBadge';
 import { PremiumBadge } from '~/components/PremiumBadge';
+import { PulseChip } from '~/components/PulseChip';
 import { TravelStatsCard } from '~/components/TravelStatsCard';
 import { SocialLinks } from '~/components/SocialLinks';
 import { GradientButton } from '~/components/GradientButton';
@@ -87,6 +88,10 @@ export default function UserProfileScreen() {
 
   // Pairwise "sidequests together" count from quest_ledger (0 = hidden).
   const [questsTogether, setQuestsTogether] = useState(0);
+
+  // Pulse Monitor state for the pair. Only hot/warm/cooling are kept — cold
+  // (or no row) is the default state of strangers and stays hidden.
+  const [pulseState, setPulseState] = useState<'hot' | 'warm' | 'cooling' | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -187,6 +192,19 @@ export default function UserProfileScreen() {
           .eq('user_hi', hi)
           .maybeSingle();
         setQuestsTogether(ledger?.quest_count ?? 0);
+
+        // Pulse Monitor state, same canonical lo/hi keying as the ledger.
+        const { data: pulse } = await supabase
+          .from('pair_pulse')
+          .select('state')
+          .eq('user_lo', lo)
+          .eq('user_hi', hi)
+          .maybeSingle();
+        setPulseState(
+          pulse?.state === 'hot' || pulse?.state === 'warm' || pulse?.state === 'cooling'
+            ? pulse.state
+            : null
+        );
       }
     } catch (err) {
       console.error('Error fetching user data:', err);
@@ -485,16 +503,19 @@ export default function UserProfileScreen() {
             </>
           )}
 
-          {/* Pairwise sidequest count — the "you two, together" retention hook.
-              Hidden at 0 / on your own profile. */}
-          {questsTogether > 0 && (
+          {/* Pairwise sidequest count — the "you two, together" retention hook
+              — plus the Pulse Monitor state chip. Hidden at 0/cold/own profile. */}
+          {(questsTogether > 0 || pulseState) && (
             <View style={styles.questsTogetherRow}>
-              <View style={styles.questsTogetherChip}>
-                <Text style={styles.questsTogetherEmoji}>⚡</Text>
-                <Text style={styles.questsTogetherText}>
-                  {questsTogether} sidequest{questsTogether === 1 ? '' : 's'} together
-                </Text>
-              </View>
+              {questsTogether > 0 && (
+                <View style={styles.questsTogetherChip}>
+                  <Text style={styles.questsTogetherEmoji}>⚡</Text>
+                  <Text style={styles.questsTogetherText}>
+                    {questsTogether} sidequest{questsTogether === 1 ? '' : 's'} together
+                  </Text>
+                </View>
+              )}
+              <PulseChip state={pulseState} />
             </View>
           )}
 
@@ -734,6 +755,10 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   questsTogetherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: authSpace.sm,
     paddingHorizontal: authSpace.xl,
     marginBottom: authSpace.xl,
   },

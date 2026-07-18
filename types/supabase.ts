@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -174,6 +194,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      engine_events: {
+        Row: {
+          created_at: string
+          event_id: number | null
+          event_key: string
+          id: number
+          pair_hi: string | null
+          pair_lo: string | null
+          payload: Json
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_id?: number | null
+          event_key: string
+          id?: never
+          pair_hi?: string | null
+          pair_lo?: string | null
+          payload?: Json
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: number | null
+          event_key?: string
+          id?: never
+          pair_hi?: string | null
+          pair_lo?: string | null
+          payload?: Json
+          user_id?: string | null
+        }
+        Relationships: []
       }
       event_costs: {
         Row: {
@@ -410,6 +463,33 @@ export type Database = {
           },
         ]
       }
+      lifecycle_events: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: number
+          job_key: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: number
+          job_key: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: number
+          job_key?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_read_receipts: {
         Row: {
           id: number
@@ -517,6 +597,51 @@ export type Database = {
           {
             foreignKeyName: "messages_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pair_pulse: {
+        Row: {
+          computed_at: string
+          last_interaction_at: string | null
+          prev_state: string | null
+          score: number
+          state: string
+          user_hi: string
+          user_lo: string
+        }
+        Insert: {
+          computed_at?: string
+          last_interaction_at?: string | null
+          prev_state?: string | null
+          score?: number
+          state?: string
+          user_hi: string
+          user_lo: string
+        }
+        Update: {
+          computed_at?: string
+          last_interaction_at?: string | null
+          prev_state?: string | null
+          score?: number
+          state?: string
+          user_hi?: string
+          user_lo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pair_pulse_user_hi_fkey"
+            columns: ["user_hi"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pair_pulse_user_lo_fkey"
+            columns: ["user_lo"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -914,6 +1039,7 @@ export type Database = {
           original_transaction_id: string | null
           provider: string | null
           started_at: string | null
+          stripe_customer_id: string | null
           subscription_type: string | null
           updated_at: string | null
           user_id: string | null
@@ -926,6 +1052,7 @@ export type Database = {
           original_transaction_id?: string | null
           provider?: string | null
           started_at?: string | null
+          stripe_customer_id?: string | null
           subscription_type?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -938,6 +1065,7 @@ export type Database = {
           original_transaction_id?: string | null
           provider?: string | null
           started_at?: string | null
+          stripe_customer_id?: string | null
           subscription_type?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1322,6 +1450,10 @@ export type Database = {
       is_conversation_member: { Args: { conv_id: number }; Returns: boolean }
       is_user_founder: { Args: { uid: string }; Returns: boolean }
       is_user_premium: { Args: { uid: string }; Returns: boolean }
+      log_engine_event: {
+        Args: { p_event_id?: number; p_event_key: string; p_payload?: Json }
+        Returns: undefined
+      }
       mark_conversation_as_read: {
         Args: { p_conversation_id: number; p_user_id: string }
         Returns: undefined
@@ -1342,6 +1474,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      refresh_pair_pulse: { Args: never; Returns: undefined }
       search_cities: {
         Args: { max_results?: number; query: string }
         Returns: {
@@ -1523,7 +1656,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

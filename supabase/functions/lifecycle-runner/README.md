@@ -37,7 +37,7 @@ idempotency backbone. Each job runs **at most once per user, forever**:
 Append an object matching this contract to the `JOBS` array in `index.ts`:
 
 ```ts
-type Candidate = { user_id: string; email: string; [key: string]: unknown };
+type Candidate = { user_id: string; email: string; job_key?: string; [key: string]: unknown };
 
 type LifecycleJob = {
   key: string;          // stable, persisted to lifecycle_events.job_key — never rename in place
@@ -47,6 +47,13 @@ type LifecycleJob = {
   run(admin, user): Promise<'sent' | 'skipped'>;     // do the work for one user
 };
 ```
+
+A candidate may carry its **own `job_key`** (prefix it with the job's static key)
+to scope the at-most-once guarantee more narrowly than "once per user, forever" —
+e.g. `cooling_pair_nudge` keys per pair-week (`cooling:{lo}:{hi}:{ISO-week}`) so
+the same user can be nudged about a different pair, or about the same pair again
+in a later week. When omitted, the job's static `key` is used and the guarantee
+is the classic once-per-user-forever.
 
 - `selectUsers` returns candidates; **idempotency is the runner's job**, don't
   re-implement it. Keep the set bounded (`BATCH_SIZE`, currently 50) so a cron tick
@@ -71,6 +78,19 @@ SQL selector over `auth.users` and call it from `selectUsers`.
 `profiles.onboarding_completed = false` and sends a **placeholder** "finish setting up
 Waypoint" email with app-store links. `enabled: false`. Flip it to `true`, finalise
 the email template + real store URLs, then deploy to activate.
+
+## cooling_pair_nudge (ENABLED — Pulse Monitor drift re-engagement)
+
+Emails **both members** of every pair that drifted hot/warm → cooling in the last
+24h (from `engine_events` rows emitted by the nightly `refresh_pair_pulse()`):
+their shared sidequest tally, how long it's been quiet, and one suggested quest
+matched to the vibes of events they actually co-attended. Blocked pairs are
+excluded. Idempotent per pair-week per user via candidate `job_key`
+`cooling:{user_lo}:{user_hi}:{ISO-week}`. Every send is recorded as
+`engine_events('nudge.sent')`; the next refresh emits `nudge.converted` if the
+pair interacts within 14 days — nudge→re-engagement conversion is measurable
+from day one. Note: the runner stays fail-closed without `LIFECYCLE_RUNNER_AUTH`
+and records `skipped` (no email) without `RESEND_API_KEY`.
 
 ## Secrets to set
 

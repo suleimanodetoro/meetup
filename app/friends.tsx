@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppImage } from '~/components/AppImage';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { GradientButton } from '~/components/GradientButton';
+import { PulseChip } from '~/components/PulseChip';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
@@ -40,6 +41,9 @@ const FRIEND_COLS =
 export default function FriendsScreen() {
   const { session } = useAuth();
   const [friends, setFriends] = useState<Friend[]>([]);
+  // Pulse Monitor state per friend id — only hot/warm/cooling are kept, so a
+  // missing key simply renders no chip (cold = the default, showing it is noise).
+  const [pulseByFriend, setPulseByFriend] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -61,6 +65,25 @@ export default function FriendsScreen() {
       .map((row) => (row.requester?.id === uid ? row.addressee : row.requester))
       .filter(Boolean) as Friend[];
     setFriends(list);
+
+    // Pulse chips: one batched query for all visible friends (no per-row round
+    // trips). pair_pulse is keyed on the canonical lo/hi pair, so match both
+    // orientations of "me + friend"; RLS already scopes rows to my own pairs.
+    if (list.length === 0) {
+      setPulseByFriend({});
+      return;
+    }
+    const idList = list.map((f) => f.id).join(',');
+    const { data: pulses } = await supabase
+      .from('pair_pulse')
+      .select('user_lo, user_hi, state')
+      .or(`and(user_lo.eq.${uid},user_hi.in.(${idList})),and(user_hi.eq.${uid},user_lo.in.(${idList}))`)
+      .in('state', ['hot', 'warm', 'cooling']);
+    const byFriend: Record<string, string> = {};
+    for (const p of pulses ?? []) {
+      byFriend[p.user_lo === uid ? p.user_hi : p.user_lo] = p.state;
+    }
+    setPulseByFriend(byFriend);
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -93,7 +116,7 @@ export default function FriendsScreen() {
           contentContainerStyle={friends.length === 0 ? styles.emptyContent : styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          renderItem={({ item }) => <FriendRow friend={item} />}
+          renderItem={({ item }) => <FriendRow friend={item} pulse={pulseByFriend[item.id]} />}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="people-outline" size={40} color={authColors.textTertiary} />
@@ -114,7 +137,7 @@ export default function FriendsScreen() {
   );
 }
 
-function FriendRow({ friend }: { friend: Friend }) {
+function FriendRow({ friend, pulse }: { friend: Friend; pulse?: string }) {
   const code = friend.location_country_code || friend.nationality_code || '';
   const place =
     [friend.location, friend.location_country].filter(Boolean).join(', ') ||
@@ -133,9 +156,12 @@ function FriendRow({ friend }: { friend: Friend }) {
         <InitialsAvatar name={friend.full_name || ''} id={friend.id} size={52} />
       )}
       <View style={styles.rowText}>
-        <Text style={styles.name} numberOfLines={1}>
-          {friend.full_name || 'Waypointer'}
-        </Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {friend.full_name || 'Waypointer'}
+          </Text>
+          <PulseChip state={pulse} />
+        </View>
         {place ? (
           <Text style={styles.sub} numberOfLines={1}>
             {getCountryFlag(code)} {place}
@@ -176,7 +202,8 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: authColors.borderMuted },
   rowText: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '600', color: authColors.textPrimary },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: authSpace.sm },
+  name: { flexShrink: 1, fontSize: 16, fontWeight: '600', color: authColors.textPrimary },
   sub: { marginTop: 2, fontSize: 14, color: authColors.textSecondary },
   empty: {
     flex: 1,
