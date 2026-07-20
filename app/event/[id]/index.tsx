@@ -806,7 +806,13 @@ export default function PlanDetailsScreen() {
                   <Text style={styles.organizerName}>
                     {event.creator.full_name || event.creator.username || 'Unknown'}
                   </Text>
-                  <Text style={styles.organizerRole}>Group Organizer</Text>
+                  {/* Auto-generated quests are transparently system-hosted:
+                      the 'waypoint' profile is the engine, not a person. */}
+                  <Text style={styles.organizerRole}>
+                    {event.creator.username === 'waypoint'
+                      ? 'Suggested by Waypoint'
+                      : 'Group Organizer'}
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </Pressable>

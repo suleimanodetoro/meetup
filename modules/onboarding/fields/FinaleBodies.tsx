@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -6,6 +6,7 @@ import {
   Image,
   Linking,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -13,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { authColors, authSpace, authType } from '~/utils/authTheme';
+import { RedeemCodeSheet } from '~/components/RedeemCodeSheet';
 
 // Survey "social proof" bubbles + the founder-note headshot on the rating step.
 const REVIEW_AVATARS = [
@@ -86,6 +88,9 @@ export async function requestWaypointReview() {
 export function TakeABowBody() {
   const pulse = useRef(new Animated.Value(0)).current;
   const confetti = useRef(new Animated.Value(0)).current;
+  // Pilot users arrive with an invite code; this is where they redeem it —
+  // before they ever meet a paywall.
+  const [showRedeemSheet, setShowRedeemSheet] = useState(false);
 
   useEffect(() => {
     const pulseAnimation = Animated.loop(
@@ -242,7 +247,15 @@ export function TakeABowBody() {
           Your profile is set. Waypoint can now show people, plans, and trips around your current
           city.
         </Text>
+        <Pressable
+          onPress={() => setShowRedeemSheet(true)}
+          hitSlop={8}
+          style={styles.inviteCodeLink}>
+          <Text style={styles.inviteCodeText}>Have an invite code?</Text>
+        </Pressable>
       </View>
+
+      <RedeemCodeSheet visible={showRedeemSheet} onClose={() => setShowRedeemSheet(false)} />
     </View>
   );
 }
@@ -466,6 +479,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 23,
     fontWeight: '600',
+  },
+  inviteCodeLink: {
+    marginTop: authSpace.lg,
+    paddingVertical: authSpace.xs,
+  },
+  inviteCodeText: {
+    color: authColors.accent,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   ratingContainer: {
     flex: 1,

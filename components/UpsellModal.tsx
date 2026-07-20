@@ -17,7 +17,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path } from 'react-native-svg';
-import Purchases, { type PurchasesPackage, PURCHASES_ERROR_CODE } from 'react-native-purchases';
+import Purchases, {
+  type PurchasesPackage,
+  PURCHASES_ERROR_CODE,
+  INTRO_ELIGIBILITY_STATUS,
+} from 'react-native-purchases';
 import { FounderBadge } from '~/components/FounderBadge';
 import { GradientButton } from '~/components/GradientButton';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
@@ -25,8 +29,7 @@ import { authColors, authSpace } from '~/utils/authTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGE_WIDTH = SCREEN_WIDTH;
-const PACKAGE_GAP = 12;
-const PACKAGE_CARD_WIDTH = (SCREEN_WIDTH - authSpace.lg * 2 - PACKAGE_GAP) / 2;
+const PACKAGE_GAP = 10;
 const TERMS_URL = 'https://www.usewaypoint.app/terms';
 const PRIVACY_URL = 'https://www.usewaypoint.app/privacy';
 
@@ -123,19 +126,41 @@ export default function UpsellModal({
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-product-id trial eligibility. A product is present here with value
+  // `false` ONLY when RevenueCat says the user is explicitly ineligible for the
+  // intro offer (already used their trial). Absent / true → show the trial.
+  // Fail open: if the check errors or returns UNKNOWN we still show the trial,
+  // because hiding it from an eligible user costs a conversion and Apple
+  // enforces real eligibility at purchase time anyway.
+  const [trialEligible, setTrialEligible] = useState<Record<string, boolean>>({});
   const activeMode = PAYWALL_PAGES[activePage]?.mode ?? mode;
   const activePackages = packagesByMode[activeMode];
   const sortedActivePackages = useMemo(() => sortPackages(activePackages), [activePackages]);
-  // Only the top two packages render, and at most one carries the "best value"
-  // badge (the founder page lists both Yearly and Lifetime, which previously both
-  // qualified — see bestValuePackageId).
-  const shownPackages = useMemo(() => sortedActivePackages.slice(0, 2), [sortedActivePackages]);
+  // Up to three packages render (weekly / monthly / yearly ladder), and at
+  // most one carries the "best value" badge (the founder page lists both
+  // Yearly and Lifetime, which previously both qualified — see
+  // bestValuePackageId).
+  const shownPackages = useMemo(() => sortedActivePackages.slice(0, 3), [sortedActivePackages]);
   const bestValueId = useMemo(() => bestValuePackageId(shownPackages), [shownPackages]);
   const selectedPackage =
     sortedActivePackages.find((pkg) => pkg.identifier === selectedPackageIdByMode[activeMode]) ??
     sortedActivePackages[0] ??
     null;
   const entitlementId = ENTITLEMENT_BY_MODE[activeMode];
+
+  // Trial label for a package, but only if the user is actually eligible.
+  // Returns null when the product has no free trial OR RevenueCat has told us
+  // this user already consumed theirs — so the "start free trial" CTA/badge
+  // never shows to someone Apple would immediately charge.
+  const trialLabelFor = useCallback(
+    (pkg: PurchasesPackage): string | null => {
+      const label = freeTrialLabel(pkg);
+      if (!label) return null;
+      if (trialEligible[pkg.product.identifier] === false) return null;
+      return label;
+    },
+    [trialEligible]
+  );
 
   // Fetch offerings only when the modal becomes visible. RC caches them
   // SDK-side so subsequent opens are instant; we don't need a global
@@ -154,6 +179,7 @@ export default function UpsellModal({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setTrialEligible({});
     Purchases.getOfferings()
       .then((offerings) => {
         if (cancelled) return;
@@ -174,6 +200,29 @@ export default function UpsellModal({
 
         if (premiumPackages.length === 0 && founderPackages.length === 0) {
           setError('No purchase options are available right now.');
+        }
+
+        // Check intro-offer eligibility for every product that actually
+        // carries a free trial, so ineligible users don't see trial wording.
+        // Non-blocking and fail-open — a failure just leaves the trial shown.
+        const trialProductIds = [...premiumPackages, ...founderPackages]
+          .filter((pkg) => freeTrialLabel(pkg) !== null)
+          .map((pkg) => pkg.product.identifier);
+        if (trialProductIds.length > 0) {
+          Purchases.checkTrialOrIntroductoryPriceEligibility(trialProductIds)
+            .then((result) => {
+              if (cancelled) return;
+              const next: Record<string, boolean> = {};
+              for (const [productId, eligibility] of Object.entries(result)) {
+                next[productId] =
+                  eligibility.status !==
+                  INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_INELIGIBLE;
+              }
+              setTrialEligible(next);
+            })
+            .catch((err) => {
+              console.warn('[UpsellModal] trial eligibility check failed:', err);
+            });
         }
       })
       .catch((err) => {
@@ -263,6 +312,7 @@ export default function UpsellModal({
   const anyPending = purchasingId !== null || restoring;
   const isPurchasingSelected = !!selectedPackage && purchasingId === selectedPackage.identifier;
   const activePageConfig = PAYWALL_PAGES[activePage] ?? PAYWALL_PAGES[initialPage];
+  const selectedTrial = selectedPackage ? trialLabelFor(selectedPackage) : null;
 
   const onMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextPage = Math.round(event.nativeEvent.contentOffset.x / PAGE_WIDTH);
@@ -273,8 +323,13 @@ export default function UpsellModal({
     if (activeMode === 'founder') {
       return 'Founder purchases are optional. Annual renews unless cancelled in App Store settings. Founder Forever is a one-time purchase. By continuing, you agree to our ';
     }
+    if (selectedTrial && selectedPackage) {
+      // Apple requires trial terms (length, post-trial price, auto-renewal)
+      // to be stated where the trial is offered.
+      return `Free for ${selectedTrial.replace('-', ' ')}, then ${selectedPackage.product.priceString} per ${periodNoun(selectedPackage)}. Renews automatically unless cancelled in App Store settings at least 24 hours before the trial ends. By continuing, you agree to our `;
+    }
     return 'By continuing, your subscription renews unless cancelled in App Store settings. You agree to our ';
-  }, [activeMode]);
+  }, [activeMode, selectedTrial, selectedPackage]);
 
   return (
     <Modal
@@ -321,14 +376,18 @@ export default function UpsellModal({
               <View style={styles.packageGrid}>
                 {shownPackages.map((pkg) => {
                   const selected = selectedPackage?.identifier === pkg.identifier;
+                  const trial = trialLabelFor(pkg);
+                  const badge =
+                    pkg.identifier === bestValueId ? 'best value' : trial ? 'free trial' : undefined;
                   return (
                     <PackageCard
                       key={pkg.identifier}
                       pkg={pkg}
                       selected={selected}
                       label={packageLabel(pkg)}
-                      badge={pkg.identifier === bestValueId ? 'best value' : undefined}
-                      subprice={packageSubprice(pkg)}
+                      badge={badge}
+                      badgeTone={badge === 'best value' ? 'dark' : 'accent'}
+                      subprice={packageSubprice(pkg, trial)}
                       disabled={anyPending}
                       onPress={() =>
                         setSelectedPackageIdByMode((current) => ({
@@ -343,7 +402,9 @@ export default function UpsellModal({
               <GradientButton
                 label={
                   selectedPackage
-                    ? `${activePageConfig.ctaIdle} - ${selectedPackage.product.priceString}`
+                    ? selectedTrial
+                      ? `start ${selectedTrial} free trial`
+                      : `${activePageConfig.ctaIdle} - ${selectedPackage.product.priceString}`
                     : 'purchase unavailable'
                 }
                 onPress={() => selectedPackage && purchasePackage(selectedPackage)}
@@ -387,17 +448,51 @@ function sortPackages(packages: PurchasesPackage[]) {
   return [...packages].sort((a, b) => packageRank(a) - packageRank(b));
 }
 
+// Display order = ascending commitment (weekly → monthly → yearly →
+// lifetime). sorted[0] doubles as the pre-selected default, so weekly is the
+// hero on the premium page while the founder page (annual + lifetime) still
+// defaults to annual.
 function packageRank(pkg: PurchasesPackage) {
   switch (pkg.packageType) {
-    case 'ANNUAL':
-      return 0;
-    case 'LIFETIME':
+    case 'WEEKLY':
       return 0;
     case 'MONTHLY':
       return 1;
-    default:
+    case 'ANNUAL':
       return 2;
+    case 'LIFETIME':
+      return 3;
+    default:
+      return 4;
   }
+}
+
+/** Billing period noun for legal copy ("week" / "month" / "year"). */
+function periodNoun(pkg: PurchasesPackage): string {
+  switch (pkg.packageType) {
+    case 'WEEKLY':
+      return 'week';
+    case 'MONTHLY':
+      return 'month';
+    case 'ANNUAL':
+      return 'year';
+    default:
+      return 'period';
+  }
+}
+
+/**
+ * "3-day" / "1-week" style label when the package carries a FREE intro offer
+ * (price 0). Paid intro offers (pay-as-you-go discounts) return null — we
+ * don't sell those, and rendering them as "free" would be an App Review
+ * rejection.
+ */
+function freeTrialLabel(pkg: PurchasesPackage): string | null {
+  const intro = pkg.product.introPrice;
+  if (!intro || intro.price !== 0) return null;
+  const unit = intro.periodUnit?.toLowerCase() ?? 'day';
+  // Hyphenated compound adjectives stay singular: "3-day", "1-week".
+  return `${intro.periodNumberOfUnits}-${unit}`;
 }
 
 // The single best-value package among those rendered. A one-time Lifetime (e.g.
@@ -411,7 +506,14 @@ function bestValuePackageId(packages: PurchasesPackage[]): string | null {
   return annual?.identifier ?? null;
 }
 
-function packageSubprice(pkg: PurchasesPackage) {
+// `trialLabel` is the eligibility-resolved trial (null if none or the user is
+// ineligible) — passed in so the subprice line matches the badge/CTA exactly.
+function packageSubprice(pkg: PurchasesPackage, trialLabel: string | null) {
+  if (pkg.packageType === 'WEEKLY') {
+    return trialLabel
+      ? `${trialLabel} free, then ${pkg.product.priceString}/wk`
+      : `${pkg.product.priceString}/wk, billed weekly`;
+  }
   if (pkg.packageType === 'ANNUAL') {
     return `${formatPriceLike(pkg.product.price / 12, pkg.product.priceString)}/mo, billed annually`;
   }
@@ -493,6 +595,7 @@ function PackageCard({
   pkg,
   label,
   badge,
+  badgeTone = 'dark',
   subprice,
   selected,
   disabled,
@@ -501,6 +604,7 @@ function PackageCard({
   pkg: PurchasesPackage;
   label: string;
   badge?: string;
+  badgeTone?: 'dark' | 'accent';
   subprice?: string;
   selected: boolean;
   disabled: boolean;
@@ -512,14 +616,16 @@ function PackageCard({
       disabled={disabled}
       style={[styles.packageCard, selected && styles.packageCardSelected]}>
       {badge ? (
-        <View style={[styles.packageBadge, selected && styles.packageBadgeSelected]}>
+        <View style={[styles.packageBadge, badgeTone === 'accent' && styles.packageBadgeAccent]}>
           <Text style={styles.packageBadgeText}>{badge}</Text>
         </View>
       ) : null}
       <View style={styles.packageTopRow}>
-        <Text style={styles.packageLabel}>{label.toLowerCase()}</Text>
+        <Text style={styles.packageLabel} numberOfLines={1}>
+          {label.toLowerCase()}
+        </Text>
         <View style={[styles.radio, selected && styles.radioSelected]}>
-          {selected ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
+          {selected ? <Ionicons name="checkmark" size={13} color="#FFFFFF" /> : null}
         </View>
       </View>
       <Text style={styles.packagePrice}>{pkg.product.priceString}</Text>
@@ -715,13 +821,14 @@ const styles = StyleSheet.create({
     paddingBottom: authSpace.lg,
   },
   packageCard: {
-    width: PACKAGE_CARD_WIDTH,
-    minHeight: 138,
+    flex: 1,
+    minHeight: 124,
     borderRadius: 16,
     backgroundColor: authColors.surface,
     borderWidth: 2,
     borderColor: authColors.borderSubtle,
-    padding: authSpace.lg,
+    paddingVertical: authSpace.lg,
+    paddingHorizontal: authSpace.md,
     justifyContent: 'space-between',
   },
   packageCardSelected: {
@@ -730,14 +837,14 @@ const styles = StyleSheet.create({
   packageBadge: {
     position: 'absolute',
     top: -12,
-    left: 16,
+    left: 10,
     borderRadius: 6,
     paddingHorizontal: authSpace.sm,
     paddingVertical: 4,
     backgroundColor: authColors.textPrimary,
   },
-  packageBadgeSelected: {
-    backgroundColor: authColors.textPrimary,
+  packageBadgeAccent: {
+    backgroundColor: authColors.accent,
   },
   packageBadgeText: {
     color: authColors.ctaPrimaryText,
@@ -748,14 +855,14 @@ const styles = StyleSheet.create({
   },
   packageTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: authSpace.sm,
+    gap: authSpace.xs,
   },
   radio: {
-    width: 25,
-    height: 25,
-    borderRadius: 13,
+    width: 21,
+    height: 21,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: '#CFC8B8',
     alignItems: 'center',
@@ -794,22 +901,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   packageLabel: {
-    fontSize: 18,
-    lineHeight: 23,
+    flexShrink: 1,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: '900',
     color: authColors.textPrimary,
     textTransform: 'lowercase',
   },
   packagePrice: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: '900',
     color: authColors.textPrimary,
     marginTop: authSpace.md,
   },
   packageMeta: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '700',
     color: authColors.textSecondary,
     marginTop: 2,

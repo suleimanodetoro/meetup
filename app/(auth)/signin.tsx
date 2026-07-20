@@ -1,13 +1,14 @@
 // app/(auth)/signin.tsx
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import AuthHeader from '~/components/auth/AuthHeader';
 import AuthInput from '~/components/auth/AuthInput';
 import AuthScreen from '~/components/auth/AuthScreen';
 import PrimaryButton from '~/components/auth/PrimaryButton';
 import SecondaryButton from '~/components/auth/SecondaryButton';
+import { useDeferredAutoFocus } from '~/components/auth/useDeferredAutoFocus';
 import ErrorBanner from '~/components/ErrorBanner';
 import { authColors, authSpace } from '~/utils/authTheme';
 import { supabase } from '~/utils/supabase';
@@ -21,7 +22,8 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const isMounted = useRef(true);
-  const passwordRef = useRef<{ focus: () => void } | null>(null);
+  const emailRef = useDeferredAutoFocus();
+  const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
     return () => {
@@ -40,7 +42,7 @@ export default function SignInScreen() {
   };
 
   const focusPassword = () => {
-    passwordRef.current?.focus?.();
+    passwordRef.current?.focus();
   };
 
   async function signIn() {
@@ -98,18 +100,18 @@ export default function SignInScreen() {
 
       <View style={styles.fields}>
         <AuthInput
+          ref={emailRef}
           label="Email address"
           type="email"
           value={email}
           onChangeText={handleEmailChange}
-          autoFocus
           returnKeyType="next"
           onSubmitEditing={focusPassword}
           editable={!loading}
         />
 
         <View style={styles.passwordWrapper}>
-          <AuthInputWithRef
+          <AuthInput
             ref={passwordRef}
             label="Password"
             type="password"
@@ -152,23 +154,6 @@ export default function SignInScreen() {
     </AuthScreen>
   );
 }
-
-// AuthInput owns its TextInput and doesn't expose a ref. To support
-// focusing the password field from the email field's "next" return key
-// without modifying the shared component, we bump a focus token that
-// remounts AuthInput with autoFocus=true. The parent owns the value, so
-// nothing typed is lost.
-const AuthInputWithRef = React.forwardRef<
-  { focus: () => void },
-  React.ComponentProps<typeof AuthInput>
->((props, ref) => {
-  const [focusToken, setFocusToken] = useState(0);
-  React.useImperativeHandle(ref, () => ({
-    focus: () => setFocusToken((n) => n + 1),
-  }));
-  return <AuthInput key={focusToken} autoFocus={focusToken > 0} {...props} />;
-});
-AuthInputWithRef.displayName = 'AuthInputWithRef';
 
 const styles = StyleSheet.create({
   headline: {

@@ -161,7 +161,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -185,6 +185,13 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# Waypoint-branded signup confirmation email. The same HTML should be pasted
+# into the hosted dashboard (Authentication → Emails → Confirm signup) — this
+# block only affects local dev / `supabase db push`-linked config.
+[auth.email.template.confirmation]
+subject = "Confirm your Waypoint account"
+content_path = "./supabase/templates/confirm-signup.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -330,4 +337,10 @@ verify_jwt = false
 # authenticated Supabase user. Auth is a shared-secret Bearer header
 # (LIFECYCLE_RUNNER_AUTH) checked inside the function, so the JWT check is off.
 [functions.lifecycle-runner]
+verify_jwt = false
+
+# Auto-generate is triggered by pg_cron / a manual curl, not by an
+# authenticated Supabase user. Auth is a shared-secret Bearer header
+# (AUTO_GENERATE_AUTH) checked inside the function, so the JWT check is off.
+[functions.auto-generate]
 verify_jwt = false

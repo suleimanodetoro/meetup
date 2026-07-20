@@ -9,6 +9,7 @@ import AuthScreen from '../../components/auth/AuthScreen';
 import IconHero from '../../components/auth/IconHero';
 import PrimaryButton from '../../components/auth/PrimaryButton';
 import SecondaryButton from '../../components/auth/SecondaryButton';
+import { useDeferredAutoFocus } from '../../components/auth/useDeferredAutoFocus';
 import ErrorBanner from '../../components/ErrorBanner';
 import { authColors, authSpace } from '../../utils/authTheme';
 import { supabase } from '~/utils/supabase';
@@ -18,6 +19,7 @@ const RESEND_COOLDOWN_MS = 30_000;
 const RESET_PASSWORD_REDIRECT = 'waypoint:///reset-password';
 
 export default function ForgotPasswordScreen() {
+  const emailRef = useDeferredAutoFocus();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -113,12 +115,12 @@ export default function ForgotPasswordScreen() {
           <View style={styles.form}>
             <ErrorBanner message={error} />
             <AuthInput
+              ref={emailRef}
               label="Email"
               value={email}
               onChangeText={setEmail}
               type="email"
               placeholder="you@example.com"
-              autoFocus
               returnKeyType="go"
               onSubmitEditing={handleReset}
             />

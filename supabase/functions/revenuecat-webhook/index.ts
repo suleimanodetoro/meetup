@@ -126,11 +126,24 @@ serve(async (req) => {
         if (!hasFounder) {
           const { data: existing } = await admin
             .from('user_subscriptions')
-            .select('subscription_type, entitlement_id')
+            .select('subscription_type, entitlement_id, provider, expires_at')
             .eq('user_id', userId)
             .maybeSingle();
           if (existing?.subscription_type === 'founder' || existing?.entitlement_id === 'founder') {
             console.log('[rc-webhook] skipping grant: existing founder row wins over non-founder RC event');
+            break;
+          }
+          // Promo grants (redeem_promo_code writes provider 'promotional')
+          // are not RC's row to reset. An RC event that carries a REAL
+          // entitlement (the user actually paid) wins over a promo, but an
+          // event with no entitlement must never wipe an active promo back
+          // to free.
+          const promoStillActive =
+            existing?.provider === 'promotional' &&
+            existing.entitlement_id !== null &&
+            (existing.expires_at === null || new Date(existing.expires_at) > new Date());
+          if (!hasPremium && promoStillActive) {
+            console.log('[rc-webhook] skipping grant: active promo row wins over non-entitled RC event');
             break;
           }
         }
@@ -189,6 +202,10 @@ serve(async (req) => {
         // this event actually owns. Mirrors stripe-webhook's expirePremium.
         if (previous?.provider === 'stripe') {
           console.log('[rc-webhook] skipping EXPIRATION: row is owned by stripe, not RevenueCat');
+          break;
+        }
+        if (previous?.provider === 'promotional') {
+          console.log('[rc-webhook] skipping EXPIRATION: row is a promo grant, not RevenueCat');
           break;
         }
         if (

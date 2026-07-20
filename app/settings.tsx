@@ -18,6 +18,7 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { isRevenueCatConfigured } from '~/lib/revenuecat';
 import UpsellModal from '~/components/UpsellModal';
+import { RedeemCodeSheet } from '~/components/RedeemCodeSheet';
 import {
   Card,
   Chevron,
@@ -34,6 +35,8 @@ const PRIVACY_URL = 'https://www.usewaypoint.app/privacy';
 export default function SettingsScreen() {
   const { signOut } = useAuth();
   const [showFounderModal, setShowFounderModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showRedeemSheet, setShowRedeemSheet] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -176,6 +179,12 @@ export default function SettingsScreen() {
             }
           />
           <Row
+            icon="gift-outline"
+            label="Redeem Code"
+            onPress={() => setShowRedeemSheet(true)}
+            right={<Chevron />}
+          />
+          <Row
             icon="diamond"
             iconColor={settingsTheme.accent}
             label="Support Waypoint"
@@ -188,6 +197,34 @@ export default function SettingsScreen() {
             }
           />
         </Card>
+
+        {/* Dev-only jump buttons for capturing App Store screenshots. Gated by
+            __DEV__ so it never appears in a production build. */}
+        {__DEV__ && (
+          <>
+            <SectionHeader title="Dev — screenshots" />
+            <Card dividerInset={52}>
+              <Row
+                icon="card-outline"
+                label="Paywall — Premium"
+                onPress={() => setShowPremiumModal(true)}
+                right={<Chevron />}
+              />
+              <Row
+                icon="diamond-outline"
+                label="Paywall — Founder"
+                onPress={() => setShowFounderModal(true)}
+                right={<Chevron />}
+              />
+              <Row
+                icon="gift-outline"
+                label="Redeem sheet"
+                onPress={() => setShowRedeemSheet(true)}
+                right={<Chevron />}
+              />
+            </Card>
+          </>
+        )}
 
         <SectionHeader title="Preferences" />
         <Card dividerInset={52}>
@@ -258,6 +295,14 @@ export default function SettingsScreen() {
         mode="founder"
         offeringIdentifier="supporter"
       />
+
+      <UpsellModal
+        visible={showPremiumModal}
+        onDismiss={() => setShowPremiumModal(false)}
+        mode="premium"
+      />
+
+      <RedeemCodeSheet visible={showRedeemSheet} onClose={() => setShowRedeemSheet(false)} />
     </SafeAreaView>
   );
 }

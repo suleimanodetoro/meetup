@@ -1,33 +1,62 @@
 /**
- * Seed local Supabase with 25 personas + a realistic social graph.
+ * Seed local (or, with the safety latch, remote) Supabase with a dense, hip,
+ * believable social graph — tuned to make the app look ALIVE for App Store
+ * screenshots, especially in DUNDEE (the hero city).
  *
  * Strategy:
- *  1. Create auth users (the `handle_new_user` trigger auto-creates a profile).
- *  2. Update each profile with the full onboarding payload.
+ *  1. Create auth users (the `handle_new_user` trigger auto-creates a profile),
+ *     WEIGHTED by CITY_USER_TARGETS so Dundee is busiest (18), the other UK
+ *     cities are moderate, and the original six keep ~their prior volume.
+ *  2. Update each profile with the full onboarding payload (onboarding_completed,
+ *     bio, valid interests taxonomy, languages, diverse names + avatars).
  *  3. Build friendship clusters by city (real social graphs cluster geographically).
- *  4. Generate visits, events, and attendance.
+ *  4. Generate visits (every persona gets a home-city visit overlapping the next
+ *     90 days so city-detail ranking surfaces them), events, and attendance.
+ *     Events are seeded as SIDEQUESTS: kind='open' (some 'crew'), status='active',
+ *     is_private=false, a quest_tags row (vibe/energy/social_mode/is_seed) each,
+ *     and localized titles (Dundee gets bespoke ones). Weighted by
+ *     CITY_EVENT_TARGETS so Dundee has 20 future-dated sidequests.
  *     The `create_event_conversation` trigger auto-creates a group conversation
  *     per event; `add_user_to_event_conversation` auto-adds attendees. We only
  *     backfill messages.
  *  5. Create DM conversations between friend pairs + a long-message sentinel.
- *  6. Drop in a pro-tier sentinel and a sparse-profile sentinel.
+ *  6. Drop in a pro-tier sentinel and a sparse-profile sentinel (kept OFF Dundee
+ *     so the hero city stays pristine in screenshots).
+ *  7. OPTIONAL owner hookup: if SEED_OWNER_EMAIL is set and matches a real auth
+ *     user, wire that account into the Dundee scene — accepted friendships,
+ *     recent DM threads, and a couple of event RSVPs — so the owner's own
+ *     Chats/Friends/profile screens look alive. Skipped silently otherwise.
  *
- * Idempotency: run `npm run seed:reset` first if re-seeding.
+ * Idempotency: RUN `npm run seed:reset` FIRST for a clean slate — it wipes every
+ * @seed.local user (cascades remove their content). Because events.user_id is
+ * ON DELETE SET NULL, reset leaves hostless seed events behind; this script
+ * sweeps those first (step 0, matched precisely via the is_seed quest_tag, so it
+ * never touches real plans). Every other insert is additive and skips-on-conflict
+ * where a unique constraint exists, so a re-run without reset stacks more data
+ * rather than crashing.
+ *
+ * Owner hookup: set SEED_OWNER_EMAIL=<your login email> to also wire your own
+ * (non-seed) account into Dundee. Unset it to skip.
  */
 
 import { faker } from '@faker-js/faker';
 import { admin, SEED_EMAIL_DOMAIN, SEED_PASSWORD } from './env';
 import {
   CITIES,
+  ALL_CITIES,
+  HERO_CITY,
+  CITY_USER_TARGETS,
+  CITY_EVENT_TARGETS,
   INTEREST_IDS,
   LANGUAGE_CODES,
   GENDERS,
   GENDER_PREFS,
   MEETING_PREFS,
-  EVENT_TEMPLATES,
   EVENT_IMAGES,
   MESSAGE_OPENERS,
+  CHAT_LINES,
   BIO_FRAGMENTS,
+  sidequestsForCity,
   getAvatarUrl,
   pick,
   pickMany,
@@ -36,8 +65,8 @@ import {
   type City,
 } from './data';
 
-const USER_COUNT = 75;
-const EVENT_COUNT = 90;
+const USER_COUNT = CITY_USER_TARGETS.reduce((sum, t) => sum + t.count, 0);
+const EVENT_COUNT = CITY_EVENT_TARGETS.reduce((sum, t) => sum + t.count, 0);
 
 type Persona = {
   id: string;
@@ -143,7 +172,7 @@ async function buildFriendships(personas: Persona[]) {
   // Cross-city: each persona gets 0-1 friend from another city.
   for (const p of personas) {
     if (Math.random() < 0.5) {
-      const otherCity = pick(CITIES.filter((c) => c.name !== p.city.name));
+      const otherCity = pick(ALL_CITIES.filter((c) => c.name !== p.city.name));
       const candidate = personas.find((o) => o.city.name === otherCity.name);
       if (candidate) addEdge(p, candidate, 'accepted');
     }
@@ -156,7 +185,9 @@ async function buildFriendships(personas: Persona[]) {
     addEdge(a, b, 'pending');
   }
 
-  const { error } = await admin.from('friendships').insert(rows);
+  const { error } = await admin
+    .from('friendships')
+    .upsert(rows, { onConflict: 'requester_id,addressee_id', ignoreDuplicates: true });
   if (error) throw new Error(`friendships insert: ${error.message}`);
   console.log(`  → ${rows.length} friendship edges (${rows.filter((r) => r.status === 'pending').length} pending)`);
 }
@@ -167,94 +198,175 @@ async function buildFriendships(personas: Persona[]) {
 
 async function createVisits(personas: Persona[]) {
   const rows: any[] = [];
-  // Two "hot" cities draw most visits; the rest are background noise.
-  const hotCities = pickMany(CITIES, 2, 2);
+  const pushVisit = (userId: string, city: City, startOffset: number, duration: number) => {
+    const start = daysFromNow(startOffset);
+    const end = daysFromNow(startOffset + duration);
+    rows.push({
+      user_id: userId,
+      city: city.name,
+      country: city.country,
+      country_code: city.countryCode,
+      start_date: start.toISOString().slice(0, 10),
+      end_date: end.toISOString().slice(0, 10),
+      created_at: faker.date.recent({ days: 60 }).toISOString(),
+    });
+  };
 
+  // 1) Every persona gets a home-city "presence" visit that overlaps the default
+  //    [today, today+90] city window, so get_city_users_ranked scores them 1000
+  //    and they surface on their own city's detail page.
   for (const p of personas) {
-    const count = faker.number.int({ min: 0, max: 4 });
+    pushVisit(p.id, p.city, faker.number.int({ min: -2, max: 14 }), faker.number.int({ min: 3, max: 12 }));
+  }
+
+  // 2) Texture: extra trips. Dundee is a guaranteed "hot" destination so the
+  //    hero city stays busy even for visitors, not just residents.
+  const hotCities = [HERO_CITY, pick(CITIES)];
+  for (const p of personas) {
+    const count = faker.number.int({ min: 0, max: 3 });
     for (let i = 0; i < count; i++) {
       const visitCity =
-        Math.random() < 0.6 ? pick(hotCities) : pick(CITIES.filter((c) => c.name !== p.city.name));
+        Math.random() < 0.6 ? pick(hotCities) : pick(ALL_CITIES.filter((c) => c.name !== p.city.name));
       const offsetDays = faker.number.int({ min: -90, max: 90 }); // past + future
-      const duration = faker.number.int({ min: 2, max: 10 });
-      const start = daysFromNow(offsetDays);
-      const end = daysFromNow(offsetDays + duration);
-      rows.push({
-        user_id: p.id,
-        city: visitCity.name,
-        country: visitCity.country,
-        country_code: visitCity.countryCode,
-        start_date: start.toISOString().slice(0, 10),
-        end_date: end.toISOString().slice(0, 10),
-        created_at: faker.date.recent({ days: 60 }).toISOString(),
-      });
+      pushVisit(p.id, visitCity, offsetDays, faker.number.int({ min: 2, max: 10 }));
     }
   }
 
   const { error } = await admin.from('visits').insert(rows);
   if (error) throw new Error(`visits insert: ${error.message}`);
-  console.log(`  → ${rows.length} visits`);
+  console.log(`  → ${rows.length} visits (incl. one home-city presence visit per user)`);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Events + attendance
 // ────────────────────────────────────────────────────────────────────────────
 
-async function createEvents(personas: Persona[]): Promise<number[]> {
+// Rough opening hour for a sidequest from its title (sunrise dips are dawn,
+// quiz/gig/bakery runs are evening, everything else is daytime).
+function hourFor(title: string): number {
+  const t = title.toLowerCase();
+  if (/sunrise|dawn|parkrun|\bdip\b/.test(t)) return faker.number.int({ min: 6, max: 8 });
+  if (/sunset|golden hour|night|evening|open-mic|quiz|bakery|vinyl|ceilidh|karaoke|rave|live music/.test(t))
+    return faker.number.int({ min: 18, max: 21 });
+  return faker.number.int({ min: 10, max: 17 });
+}
+
+async function createEvents(
+  personas: Persona[]
+): Promise<{ eventIds: number[]; dundeeEventIds: number[] }> {
   const eventIds: number[] = [];
+  const dundeeEventIds: number[] = [];
+  const questTagRows: any[] = [];
 
-  for (let i = 0; i < EVENT_COUNT; i++) {
-    const creator = pick(personas);
-    const template = pick(EVENT_TEMPLATES);
-    const city = creator.city;
-    const lng = jitter(city.lng, 0.05);
-    const lat = jitter(city.lat, 0.05);
-    const daysOut = faker.number.int({ min: -7, max: 30 });
-    const eventDate = daysFromNow(daysOut);
-    eventDate.setHours(faker.number.int({ min: 18, max: 22 }), 0, 0, 0);
+  // One shuffled pass over the cover pool with a rolling index → consecutive
+  // events (including Dundee's, which are created first) get distinct images.
+  const shuffledImages = [...EVENT_IMAGES].sort(() => Math.random() - 0.5);
+  let imgIdx = 0;
 
-    const { data, error } = await admin
-      .from('events')
-      .insert({
-        title: template.title,
-        description: template.desc,
-        date: eventDate.toISOString(),
-        user_id: creator.id,
-        image_uri: EVENT_IMAGES[i % EVENT_IMAGES.length],
-        city: city.name,
-        country: city.country,
-        country_code: city.countryCode,
-        location_point: `POINT(${lng} ${lat})`,
-      })
-      .select('id')
-      .single();
-
-    if (error) throw new Error(`event insert (${template.title}): ${error.message}`);
-    eventIds.push(data.id);
-
-    // Attendance: creator auto-attends, plus 1-8 others (mostly from same city).
-    const candidates = personas.filter((p) => p.id !== creator.id);
-    const sameCity = candidates.filter((p) => p.city.name === city.name);
-    const otherCity = candidates.filter((p) => p.city.name !== city.name);
-    const attendees = [
-      ...pickMany(sameCity, 1, Math.min(5, sameCity.length)),
-      ...pickMany(otherCity, 0, 2),
-    ];
-
-    const attendanceRows = [
-      { event_id: data.id, user_id: creator.id, created_at: eventDate.toISOString() },
-      ...attendees.map((a) => ({
-        event_id: data.id,
-        user_id: a.id,
-        created_at: faker.date.recent({ days: 14 }).toISOString(),
-      })),
-    ];
-    const { error: attErr } = await admin.from('attendance').insert(attendanceRows);
-    if (attErr) throw new Error(`attendance for event ${data.id}: ${attErr.message}`);
+  const byCity = new Map<string, Persona[]>();
+  for (const p of personas) {
+    if (!byCity.has(p.city.name)) byCity.set(p.city.name, []);
+    byCity.get(p.city.name)!.push(p);
   }
 
-  console.log(`  → ${eventIds.length} events with attendance`);
-  return eventIds;
+  for (const target of CITY_EVENT_TARGETS) {
+    const city = target.city;
+    const cityPersonas = byCity.get(city.name) ?? [];
+    if (cityPersonas.length === 0) continue; // no host to author a plan there
+    const pool = sidequestsForCity(city);
+    const isHero = city.name === HERO_CITY.name;
+
+    for (let n = 0; n < target.count; n++) {
+      const creator = pick(cityPersonas);
+      const template = pick(pool);
+      const lng = jitter(city.lng, 0.05);
+      const lat = jitter(city.lat, 0.05);
+
+      // Hero city: always future & inside the 90-day window (top match_score, so
+      // all 12 map pins are live Dundee sidequests). Others: mostly future, a few
+      // just-passed so the city page shows some recent history too.
+      const daysOut = isHero
+        ? faker.number.int({ min: 1, max: 75 })
+        : Math.random() < 0.15
+          ? faker.number.int({ min: -6, max: 0 })
+          : faker.number.int({ min: 1, max: 75 });
+      const eventDate = daysFromNow(daysOut);
+      eventDate.setHours(hourFor(template.title), 0, 0, 0);
+
+      const kind = template.kind ?? (Math.random() < 0.18 ? 'crew' : 'open');
+
+      const { data, error } = await admin
+        .from('events')
+        .insert({
+          title: template.title,
+          description: template.desc,
+          date: eventDate.toISOString(),
+          user_id: creator.id,
+          image_uri: shuffledImages[imgIdx++ % shuffledImages.length],
+          city: city.name,
+          country: city.country,
+          country_code: city.countryCode,
+          location_name: template.venue ?? null,
+          location_point: `POINT(${lng} ${lat})`,
+          interests: [template.interest],
+          is_private: false,
+          kind,
+          status: 'active',
+          comfort: faker.number.int({ min: 1, max: 3 }),
+        })
+        .select('id')
+        .single();
+
+      if (error) throw new Error(`event insert (${template.title}): ${error.message}`);
+      eventIds.push(data.id);
+      if (isHero) dundeeEventIds.push(data.id);
+
+      // quest_tags: the matchable dimensions that make this row a real sidequest.
+      questTagRows.push({
+        event_id: data.id,
+        vibe: template.vibe,
+        energy_level: template.energy,
+        social_mode: template.social,
+        duration_min: template.duration,
+        risk_tier: template.soloSafe === false ? 2 : 1,
+        is_solo_safe: template.soloSafe ?? true,
+        is_seed: true,
+      });
+
+      // Attendance: creator + a power-law crowd (mostly same-city), aiming for
+      // ~3-9 going. Small cities backfill from other cities so plans aren't empty.
+      const candidates = personas.filter((p) => p.id !== creator.id);
+      const sameCity = candidates.filter((p) => p.city.name === city.name);
+      const otherCity = candidates.filter((p) => p.city.name !== city.name);
+      const extra = Math.random() < 0.75
+        ? faker.number.int({ min: 2, max: 5 })
+        : faker.number.int({ min: 6, max: 8 });
+      const attendees = pickMany(sameCity, Math.min(2, sameCity.length), Math.min(extra, sameCity.length));
+      const need = extra - attendees.length;
+      if (need > 0) attendees.push(...pickMany(otherCity, need, need));
+
+      const attendanceRows = [
+        { event_id: data.id, user_id: creator.id, created_at: eventDate.toISOString() },
+        ...attendees.map((a) => ({
+          event_id: data.id,
+          user_id: a.id,
+          created_at: faker.date.recent({ days: 14 }).toISOString(),
+        })),
+      ];
+      const { error: attErr } = await admin.from('attendance').insert(attendanceRows);
+      if (attErr) throw new Error(`attendance for event ${data.id}: ${attErr.message}`);
+    }
+  }
+
+  const { error: qtErr } = await admin
+    .from('quest_tags')
+    .upsert(questTagRows, { onConflict: 'event_id', ignoreDuplicates: true });
+  if (qtErr) throw new Error(`quest_tags insert: ${qtErr.message}`);
+
+  console.log(
+    `  → ${eventIds.length} events (${dundeeEventIds.length} in Dundee) with attendance + quest_tags`
+  );
+  return { eventIds, dundeeEventIds };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -362,7 +474,12 @@ async function createSentinels(personas: Persona[]) {
   // Sentinel #1: premium-tier user. The row already exists (auto-created on
   // profile insert as 'free'); we just flip it to the paid shape that
   // RevenueCat's webhook would write.
-  const premiumUser = personas[0];
+  // Keep the hero city pristine for screenshots: the premium badge lands on a
+  // Dundee persona (a nice touch on the busiest map), but the sparse/verbose/
+  // scroll-test sentinels are pulled from OTHER cities so no Dundee pin looks
+  // broken or half-empty.
+  const premiumUser = personas.find((p) => p.city.name === HERO_CITY.name) ?? personas[0];
+  const nonHero = personas.filter((p) => p.city.name !== HERO_CITY.name && p.id !== premiumUser.id);
   const { error: subErr } = await admin
     .from('user_subscriptions')
     .update({
@@ -375,8 +492,8 @@ async function createSentinels(personas: Persona[]) {
   console.log(`  → ${premiumUser.name} marked as premium`);
 
   // Sentinel #2: a high-volume DM thread for scroll-perf testing
-  const a = personas[1];
-  const b = personas[2];
+  const a = nonHero[0];
+  const b = nonHero[1];
   const { data: conv } = await admin
     .from('conversations')
     .insert({ type: 'dm', created_at: faker.date.past({ years: 1 }).toISOString() })
@@ -402,8 +519,8 @@ async function createSentinels(personas: Persona[]) {
     console.log(`  → 80-msg scroll-perf DM between ${a.name} and ${b.name}`);
   }
 
-  // Sentinel #3: sparse-profile user — clear out optional fields on persona[3]
-  const sparse = personas[3];
+  // Sentinel #3: sparse-profile user — clear out optional fields
+  const sparse = nonHero[2];
   await admin
     .from('profiles')
     .update({ bio: null, avatar_url: '', languages: [], interests: [] })
@@ -411,10 +528,205 @@ async function createSentinels(personas: Persona[]) {
   console.log(`  → ${sparse.name} has a sparse profile (no bio, no avatar)`);
 
   // Sentinel #4: long-bio user
-  const verbose = personas[4];
+  const verbose = nonHero[3];
   const longBio = Array.from({ length: 6 }, () => faker.lorem.sentence(15)).join(' ');
   await admin.from('profiles').update({ bio: longBio }).eq('id', verbose.id);
   console.log(`  → ${verbose.name} has a wall-of-text bio`);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Optional owner hookup — wire a real account into the Dundee scene
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Look up a real (non-seed) auth user by email, case-insensitively. */
+async function findAuthUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+  const target = email.trim().toLowerCase();
+  let page = 1;
+  // Page through in case the project has many users.
+  for (;;) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`listUsers: ${error.message}`);
+    const hit = data.users.find((u) => u.email?.toLowerCase() === target);
+    if (hit) return { id: hit.id, email: hit.email! };
+    if (data.users.length < 1000) return null;
+    page += 1;
+  }
+}
+
+/**
+ * If SEED_OWNER_EMAIL points at a real auth user, make THEIR account look alive
+ * in Dundee: accepted friendships, recent DM threads, and a couple of RSVPs.
+ * Skips silently (with a console note) if the var is unset or no user matches.
+ */
+async function hookupOwner(personas: Persona[], dundeeEventIds: number[]) {
+  const ownerEmail = process.env.SEED_OWNER_EMAIL;
+  if (!ownerEmail) {
+    console.log('  → SEED_OWNER_EMAIL not set — skipping owner hookup');
+    return;
+  }
+
+  const owner = await findAuthUserByEmail(ownerEmail);
+  if (!owner) {
+    console.log(`  → No auth user matches SEED_OWNER_EMAIL (${ownerEmail}) — skipping owner hookup`);
+    return;
+  }
+  const ownerId = owner.id;
+
+  const dundeePersonas = personas.filter((p) => p.city.name === HERO_CITY.name);
+  if (dundeePersonas.length === 0) {
+    console.log('  → No Dundee personas to connect the owner to — skipping owner hookup');
+    return;
+  }
+
+  // Clean up orphan DM shells from a prior seed: a DM whose only other participant
+  // was a now-deleted @seed.local user leaves the owner as the sole participant.
+  // Deleting those keeps the owner's Chats screen tidy across reset+reseed. Never
+  // touches a real 2-person DM.
+  const { data: myParts } = await admin
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', ownerId);
+  const convIds = [...new Set((myParts ?? []).map((r) => r.conversation_id))];
+  let cleaned = 0;
+  for (const cid of convIds) {
+    const { data: convRow } = await admin.from('conversations').select('type').eq('id', cid).single();
+    if (convRow?.type !== 'dm') continue;
+    const { count } = await admin
+      .from('conversation_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', cid);
+    if ((count ?? 0) < 2) {
+      await admin.from('conversations').delete().eq('id', cid);
+      cleaned += 1;
+    }
+  }
+  if (cleaned > 0) console.log(`  → cleaned ${cleaned} orphan owner DM shell(s)`);
+
+  // (a) 4-6 accepted friendships, directions mixed so some are owner-initiated.
+  const friendPartners = pickMany(dundeePersonas, 4, Math.min(6, dundeePersonas.length));
+  const friendshipRows = friendPartners.map((p, idx) => {
+    const ownerRequests = idx % 2 === 0;
+    return {
+      requester_id: ownerRequests ? ownerId : p.id,
+      addressee_id: ownerRequests ? p.id : ownerId,
+      status: 'accepted' as const,
+      created_at: faker.date.recent({ days: 60 }).toISOString(),
+    };
+  });
+  const { error: fErr } = await admin
+    .from('friendships')
+    .upsert(friendshipRows, { onConflict: 'requester_id,addressee_id', ignoreDuplicates: true });
+  if (fErr) throw new Error(`owner friendships: ${fErr.message}`);
+
+  // (b) 3-5 DM threads with those friends, 2-6 messages each, staggered so the
+  //     inbox orders naturally and the newest message is recent + incoming.
+  const dmPartners = pickMany(
+    friendPartners,
+    Math.min(3, friendPartners.length),
+    Math.min(5, friendPartners.length)
+  );
+  const now = Date.now();
+  let ownerMsgCount = 0;
+  for (let j = 0; j < dmPartners.length; j++) {
+    const partner = dmPartners[j];
+    const convCreatedAt = new Date(now - (2 + j) * 24 * 3600 * 1000).toISOString();
+    const { data: conv, error: convErr } = await admin
+      .from('conversations')
+      .insert({ type: 'dm', created_at: convCreatedAt })
+      .select('id')
+      .single();
+    if (convErr) throw new Error(`owner dm conv: ${convErr.message}`);
+
+    const { error: partErr } = await admin.from('conversation_participants').upsert(
+      [
+        { conversation_id: conv.id, user_id: ownerId, joined_at: convCreatedAt },
+        { conversation_id: conv.id, user_id: partner.id, joined_at: convCreatedAt },
+      ],
+      { onConflict: 'conversation_id,user_id', ignoreDuplicates: true }
+    );
+    if (partErr) throw new Error(`owner dm participants: ${partErr.message}`);
+
+    const m = faker.number.int({ min: 2, max: 6 });
+    const rows: any[] = [];
+    let tMin = j * 37 + faker.number.int({ min: 5, max: 150 }); // minutes ago for newest msg
+    for (let k = 0; k < m; k++) {
+      rows.push({
+        conversation_id: conv.id,
+        // Newest message (k===0) comes FROM the partner so it reads as incoming.
+        user_id: k === 0 ? partner.id : Math.random() < 0.5 ? ownerId : partner.id,
+        content: pick(CHAT_LINES),
+        message_type: 'text',
+        created_at: new Date(now - tMin * 60 * 1000).toISOString(),
+      });
+      tMin += faker.number.int({ min: 20, max: 600 }); // earlier messages further back
+    }
+    rows.sort((x, y) => x.created_at.localeCompare(y.created_at));
+    const { error: msgErr } = await admin.from('messages').insert(rows);
+    if (msgErr) throw new Error(`owner dm messages: ${msgErr.message}`);
+    ownerMsgCount += rows.length;
+  }
+
+  // (c) RSVP the owner into 2-3 Dundee sidequests (the attendance trigger also
+  //     drops them into each event's group chat). Skip events they already attend.
+  let rsvpCount = 0;
+  if (dundeeEventIds.length > 0) {
+    const rsvpTargets = pickMany(dundeeEventIds, 2, Math.min(3, dundeeEventIds.length));
+    const { data: existing } = await admin
+      .from('attendance')
+      .select('event_id')
+      .eq('user_id', ownerId)
+      .in('event_id', rsvpTargets);
+    const already = new Set((existing ?? []).map((r) => r.event_id));
+    const toAdd = rsvpTargets.filter((id) => !already.has(id));
+    if (toAdd.length > 0) {
+      const { error: attErr } = await admin.from('attendance').insert(
+        toAdd.map((id) => ({
+          event_id: id,
+          user_id: ownerId,
+          created_at: faker.date.recent({ days: 10 }).toISOString(),
+        }))
+      );
+      if (attErr) throw new Error(`owner attendance: ${attErr.message}`);
+      rsvpCount = toAdd.length;
+    }
+  }
+
+  console.log(
+    `  → owner ${owner.email}: ${friendshipRows.length} friends, ${dmPartners.length} DMs (${ownerMsgCount} msgs), ${rsvpCount} Dundee RSVPs`
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Pre-clean — sweep orphaned seed events that seed:reset can't reach
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * events.user_id is ON DELETE SET NULL, so when seed:reset deletes the @seed.local
+ * hosts their events survive as hostless rows — and a hostless FUTURE event still
+ * passes every get_city_plans_ranked filter, so it lingers as a ghost pin on the
+ * map. reset.ts's orphan sweep skips NULL user_id, so those never get cleaned.
+ *
+ * We fix that here (reset can't be edited) precisely and PRODUCTION-SAFELY: only
+ * events carrying an is_seed quest_tag AND already hostless are removed. Real
+ * user plans never carry is_seed, and the host-null guard means a re-run without
+ * reset (seed events still have live seed hosts) leaves live rows alone. Deleting
+ * the event cascades its quest_tags, attendance, and auto-created group chat.
+ */
+async function cleanupOrphanSeedEvents() {
+  const { data: seedTags } = await admin.from('quest_tags').select('event_id').eq('is_seed', true);
+  const seedEventIds = (seedTags ?? []).map((r) => r.event_id);
+  if (seedEventIds.length === 0) {
+    console.log('  → no prior seed events to sweep');
+    return;
+  }
+  const { data: deleted, error } = await admin
+    .from('events')
+    .delete()
+    .is('user_id', null)
+    .in('id', seedEventIds)
+    .select('id');
+  if (error) throw new Error(`orphan seed-event sweep: ${error.message}`);
+  console.log(`  → swept ${deleted?.length ?? 0} orphaned seed event(s) from a prior reset`);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -422,41 +734,57 @@ async function createSentinels(personas: Persona[]) {
 // ────────────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`Seeding ${USER_COUNT} users + ${EVENT_COUNT} events...\n`);
+  console.log(`Seeding ${USER_COUNT} users + ${EVENT_COUNT} events (Dundee-weighted)...\n`);
 
-  console.log('1/6  Creating personas');
-  const personas: Persona[] = [];
-  for (let i = 0; i < USER_COUNT; i++) {
-    const city = CITIES[i % CITIES.length];
-    const persona = await createPersona(i, city);
-    personas.push(persona);
-    process.stdout.write(`     ${i + 1}/${USER_COUNT} ${persona.name.padEnd(28)} (${city.name})\n`);
+  // Weighted city assignment: expand CITY_USER_TARGETS into a flat list so each
+  // persona lands in the right city (Dundee densest). idx stays global so avatar
+  // portraits don't collide within a gender bucket.
+  const cityPlan: City[] = [];
+  for (const t of CITY_USER_TARGETS) {
+    for (let n = 0; n < t.count; n++) cityPlan.push(t.city);
   }
 
-  console.log('\n2/6  Building friendship graph');
+  console.log('0/7  Sweeping orphaned seed events from a prior reset');
+  await cleanupOrphanSeedEvents();
+
+  console.log('\n1/7  Creating personas');
+  const personas: Persona[] = [];
+  for (let i = 0; i < cityPlan.length; i++) {
+    const city = cityPlan[i];
+    const persona = await createPersona(i, city);
+    personas.push(persona);
+    process.stdout.write(`     ${i + 1}/${cityPlan.length} ${persona.name.padEnd(28)} (${city.name})\n`);
+  }
+
+  console.log('\n2/7  Building friendship graph');
   await buildFriendships(personas);
 
-  console.log('\n3/6  Generating visits');
+  console.log('\n3/7  Generating visits');
   await createVisits(personas);
 
-  console.log('\n4/6  Creating events + attendance');
-  const eventIds = await createEvents(personas);
+  console.log('\n4/7  Creating events (sidequests) + attendance');
+  const { eventIds, dundeeEventIds } = await createEvents(personas);
 
-  console.log('\n5/6  Backfilling group chats + DMs');
+  console.log('\n5/7  Backfilling group chats + DMs');
   await backfillGroupChats(eventIds);
   await createDMs(personas);
 
-  console.log('\n6/6  Sentinels');
+  console.log('\n6/7  Sentinels');
   await createSentinels(personas);
 
+  console.log('\n7/7  Owner hookup (optional)');
+  await hookupOwner(personas, dundeeEventIds);
+
+  const dundeeCount = personas.filter((p) => p.city.name === HERO_CITY.name).length;
   console.log('\nDone. Log in with any seeded user:');
   console.log(`  Email:    <username>${SEED_EMAIL_DOMAIN}`);
   console.log(`  Password: ${SEED_PASSWORD}`);
-  console.log('\nExamples:');
-  for (const p of personas.slice(0, 3)) {
+  console.log(`\n${dundeeCount} personas + ${dundeeEventIds.length} sidequests seeded in Dundee.`);
+  console.log('Examples:');
+  for (const p of personas.filter((x) => x.city.name === HERO_CITY.name).slice(0, 3)) {
     console.log(`  ${p.email}  (${p.city.name})`);
   }
-  console.log(`\nPro-tier sentinel: ${personas[0].email}`);
+  console.log(`\nPro-tier sentinel: ${personas.find((p) => p.city.name === HERO_CITY.name)?.email ?? personas[0].email}`);
 }
 
 main().catch((err) => {

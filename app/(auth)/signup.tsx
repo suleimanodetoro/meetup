@@ -1,12 +1,13 @@
 // app/(auth)/signup.tsx
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import AuthHeader from '~/components/auth/AuthHeader';
 import AuthInput from '~/components/auth/AuthInput';
 import AuthScreen from '~/components/auth/AuthScreen';
 import PrimaryButton from '~/components/auth/PrimaryButton';
+import { useDeferredAutoFocus } from '~/components/auth/useDeferredAutoFocus';
 import ErrorBanner from '~/components/ErrorBanner';
 import { authColors, authSpace } from '~/utils/authTheme';
 import { supabase } from '~/utils/supabase';
@@ -21,6 +22,9 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const emailRef = useDeferredAutoFocus();
+  const passwordRef = useRef<TextInput>(null);
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -105,18 +109,20 @@ export default function SignUpScreen() {
 
       <View style={styles.field}>
         <AuthInput
+          ref={emailRef}
           label="Email address"
           value={email}
           onChangeText={setEmail}
           type="email"
-          autoFocus
           returnKeyType="next"
+          onSubmitEditing={() => passwordRef.current?.focus()}
           editable={!loading}
         />
       </View>
 
       <View style={styles.field}>
         <AuthInput
+          ref={passwordRef}
           label="Password"
           value={password}
           onChangeText={setPassword}
