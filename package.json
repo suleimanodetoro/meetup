@@ -13,6 +13,7 @@
     "seed": "tsx scripts/seed/seed.ts",
     "seed:reset": "tsx scripts/seed/reset.ts",
     "admin:teardown": "tsx scripts/admin/teardown.ts",
+    "admin:create-system-host": "tsx scripts/admin/create-system-host.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

@@ -79,6 +79,9 @@ const admin = createClient(url, serviceRoleKey, {
 
 // Hardcoded protection: nothing the operator passes can ever delete these.
 const OWNER_PREFIXES = ['odetoro75', 'suleimanodetoro'];
+// Service identities the app depends on (e.g. the auto-generate system host,
+// created by scripts/admin/create-system-host.ts). Exact-match, unoverridable.
+const SYSTEM_EMAILS = ['system@usewaypoint.app'];
 const SEED_EMAIL_DOMAIN = '@seed.local';
 const AVATAR_BUCKET = 'avatars';
 const DELETE_DELAY_MS = 150;
@@ -505,6 +508,7 @@ async function main() {
     for (const prefix of OWNER_PREFIXES) {
       if (lower.startsWith(prefix)) return `owner (${prefix}*)`;
     }
+    if (SYSTEM_EMAILS.includes(lower)) return 'system identity (auto-generate host)';
     if (!opts.includeSeed && lower.endsWith(SEED_EMAIL_DOMAIN)) return 'seed (@seed.local)';
     for (let i = 0; i < keepMatchers.length; i++) {
       if (keepMatchers[i](email)) return `keep (${opts.keep[i]})`;

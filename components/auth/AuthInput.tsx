@@ -28,19 +28,22 @@ interface AuthInputProps {
   editable?: boolean;
 }
 
-export default function AuthInput({
-  label,
-  value,
-  onChangeText,
-  type = 'text',
-  placeholder,
-  autoFocus,
-  returnKeyType,
-  onSubmitEditing,
-  error,
-  hint,
-  editable = true,
-}: AuthInputProps) {
+const AuthInput = React.forwardRef<TextInput, AuthInputProps>(function AuthInput(
+  {
+    label,
+    value,
+    onChangeText,
+    type = 'text',
+    placeholder,
+    autoFocus,
+    returnKeyType,
+    onSubmitEditing,
+    error,
+    hint,
+    editable = true,
+  },
+  ref
+) {
   const [secureVisible, setSecureVisible] = useState(false);
   const isPassword = type === 'password';
   const isEmail = type === 'email';
@@ -56,6 +59,7 @@ export default function AuthInput({
       </View>
       <View style={[styles.field, hasError && styles.fieldError]}>
         <TextInput
+          ref={ref}
           style={[styles.input, isPassword && styles.inputWithRightSlot]}
           value={value}
           onChangeText={onChangeText}
@@ -93,7 +97,9 @@ export default function AuthInput({
       {hasError ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
-}
+});
+
+export default AuthInput;
 
 const styles = StyleSheet.create({
   wrapper: {

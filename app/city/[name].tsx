@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import Mapbox, { Camera, MapView } from '@rnmapbox/maps';
+import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,7 +58,6 @@ export default function CityDetailScreen() {
     users,
     plans,
     loading,
-    refetch,
     error,
     loadMoreUsers,
     loadMorePlans,
@@ -145,6 +144,29 @@ export default function CityDetailScreen() {
           animationMode="flyTo"
           animationDuration={2000}
         />
+        {plans
+          .filter((p) => p.lat != null && p.lng != null)
+          .map((p) => (
+            <MarkerView
+              key={`plan-${p.event_id}`}
+              coordinate={[p.lng!, p.lat!]}
+              anchor={{ x: 0.5, y: 1 }}
+              allowOverlap>
+              <Pressable
+                style={styles.planBubble}
+                onPress={() => router.push(`/event/${p.event_id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open plan ${p.title}`}>
+                <Ionicons name="calendar" size={13} color="#007AFF" />
+                <Text style={styles.planBubbleText} numberOfLines={1}>
+                  {p.title}
+                </Text>
+                {p.attendee_count > 0 ? (
+                  <Text style={styles.planBubbleCount}>{p.attendee_count}</Text>
+                ) : null}
+              </Pressable>
+            </MarkerView>
+          ))}
       </MapView>
 
       <Pressable
@@ -168,7 +190,6 @@ export default function CityDetailScreen() {
         plans={plans}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onRefresh={refetch}
         onPaywallCardEntered={shouldGateUsers ? onPaywallCardEntered : () => {}}
         onPaywallCardLeft={onPaywallCardLeft}
         loading={loading}
@@ -222,6 +243,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  planBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: 160,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'white',
+    borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  planBubbleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111',
+    flexShrink: 1,
+  },
+  planBubbleCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#007AFF',
   },
   searchButton: {
     position: 'absolute',

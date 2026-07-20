@@ -16,5 +16,12 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
+  ],
+  // Edge functions are Deno programs (https: imports, Deno globals) — the RN
+  // tsconfig can only ever report noise for them. Deno tooling checks them.
+  // NOTE: setting "exclude" replaces tsc's default, so node_modules is listed.
+  "exclude": [
+    "node_modules",
+    "supabase/functions"
   ]
 }

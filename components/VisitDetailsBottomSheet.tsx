@@ -1,12 +1,11 @@
 // components/VisitDetailsBottomSheet.tsx
-import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   ActivityIndicator,
-  RefreshControl,
   type ViewToken,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -37,7 +36,6 @@ interface Props {
   /** A paywall-eligible card just left the viewport. */
   onPaywallCardLeft: (index: number) => void;
   loading: boolean;
-  onRefresh: () => void | Promise<void>;
   onLoadMoreUsers: () => void;
   onLoadMorePlans: () => void;
   usersLoadingMore: boolean;
@@ -54,7 +52,6 @@ export default function VisitDetailsBottomSheet({
   onPaywallCardEntered,
   onPaywallCardLeft,
   loading,
-  onRefresh,
   onLoadMoreUsers,
   onLoadMorePlans,
   usersLoadingMore,
@@ -63,7 +60,6 @@ export default function VisitDetailsBottomSheet({
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['35%', '75%', '95%'], []);
   const { hasSubscription, isLoading: subscriptionLoading } = useSubscription();
-  const [refreshing, setRefreshing] = useState(false);
 
   // FlatList rejects any change to viewabilityConfigCallbackPairs after
   // mount, so we cannot rebuild it when hasSubscription or the callbacks
@@ -128,12 +124,6 @@ export default function VisitDetailsBottomSheet({
       },
     },
   ]).current;
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await onRefresh();
-    setRefreshing(false);
-  }, [onRefresh]);
 
   const renderUserItem = useCallback(
     ({ item, index }: { item: any; index: number }) => {
@@ -259,7 +249,6 @@ export default function VisitDetailsBottomSheet({
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={renderFooter}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
@@ -274,7 +263,6 @@ export default function VisitDetailsBottomSheet({
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={renderFooter}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
         />

@@ -29,6 +29,9 @@ export interface CityPlan {
   host_name: string | null;
   host_avatar: string | null;
   match_score: number;
+  /** Event position from events.location_point; null when the event has no pin. */
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface CityOverview {
