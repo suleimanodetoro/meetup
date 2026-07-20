@@ -109,7 +109,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   assetBundlePatterns: ['**/*'],
   ios: {
-    supportsTablet: true,
+    // iPhone-only: universal (tablet) builds force iPad screenshots at App
+    // Review and we don't design for iPad.
+    supportsTablet: false,
     bundleIdentifier: 'app.usewaypoint',
     // Universal links: opens https://usewaypoint.app/event|profile/* in the app.
     // Requires the apple-app-site-association file hosted on usewaypoint.app + a
