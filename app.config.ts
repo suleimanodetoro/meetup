@@ -20,6 +20,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     './plugins/withFmtConstevalFix',
+    [
+      // GoogleSignIn 9.2 pulls AppCheckCore 11.3, which requires modular
+      // headers on these two Google pods when building as static libraries —
+      // without this, EAS pod install fails ("Swift pod AppCheckCore depends
+      // upon GoogleUtilities and RecaptchaInterop, which do not define
+      // modules").
+      'expo-build-properties',
+      {
+        ios: {
+          extraPods: [
+            { name: 'GoogleUtilities', modular_headers: true },
+            { name: 'RecaptchaInterop', modular_headers: true },
+          ],
+        },
+      },
+    ],
     'expo-video',
     'expo-web-browser',
     'expo-apple-authentication',
