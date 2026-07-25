@@ -34,6 +34,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
             { name: 'RecaptchaInterop', modular_headers: true },
           ],
         },
+        // Target Android 16 (API 36) — required by Google Play for app updates
+        // from 31 Aug 2026. compileSdk 36 needs a build image that ships the
+        // API-36 platform (see eas.json production.android.image = "latest").
+        android: {
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
+        },
       },
     ],
     'expo-video',
