@@ -30,6 +30,18 @@ android
 HANDOFF.md
 CONTINUE-PROMPT.md
 
+# Internal planning, commercial strategy and security material — never publish.
+# These stay on disk (they are the working record) but the repo is public, so
+# they must not be tracked. Untracked 2026-07-25; still readable in history
+# before that commit.
+TODO.md
+notes/
+docs/specs/
+docs/momentum-engine-v2.md
+docs/pricing-2026-07-launch.md
+docs/android-launch/
+docs/oc3/
+
 # Account-teardown audit logs (contain deleted-user PII — never commit)
 scripts/admin/logs/
 # >>> security-audit 2026-06-13 (added by Claude) >>>
@@ -40,6 +52,8 @@ scripts/admin/logs/
 *.p8
 *.pem
 *.key
+# Google Play submit credential (EAS submit) — service account JSON, never commit
+google-play-service-account.json
 *-accessKeys.csv
 *accessKeys*.csv
 *service_account*.json
