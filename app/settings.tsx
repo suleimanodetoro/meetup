@@ -125,7 +125,7 @@ export default function SettingsScreen() {
         restored ? 'Purchases Restored' : 'Nothing to Restore',
         restored
           ? 'Your purchases have been restored to this account.'
-          : 'No previous purchases were found for this Apple ID.'
+          : 'No previous purchases were found for this account.'
       );
     } catch (error: any) {
       console.error('[Settings] restore failed:', error);

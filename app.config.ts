@@ -162,6 +162,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
       'android.permission.POST_NOTIFICATIONS',
+      // Android 13+ scoped media permission for the profile/trip photo picker
+      // (replaces the legacy READ_EXTERNAL_STORAGE the picker would otherwise
+      // fall back to). No CAMERA — the app is photo-library-only.
+      'android.permission.READ_MEDIA_IMAGES',
     ],
   },
   extra: {
