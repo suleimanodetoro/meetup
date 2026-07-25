@@ -2,7 +2,7 @@
 
 > **Meet people through plans, not profiles.**
 
-Waypoint is an open-source mobile platform rethinking how adults form meaningful friendships after university, relocation, or simply the slow drift of growing up. Instead of asking you to scroll through strangers, Waypoint asks a simpler question: *where are you going?*
+Waypoint is a mobile platform rethinking how adults form meaningful friendships after university, relocation, or simply the slow drift of growing up. Instead of asking you to scroll through strangers, Waypoint asks a simpler question: *where are you going?*
 
 Log your plans. Browse what others are doing. Show up. The friendships follow.
 
@@ -10,13 +10,12 @@ Log your plans. Browse what others are doing. Show up. The friendships follow.
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey)](https://usewaypoint.app)
 [![Built with Expo](https://img.shields.io/badge/built%20with-Expo%20SDK%2053-black?logo=expo)](https://expo.dev)
 [![Supabase](https://img.shields.io/badge/backend-Supabase%20%2B%20PostgreSQL-green?logo=supabase)](https://supabase.com)
-[![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 
 ---
 
 ## The Problem Worth Solving
 
-Loneliness among adults is a public health crisis. 83% of Waypoint's alpha testers reported experiencing loneliness at least monthly. The existing solutions — dating apps repurposed for friendship, event platforms for passive browsing, group chats that go cold — all address isolated moments. None manage the full arc from *first encounter* to *lasting connection*.
+Loneliness among adults is a public health crisis, and it is the reason Waypoint exists. The existing solutions — dating apps repurposed for friendship, event platforms for passive browsing, group chats that go cold — all address isolated moments. None manage the full arc from *first encounter* to *lasting connection*.
 
 The root cause is structural: most social apps optimise for the swipe, not the relationship. They generate meetings. They don't generate friendships.
 
@@ -26,7 +25,7 @@ Waypoint was built to fix that.
 
 ## The Social Momentum Engine
 
-Waypoint's core innovation is the **Social Momentum Engine** — a four-component intelligence system that manages the complete friendship lifecycle, not just the introduction.
+The **Social Momentum Engine** is the system at the centre of Waypoint — four components that between them address the complete friendship lifecycle, not just the introduction.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -48,13 +47,13 @@ Waypoint's core innovation is the **Social Momentum Engine** — a four-componen
 
 Each component feeds data into the others. The system compounds: every activity attended, every message exchanged, every friendship formed generates new behavioural signal that refines future group composition.
 
-In my research during development, every platform I evaluated addresses a single phase of the friendship journey. This system was designed to connect all of them.
+The platforms surveyed during design each address a single phase of the friendship journey — introduction, or scheduling, or messaging. This system was designed to connect them.
 
 ---
 
 ## Architecture Overview
 
-Waypoint is a production-grade full-stack mobile platform built entirely by me. The scope:
+Waypoint is a full-stack mobile platform with a single maintainer. Every architectural, schema and system-design decision below is mine. The scope:
 
 | Layer | Stack |
 |-------|-------|
@@ -71,15 +70,17 @@ Waypoint is a production-grade full-stack mobile platform built entirely by me. 
 
 ### By the numbers
 
+Every figure below is countable from this repository at the current commit.
+
 ```
-15+    screens with file-based routing
-13     onboarding steps capturing interests, location, scheduling preferences  
-12     core relational database tables
-60+    columns across the schema
-17     custom PostgreSQL RPC functions
-40+    row-level security policies
-30+    incremental schema migrations
-1      developer who built all of it
+39     route files (file-based routing)
+14     onboarding steps capturing interests, location, scheduling preferences
+24     relational database tables
+38     client-callable PostgreSQL RPC functions
+76     incremental schema migrations
+ 4     Deno edge functions (auto-generate, lifecycle-runner, 2 payment webhooks)
+165    curated activity templates in the quest catalog
+ 1     maintainer
 ```
 
 ### Database Architecture
@@ -115,20 +116,13 @@ This combination of contextual signals — visit intentions alongside behavioura
 
 ---
 
-## Why Open Source?
+## Why the source is readable
 
-Loneliness is too important a problem for any single team to solve alone.
-
-Waypoint started as a solo project — one engineer, no team, no institutional backing. What emerged is a technical foundation capable of supporting millions of users. But the harder problem — how adults actually form and sustain friendships in the modern world — is a human problem that deserves more than one perspective.
-
-By open-sourcing Waypoint, the goal is to:
-
-1. **Invite collaboration** from engineers, designers, and researchers who care about social connection
-2. **Advance the field** of social discovery technology with transparent, inspectable architecture
-3. **Build in public** — decisions, tradeoffs, and mistakes included
-4. **Create a reference implementation** for activity-based social platforms that others can build on
-
-If you've ever moved to a new city and felt the weight of starting over socially — this project is for you.
+Waypoint is a commercial product, not an open-source project — the code is
+proprietary and not licensed for reuse. The repository is readable because the
+engineering decisions behind it are worth being able to inspect: the schema, the
+row-level security model, the compatibility scoring, and the record of how each
+of them changed and why.
 
 ---
 
@@ -169,22 +163,6 @@ npx expo start
 
 ---
 
-## Contributing
-
-Waypoint is actively looking for contributors in:
-
-- **iOS/React Native** — performance, animations, platform-specific polish
-- **Backend/PostgreSQL** — query optimisation, RPC functions, schema improvements
-- **ML/Matching** — improving the compatibility scoring algorithm
-- **Design** — UI/UX research on social connection patterns
-- **Research** — loneliness, friendship formation, social psychology
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
-
-For significant changes, open an issue first to discuss what you'd like to change.
-
----
-
 ## Project Status
 
 Waypoint is in **active alpha**. Core systems are live and have been validated with real users through TestFlight. The platform is pre-public-launch.
@@ -192,17 +170,6 @@ Waypoint is in **active alpha**. Core systems are live and have been validated w
 **Try the beta:** [testflight.apple.com/join/fhUJQEHd](https://testflight.apple.com/join/fhUJQEHd)
 
 **Website:** [usewaypoint.app](https://usewaypoint.app)
-
----
-
-## Alpha Validation
-
-From the TestFlight testing programme:
-
-- **83%** of testers reported experiencing loneliness at least monthly
-- **7.4/10** recommendation score during alpha stage  
-- **43%** of testers indicated willingness to pay for premium features
-- Seed investment secured prior to public launch on the strength of the technical product
 
 ---
 
@@ -214,7 +181,6 @@ From the TestFlight testing programme:
 - [ ] Pulse Monitor rollout
 - [ ] Web companion app
 - [ ] API documentation
-- [ ] Contribution guidelines
 
 ---
 
@@ -222,7 +188,7 @@ From the TestFlight testing programme:
 
 **Suleiman Odetoro** — Software Engineer, Founder
 
-Solo-built while employed full-time as a QA Engineer. MSc Software Engineering with Distinction, Leeds Beckett University.
+Built while employed full-time as a QA Engineer. MSc Software Engineering with Distinction, Leeds Beckett University.
 
 [usewaypoint.app](https://usewaypoint.app) · [LinkedIn](https://linkedin.com/in/suleimanodetoro)
 
@@ -230,7 +196,10 @@ Solo-built while employed full-time as a QA Engineer. MSc Software Engineering w
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+**No licence is granted.** © 2025–2026 Suleiman Odetoro. All rights reserved.
+
+The source is public to read. It is not licensed for use, modification or
+redistribution, and no contributions are being accepted.
 
 ---
 
