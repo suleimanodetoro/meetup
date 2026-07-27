@@ -68,7 +68,11 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     if (!rootNavigationState?.key) return;
 
-    const first = segments[0] ?? '';
+    // Expo's generated route tuple is environment-dependent. A clean checkout
+    // may type this as a one-element tuple even though nested routes expose a
+    // second runtime segment, so widen before guarded positional access.
+    const routeSegments: readonly string[] = segments;
+    const first = routeSegments[0] ?? '';
     const inAuthGroup = first === '(auth)';
     const inTabsGroup = first === '(tabs)';
 
@@ -81,7 +85,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
     // fires the instant exchangeCodeForSession resolves and unmounts the
     // screen before it can show success or let the user pick a new
     // password.
-    const innerAuthSegment = inAuthGroup ? segments[1] : undefined;
+    const innerAuthSegment = inAuthGroup ? routeSegments[1] : undefined;
     const isTransientAuthFlow =
       innerAuthSegment === 'reset-password' || innerAuthSegment === 'confirm-email';
 
@@ -120,7 +124,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
 
     // ----- Authenticated but not onboarded: send to onboarding, even from (auth) -----
     if (!hasCompletedOnboarding) {
-      const onOnboarding = inAuthGroup && segments[1] === 'onboarding';
+      const onOnboarding = inAuthGroup && routeSegments[1] === 'onboarding';
       // Transient auth flows handle their own next-step navigation once
       // they've finished, so don't yank the user mid-exchange.
       if (!onOnboarding && !isTransientAuthFlow) {
