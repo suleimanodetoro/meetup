@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -50,12 +50,7 @@ export default function SearchUsersScreen() {
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<SearchResult[]>([]);
 
-  useEffect(() => {
-    fetchSuggestedUsers();
-    loadRecentSearches();
-  }, []);
-
-  const fetchSuggestedUsers = async () => {
+  const fetchSuggestedUsers = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -70,38 +65,46 @@ export default function SearchUsersScreen() {
     } catch (error) {
       console.error('Error fetching suggested users:', error);
     }
-  };
+  }, [session?.user?.id]);
 
-  const loadRecentSearches = async () => {
+  const loadRecentSearches = useCallback(async () => {
     // Load from AsyncStorage or local state management
     // This is a placeholder - implement actual storage
-  };
+  }, []);
 
-  const performSearch = useCallback(
-    debounce(async (query: string) => {
-      if (!query.trim() || !session?.user?.id) {
-        setSearchResults([]);
-        return;
-      }
+  useEffect(() => {
+    void fetchSuggestedUsers();
+    void loadRecentSearches();
+  }, [fetchSuggestedUsers, loadRecentSearches]);
 
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.rpc('search_users_for_friends', {
-          searcher_id: session.user.id,
-          search_term: query,
-          limit_count: 20,
-        });
+  const performSearch = useMemo(
+    () =>
+      debounce(async (query: string) => {
+        if (!query.trim() || !session?.user?.id) {
+          setSearchResults([]);
+          return;
+        }
 
-        if (error) throw error;
-        setSearchResults(dedupeUsers((data || []) as unknown as SearchResult[]));
-      } catch (error) {
-        console.error('Error searching users:', error);
-      } finally {
-        setLoading(false);
-      }
-    }, 300),
-    [session]
+        setLoading(true);
+        try {
+          const { data, error } = await supabase.rpc('search_users_for_friends', {
+            searcher_id: session.user.id,
+            search_term: query,
+            limit_count: 20,
+          });
+
+          if (error) throw error;
+          setSearchResults(dedupeUsers((data || []) as unknown as SearchResult[]));
+        } catch (error) {
+          console.error('Error searching users:', error);
+        } finally {
+          setLoading(false);
+        }
+      }, 300),
+    [session?.user?.id]
   );
+
+  useEffect(() => () => performSearch.cancel(), [performSearch]);
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);

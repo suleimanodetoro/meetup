@@ -1563,6 +1563,16 @@ export type Database = {
       is_conversation_member: { Args: { conv_id: number }; Returns: boolean }
       is_user_founder: { Args: { uid: string }; Returns: boolean }
       is_user_premium: { Args: { uid: string }; Returns: boolean }
+      capture_quest_intent: {
+        Args: {
+          p_budget?: number | null
+          p_categories?: string[] | null
+          p_energy?: number | null
+          p_social?: string | null
+          p_time_max?: number | null
+        }
+        Returns: number
+      }
       log_engine_event: {
         Args: { p_event_id?: number; p_event_key: string; p_payload?: Json }
         Returns: undefined

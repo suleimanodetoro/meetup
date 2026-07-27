@@ -1,5 +1,5 @@
 // ~/hooks/useNearbyEvents.ts
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 import { NearbyEvent } from '~/types/db';
 import { Alert } from 'react-native';
@@ -23,13 +23,7 @@ export const useNearbyEvents = () => {
     })();
   }, []);
 
-  useEffect(() => {
-    if (location) {
-      fetchNearbyEvents();
-    }
-  }, [location]);
-
-  const fetchNearbyEvents = async () => {
+  const fetchNearbyEvents = useCallback(async () => {
     if (!location) {
       return;
     }
@@ -38,8 +32,8 @@ export const useNearbyEvents = () => {
 
     try {
       const { data, error } = await supabase.rpc('nearby_events', {
-        lat: location?.coords.latitude!,
-        long: location?.coords.longitude!,
+        lat: location.coords.latitude,
+        long: location.coords.longitude,
       });
 
       if (error) {
@@ -56,13 +50,19 @@ export const useNearbyEvents = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [location]);
+
+  useEffect(() => {
+    if (location) {
+      void fetchNearbyEvents();
+    }
+  }, [fetchNearbyEvents, location]);
 
   // Return the state values instead of JSX
   return {
     events,
     loading,
     error,
-    refetch: fetchNearbyEvents
+    refetch: fetchNearbyEvents,
   };
 };

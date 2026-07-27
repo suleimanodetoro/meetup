@@ -11,6 +11,8 @@ import {
   SafeAreaView,
   Dimensions,
   StatusBar,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import BottomSheet, {
   BottomSheetScrollView,
@@ -25,7 +27,6 @@ import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { Platform, ToastAndroid } from 'react-native';
 import { getInterestEmoji } from '~/utils/constants';
 
 import { supabase } from '~/utils/supabase';
@@ -83,24 +84,24 @@ interface EventDetails {
     username?: string;
     avatar_url?: string;
   };
-  attendees?: Array<{
+  attendees?: {
     user: {
       id: string;
       full_name?: string;
       username?: string;
       avatar_url?: string;
     };
-  }>;
-  venues?: Array<{
+  }[];
+  venues?: {
     venue_name: string;
     venue_city?: string;
     venue_address?: string;
-  }>;
-  costs?: Array<{
+  }[];
+  costs?: {
     item_name: string;
     amount?: number;
     is_optional?: boolean;
-  }>;
+  }[];
 }
 
 export default function PlanDetailsScreen() {
@@ -148,15 +149,7 @@ export default function PlanDetailsScreen() {
     managedBy: true,
   });
 
-  useEffect(() => {
-    StatusBar.setBarStyle('light-content');
-    if (id) {
-      fetchEventDetails();
-    }
-    return () => StatusBar.setBarStyle('dark-content');
-  }, [id]);
-
-  const fetchEventDetails = async () => {
+  const fetchEventDetails = useCallback(async () => {
     try {
       const { data: eventData, error: eventError } = await supabase
         .from('events')
@@ -209,7 +202,15 @@ export default function PlanDetailsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, session?.user?.id]);
+
+  useEffect(() => {
+    StatusBar.setBarStyle('light-content');
+    if (id) {
+      void fetchEventDetails();
+    }
+    return () => StatusBar.setBarStyle('dark-content');
+  }, [fetchEventDetails, id]);
 
   const handleJoinPlan = async () => {
     if (!session?.user?.id) {
@@ -297,10 +298,11 @@ export default function PlanDetailsScreen() {
     partnerSheetRef.current?.close();
     if (!me || !target) return;
     try {
-      await supabase.from('prompt_dismissals').upsert(
+      const { error: dismissalError } = await supabase.from('prompt_dismissals').upsert(
         { user_id: me, target_id: target, prompt_type: 'post_quest_add' },
         { onConflict: 'user_id,target_id,prompt_type', ignoreDuplicates: true }
       );
+      if (dismissalError) throw dismissalError;
       void supabase.rpc('log_engine_event', {
         p_event_key: 'confidence.prompt_dismissed',
         p_payload: { type: 'post_quest_add', target_id: target },

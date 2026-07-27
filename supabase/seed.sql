@@ -1,0 +1,3 @@
+-- Local database resets intentionally start without application data.
+-- `npm run test:db` loads deterministic, local-only regression fixtures from
+-- supabase/tests/fixtures.sql after validating the database URL is loopback.

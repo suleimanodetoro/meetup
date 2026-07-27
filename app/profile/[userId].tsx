@@ -1,5 +1,5 @@
 // app/profile/[userId].tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -105,13 +105,7 @@ export default function UserProfileScreen() {
   const [warmPrompt, setWarmPrompt] = useState<{ context: string } | null>(null);
   const warmShownLogged = useRef(false);
 
-  useEffect(() => {
-    if (userId) {
-      fetchUserData();
-    }
-  }, [userId]);
-
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     if (!userId || !session?.user?.id) return;
 
     try {
@@ -241,7 +235,13 @@ export default function UserProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.id, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void fetchUserData();
+    }
+  }, [fetchUserData, userId]);
 
   const handleFriendRequest = async () => {
     if (!session?.user?.id || !userId || processingAction) return;
@@ -307,10 +307,11 @@ export default function UserProfileScreen() {
     if (!session?.user?.id || !userId) return;
     setWarmPrompt(null);
     try {
-      await supabase.from('prompt_dismissals').upsert(
+      const { error: dismissalError } = await supabase.from('prompt_dismissals').upsert(
         { user_id: session.user.id, target_id: userId, prompt_type: 'warm_pair_add' },
         { onConflict: 'user_id,target_id,prompt_type', ignoreDuplicates: true }
       );
+      if (dismissalError) throw dismissalError;
       void supabase.rpc('log_engine_event', {
         p_event_key: 'confidence.prompt_dismissed',
         p_payload: { type: 'warm_pair_add', target_id: userId },

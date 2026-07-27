@@ -1,19 +1,9 @@
 // app/components/CreateOptionsModal.tsx
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  Modal,
-  Animated,
-  Pressable,
-  StyleSheet,
-  Dimensions,
-} from 'react-native';
+import { View, Text, Modal, Animated, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface CreateOptionsModalProps {
   visible: boolean;
@@ -53,7 +43,7 @@ export default function CreateOptionsModal({ visible, onClose }: CreateOptionsMo
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [opacity, translateY, visible]);
 
   const handleStartSidequest = () => {
     onClose();

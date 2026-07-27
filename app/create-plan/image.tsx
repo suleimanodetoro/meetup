@@ -36,8 +36,6 @@ export default function PlanImageScreen() {
     }, [setStep])
   );
 
-  const canProceed = !busy && !!previewUri;
-
   const pickImage = async () => {
     try {
       setBusy(true);

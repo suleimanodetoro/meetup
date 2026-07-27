@@ -41,30 +41,7 @@ export default function DestinationsScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
-  useEffect(() => {
-    updateField('venues', venues);
-  }, [venues, updateField]);
-
-  // 1) Auto-search with 300ms debounce
-  useEffect(() => {
-    const delaySearch = setTimeout(() => {
-      if (searchQuery.trim().length >= 2) {
-        handleSearch();
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(delaySearch);
-  }, [searchQuery]);
-
-  useFocusEffect(
-    useCallback(() => {
-      setStep(5);
-    }, [setStep])
-  );
-
-  // 2) Updated handleSearch with type filtering + better result handling
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
 
     setSearching(true);
@@ -96,34 +73,29 @@ export default function DestinationsScreen() {
     } finally {
       setSearching(false);
     }
-  };
+  }, [searchQuery, session?.access_token]);
 
-  // 3) Optional: proximity biasing (lng,lat) if user location is known
-  const handleSearchWithProximity = async (userLat?: number, userLng?: number) => {
-    if (!searchQuery.trim()) return;
+  useEffect(() => {
+    updateField('venues', venues);
+  }, [venues, updateField]);
 
-    setSearching(true);
-    try {
-      const options: any = { types: ['place', 'poi', 'address'] };
-      if (userLat && userLng) {
-        // Mapbox expects "lng,lat"
-        options.proximity = `${userLng},${userLat}`;
+  // 1) Auto-search with 300ms debounce
+  useEffect(() => {
+    const delaySearch = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        void handleSearch();
+      } else {
+        setSearchResults([]);
       }
+    }, 300);
+    return () => clearTimeout(delaySearch);
+  }, [handleSearch, searchQuery]);
 
-      const data = await getSuggestions(
-        searchQuery,
-        session?.access_token || 'session-' + Date.now(),
-        options
-      );
-
-      setSearchResults(data?.suggestions || []);
-    } catch (error) {
-      console.error('Search error:', error);
-      Alert.alert('Error', 'Failed to search venues');
-    } finally {
-      setSearching(false);
-    }
-  };
+  useFocusEffect(
+    useCallback(() => {
+      setStep(5);
+    }, [setStep])
+  );
 
   const addVenue = async (venue: any) => {
     if (venues.length >= 3) {

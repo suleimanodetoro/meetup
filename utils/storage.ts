@@ -38,7 +38,7 @@ export function storagePathFromPublicUrl(
  * their own `${uid}/` folder, so a stray/foreign url simply no-ops server-side.
  */
 export async function removeStorageObjectsByUrl(
-  urls: Array<string | null | undefined>,
+  urls: (string | null | undefined)[],
   bucket = 'avatars'
 ): Promise<void> {
   const paths = urls

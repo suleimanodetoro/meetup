@@ -161,6 +161,22 @@ MAPBOX_DOWNLOAD_TOKEN=your_mapbox_download_token
 npx expo start
 ```
 
+### Quality and regression tests
+
+Start local Supabase, then run the same quality gate enforced on every pull
+request and push to `main`:
+
+```bash
+npx supabase start
+npm test
+```
+
+The gate requires a clean TypeScript compile and zero ESLint warnings, then
+runs the database authorization, consent, Chemistry, intent atomicity and
+Auto-Generate transaction tests. Its final check uses two concurrent database
+clients to exercise duplicate-generation protection. Test fixtures are fixed,
+local-only identities; the runner refuses non-loopback database URLs.
+
 ---
 
 ## Project Status

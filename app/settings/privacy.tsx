@@ -1,6 +1,6 @@
 // app/settings/privacy.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -47,14 +47,7 @@ export default function PrivacySettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchPrivacySettings();
-      fetchBlockedUsers();
-    }
-  }, [session]);
-
-  const fetchPrivacySettings = async () => {
+  const fetchPrivacySettings = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -90,9 +83,9 @@ export default function PrivacySettingsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.id]);
 
-  const fetchBlockedUsers = async () => {
+  const fetchBlockedUsers = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -110,7 +103,14 @@ export default function PrivacySettingsScreen() {
     } catch (error) {
       console.error('Error fetching blocked users:', error);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      void fetchPrivacySettings();
+      void fetchBlockedUsers();
+    }
+  }, [fetchBlockedUsers, fetchPrivacySettings, session?.user?.id]);
 
   const updateSetting = async (key: keyof UserPrivacySettings, value: any) => {
     if (!settings || !session?.user?.id) return;
@@ -147,11 +147,12 @@ export default function PrivacySettingsScreen() {
             const blockerId = session?.user?.id;
             if (!blockerId) return;
             try {
-              await supabase
+              const { error } = await supabase
                 .from('blocked_users')
                 .delete()
                 .eq('blocker_id', blockerId)
                 .eq('blocked_id', blockedUserId);
+              if (error) throw error;
 
               setBlockedUsers((prev) => prev.filter((b) => b.blocked_id !== blockedUserId));
               Alert.alert('User unblocked');
@@ -286,11 +287,11 @@ export default function PrivacySettingsScreen() {
           </Card>
         ) : (
           <Card>
-            <Row label="You haven't blocked anyone" />
+            <Row label="You haven’t blocked anyone" />
           </Card>
         )}
         <SectionFootnote>
-          Blocked users can't message you or see your profile.
+          Blocked users can’t message you or see your profile.
         </SectionFootnote>
       </ScrollView>
     </SafeAreaView>

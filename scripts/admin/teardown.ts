@@ -379,7 +379,7 @@ type Candidate = {
   counts: Counts;
 };
 
-function buildMatchers(entries: string[]): Array<(email: string) => boolean> {
+function buildMatchers(entries: string[]): ((email: string) => boolean)[] {
   return entries.map((entry) => {
     const re = asRegex(entry);
     if (re) return (email: string) => re.test(email);
@@ -565,8 +565,8 @@ async function main() {
 
   // --- Classify ---
   const candidates: Candidate[] = [];
-  const protectedHits: Array<{ email: string; reason: string }> = [];
-  const premiumHits: Array<{ email: string; reason: string }> = [];
+  const protectedHits: { email: string; reason: string }[] = [];
+  const premiumHits: { email: string; reason: string }[] = [];
   let seedProtected = 0;
   let notSelected = 0;
 
@@ -734,7 +734,7 @@ async function main() {
 
   let deleted = 0;
   let avatarsRemoved = 0;
-  const errors: Array<{ email: string; id: string; error: string }> = [];
+  const errors: { email: string; id: string; error: string }[] = [];
 
   for (const c of candidates) {
     // 1. Storage first (matches delete_user_account ordering; deleteUser does

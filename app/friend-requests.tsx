@@ -1,6 +1,6 @@
 // app/friend-requests.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,8 +18,8 @@ import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { GradientButton } from '~/components/GradientButton';
 import { router } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
-import { FriendRequest, Profile, Event } from '~/types/messaging';
-import AuthProvider, { useAuth } from '~/contexts/AuthProvider';
+import { FriendRequest } from '~/types/messaging';
+import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import { respondToFriendRequest } from '~/utils/friendRequests';
 
@@ -30,13 +30,7 @@ export default function FriendRequestsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchFriendRequests();
-    }
-  }, [session]);
-
-  const fetchFriendRequests = async () => {
+  const fetchFriendRequests = useCallback(async () => {
     const userId = session?.user?.id;
     if (!userId) return;
 
@@ -99,7 +93,13 @@ export default function FriendRequestsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      void fetchFriendRequests();
+    }
+  }, [fetchFriendRequests, session?.user?.id]);
 
   const handleAccept = async (requestId: number, requesterId: string) => {
     setProcessingIds((prev) => new Set(prev).add(requestId));

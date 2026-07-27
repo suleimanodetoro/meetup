@@ -7,8 +7,15 @@
 // the create form, or skip straight to a blank custom sidequest.
 // Optional and skippable — never forced.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,44 +157,25 @@ export default function CreateIntentScreen() {
     }
   }, [resetForm]);
 
-  // Persist the stated intent so it becomes behavioural signal for chemistry
-  // matching: one quest_intents row + one engine event per suggestion REQUEST
-  // (this runs from runSuggest(), never on token taps). Fire-and-forget — a
-  // failure here must never block or break the suggestion flow.
-  const persistIntent = (p: IntentParams) => {
+  // Persist one coherent behavioural fact per suggestion request. The RPC
+  // commits quest_intents + intent.submitted atomically; the suggestion UI
+  // remains available if capture fails, but analytics can no longer claim an
+  // intent that the product did not persist.
+  const persistIntent = async (p: IntentParams) => {
     const uid = session?.user?.id;
     if (!uid) return;
-    void (async () => {
-      try {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('location, location_country_code')
-          .eq('id', uid)
-          .maybeSingle();
-        await supabase.from('quest_intents').insert({
-          user_id: uid,
-          city: prof?.location ?? null,
-          country_code: prof?.location_country_code ?? null,
-          energy: p.energy,
-          social: p.who,
-          time_max: p.time,
-          budget: p.spend,
-          categories: p.vibes.length ? p.vibes : null,
-        });
-        await supabase.rpc('log_engine_event', {
-          p_event_key: 'intent.submitted',
-          p_payload: {
-            energy: p.energy,
-            social: p.who,
-            time_max: p.time,
-            budget: p.spend,
-            categories: p.vibes,
-          },
-        });
-      } catch (e) {
-        console.warn('intent capture failed (non-blocking):', e);
-      }
-    })();
+    try {
+      const { error } = await supabase.rpc('capture_quest_intent', {
+        p_energy: p.energy,
+        p_social: p.who,
+        p_time_max: p.time,
+        p_budget: p.spend,
+        p_categories: p.vibes.length ? p.vibes : null,
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.warn('intent capture failed (non-blocking):', error);
+    }
   };
 
   // Takes explicit params (not state) so "Surprise me" and preset flows can't
@@ -196,7 +184,7 @@ export default function CreateIntentScreen() {
     setActiveSlot(null);
     setLoading(true);
     setErrored(false);
-    persistIntent(p);
+    void persistIntent(p);
     try {
       const { data, error } = await (supabase.rpc as any)('suggest_quest', {
         p_energy: p.energy,

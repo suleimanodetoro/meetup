@@ -91,12 +91,10 @@ export function OnboardingFrame({
         onSignOut();
       }
     : undefined;
-  const handleContinuePress = onContinue
-    ? () => {
-        triggerLightHaptic();
-        onContinue();
-      }
-    : undefined;
+  const handleContinuePress = () => {
+    triggerLightHaptic();
+    onContinue?.();
+  };
 
   const header = (
     <View style={styles.headerRow}>
