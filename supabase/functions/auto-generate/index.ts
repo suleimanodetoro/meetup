@@ -15,18 +15,17 @@
 // renders "Suggested by Waypoint" off its username. Invitees are EMAILED an
 // invite (consent — never auto-RSVP'd).
 //
-// Mirrors supabase/functions/lifecycle-runner: fail-closed Bearer-secret auth,
-// service_role client that bypasses RLS, optional Resend transport that
-// degrades to 'skipped', and lifecycle_events(user_id, job_key) as the
-// at-most-once invite ledger. See ./README.md for secrets, deploy, curl and
-// the pg_cron migration (20260718150000_autogen_cron.sql).
+// Creation is committed through reserve_autogen_event: event, tags, creation
+// metric, invite outbox rows and lifecycle claims are one transaction. Email
+// delivery happens only after that commit through leased outbox rows and uses
+// the outbox's stable Resend idempotency key. See ./README.md.
 //
 //   Auth:   Bearer <AUTO_GENERATE_AUTH>  (503 if unset, 401 on mismatch)
 //   Invoke: POST {}                  -> auto-cancel sweep + hot path
 //           POST { "mode": "daily" } -> auto-cancel sweep + hot path + cold path
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const AUTOGEN_AUTH = Deno.env.get('AUTO_GENERATE_AUTH');
 const SYSTEM_HOST_USER_ID = Deno.env.get('SYSTEM_HOST_USER_ID');
@@ -43,7 +42,6 @@ const FROM_EMAIL = Deno.env.get('LIFECYCLE_FROM_EMAIL') ?? 'Waypoint <hello@usew
 const DEEP_LINK_BASE = 'https://usewaypoint.app/event';
 
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-type Admin = SupabaseClient;
 
 // =====================================================================
 // Tuning constants
@@ -129,21 +127,48 @@ const cityKey = (city: string) => city.trim().toLowerCase();
 // =====================================================================
 // Email transport (same contract as lifecycle-runner)
 // =====================================================================
-async function sendEmail(args: { to: string; subject: string; html: string }): Promise<'sent' | 'skipped'> {
+type EmailDelivery = {
+  delivery: 'sent' | 'skipped';
+  providerEmailId: string | null;
+  detail: string | null;
+};
+
+class EmailDeliveryError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+  }
+}
+
+async function sendEmail(args: {
+  to: string;
+  subject: string;
+  html: string;
+  idempotencyKey: string;
+}): Promise<EmailDelivery> {
   if (!RESEND_API_KEY) {
     console.log('[autogen] RESEND_API_KEY unset — would email', args.to, '::', args.subject);
-    return 'skipped';
+    return { delivery: 'skipped', providerEmailId: null, detail: 'RESEND_API_KEY unset' };
   }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+      // Resend retains keys for 24 hours. The outbox lease is ten minutes and
+      // cron runs hourly, so an ambiguous response is retried inside that
+      // provider window with the exact same request identity.
+      'Idempotency-Key': args.idempotencyKey,
+    },
     body: JSON.stringify({ from: FROM_EMAIL, to: args.to, subject: args.subject, html: args.html }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`resend ${res.status}: ${text}`);
+    const concurrent = res.status === 409 && text.includes('concurrent_idempotent_requests');
+    const retryable = concurrent || res.status === 429 || res.status >= 500;
+    throw new EmailDeliveryError(`resend ${res.status}: ${text}`, retryable);
   }
-  return 'sent';
+  const body = await res.json().catch(() => null) as { id?: string } | null;
+  return { delivery: 'sent', providerEmailId: body?.id ?? null, detail: null };
 }
 
 function inviteEmailHtml(args: {
@@ -382,13 +407,98 @@ async function pickQuest(prefs: {
 // =====================================================================
 type CreatedReport = {
   event_id: number;
+  generation_key: string;
+  created: boolean;
   city: string;
   title: string;
   slug: string;
   date: string;
   cluster_size: number;
-  invited: Array<{ user_id: string; delivery: string }>;
+  invited: { user_id: string; delivery: string }[];
 };
+
+type ClaimedInvite = {
+  invite_id: number;
+  event_id: number;
+  user_id: string;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  idempotency_key: string;
+  attempt_count: number;
+  path: 'hot' | 'daily';
+  city: string;
+  scheduled_for: string;
+  quest_title: string;
+  quest_dare: string;
+};
+
+/**
+ * Deliver committed outbox rows. The database lease prevents two workers from
+ * owning a row simultaneously; Resend's stable idempotency key covers a crash
+ * after the provider accepted an email but before completion was recorded.
+ */
+async function drainInviteOutbox(
+  eventId: number | null = null,
+  limit = 20,
+): Promise<{ user_id: string; delivery: string }[]> {
+  const workerToken = crypto.randomUUID();
+  const { data, error } = await admin.rpc('claim_autogen_invites', {
+    p_worker_token: workerToken,
+    p_event_id: eventId,
+    p_limit: limit,
+    p_lease_seconds: 600,
+  });
+  if (error) throw error;
+
+  const delivered: { user_id: string; delivery: string }[] = [];
+  for (const invite of (data ?? []) as ClaimedInvite[]) {
+    let delivery: 'sent' | 'skipped' | 'failed' = 'skipped';
+    let detail: string | null = null;
+    let providerEmailId: string | null = null;
+    let retryable = false;
+
+    try {
+      if (!invite.recipient_email) {
+        detail = 'no email on auth user at reservation time';
+      } else {
+        const result = await sendEmail({
+          to: invite.recipient_email,
+          subject: `${invite.quest_title} — a sidequest in ${invite.city}`,
+          html: inviteEmailHtml({
+            fullName: invite.recipient_name,
+            title: invite.quest_title,
+            dare: invite.quest_dare,
+            city: invite.city,
+            dateISO: invite.scheduled_for,
+            eventId: invite.event_id,
+          }),
+          idempotencyKey: invite.idempotency_key,
+        });
+        delivery = result.delivery;
+        detail = result.detail;
+        providerEmailId = result.providerEmailId;
+      }
+    } catch (err) {
+      delivery = 'failed';
+      detail = (err instanceof Error ? err.message : String(err)).slice(0, 500);
+      retryable = err instanceof EmailDeliveryError && err.retryable;
+      console.error(`[autogen] invite attempt failed for ${invite.user_id}:`, detail);
+    }
+
+    const { data: finalStatus, error: completeErr } = await admin.rpc('complete_autogen_invite', {
+      p_invite_id: invite.invite_id,
+      p_worker_token: workerToken,
+      p_delivery: delivery,
+      p_detail: detail,
+      p_provider_email_id: providerEmailId,
+      p_retryable: retryable,
+    });
+    if (completeErr) throw completeErr;
+    delivered.push({ user_id: invite.user_id, delivery: finalStatus as string });
+  }
+
+  return delivered;
+}
 
 async function createAndInvite(args: {
   path: 'hot' | 'daily';
@@ -401,120 +511,34 @@ async function createAndInvite(args: {
 }): Promise<CreatedReport> {
   const dateISO = args.date.toISOString();
 
-  // The event. location_point stays NULL — the home map scatters pins from the
-  // city name (verified in app/(tabs)/index.tsx); the meeting point is settled
-  // in the event's group chat, per location_name.
-  const { data: ev, error: evErr } = await admin
-    .from('events')
-    .insert({
-      user_id: SYSTEM_HOST_USER_ID!,
-      kind: 'open',
-      status: 'active',
-      is_private: false,
-      title: args.quest.title,
-      description: args.quest.dare,
-      city: args.city,
-      country: args.country,
-      country_code: args.countryCode,
-      interests: args.quest.interests ?? [], // jsonb ARRAY, straight from the catalog
-      location_point: null,
-      location_name: `Meet central ${args.city} — exact spot in the chat`,
-      date: dateISO,
-      quest_catalog_id: args.quest.id,
-    })
-    .select('id')
-    .single();
-  if (evErr) throw evErr;
-  const eventId = ev.id as number;
-
-  const { error: tagErr } = await admin.from('quest_tags').insert({
-    event_id: eventId,
-    vibe: args.quest.vibe ?? [],
-    energy_level: args.quest.energy_level,
-    social_mode: args.quest.social_mode,
-    duration_min: args.quest.duration_min,
-    risk_tier: args.quest.risk_tier,
-    is_solo_safe: args.quest.is_solo_safe,
-    is_seed: false,
+  const { data, error } = await admin.rpc('reserve_autogen_event', {
+    p_path: args.path,
+    p_city: args.city,
+    p_country: args.country,
+    p_country_code: args.countryCode,
+    p_scheduled_for: dateISO,
+    p_system_host_user_id: SYSTEM_HOST_USER_ID!,
+    p_quest_catalog_id: args.quest.id,
+    p_cluster_user_ids: args.cluster,
+    p_max_live_city_events: MAX_LIVE_SYSTEM_EVENTS_PER_CITY,
   });
-  if (tagErr) throw tagErr;
+  if (error) throw error;
+  const reservation = (Array.isArray(data) ? data[0] : data) as {
+    event_id: number;
+    generation_key: string;
+    created: boolean;
+  } | null;
+  if (!reservation) throw new Error('reserve_autogen_event returned no row');
 
-  const { error: createdErr } = await admin.from('engine_events').insert({
-    event_key: 'autogen.created',
-    event_id: eventId,
-    payload: {
-      path: args.path,
-      city: args.city,
-      cluster_size: args.cluster.length,
-      catalog_slug: args.quest.slug,
-    },
-  });
-  if (createdErr) throw createdErr;
-
-  // Invites: consent-first (email with a deep link; never auto-RSVP).
-  // lifecycle_events job_key `autogen:{event_id}` is the at-most-once ledger,
-  // and — because rows are dated — the "1 auto-quest invite per user per ISO
-  // week" guardrail reads this same table (see invitedThisWeek()).
-  const jobKey = `autogen:${eventId}`;
-  const invited: CreatedReport['invited'] = [];
-
-  const { data: profs, error: profErr } = await admin
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', args.cluster);
-  if (profErr) throw profErr;
-  const nameById = new Map<string, string | null>(
-    (profs ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]),
-  );
-
-  for (const userId of args.cluster) {
-    let delivery: 'sent' | 'skipped' | 'failed' = 'skipped';
-    let detail: string | null = null;
-    try {
-      const { data: au, error: auErr } = await admin.auth.admin.getUserById(userId);
-      if (auErr) throw auErr;
-      const email = au?.user?.email;
-      if (email) {
-        delivery = await sendEmail({
-          to: email,
-          subject: `${args.quest.title} — a sidequest in ${args.city}`,
-          html: inviteEmailHtml({
-            fullName: nameById.get(userId) ?? null,
-            title: args.quest.title,
-            dare: args.quest.dare,
-            city: args.city,
-            dateISO,
-            eventId,
-          }),
-        });
-      } else {
-        detail = 'no email on auth user';
-      }
-    } catch (err) {
-      delivery = 'failed';
-      detail = (err instanceof Error ? err.message : String(err)).slice(0, 500);
-      console.error(`[autogen] invite failed for ${userId}:`, detail);
-    }
-
-    // Ledger row (unique-guarded; a 23505 means a concurrent tick got there first).
-    const { error: ledgerErr } = await admin
-      .from('lifecycle_events')
-      .insert({ user_id: userId, job_key: jobKey, status: delivery, detail });
-    if (ledgerErr && (ledgerErr as { code?: string }).code !== '23505') throw ledgerErr;
-
-    const { error: invErr } = await admin.from('engine_events').insert({
-      event_key: 'autogen.invited',
-      user_id: userId,
-      event_id: eventId,
-      payload: { path: args.path, city: args.city, delivery },
-    });
-    if (invErr) throw invErr;
-
-    invited.push({ user_id: userId, delivery });
-  }
+  // The transaction above committed the event and every claim before this
+  // external side effect. A retry that finds the same reservation simply
+  // drains any outbox work that remains.
+  const invited = await drainInviteOutbox(reservation.event_id, CLUSTER_MAX);
 
   return {
-    event_id: eventId,
+    event_id: reservation.event_id,
+    generation_key: reservation.generation_key,
+    created: reservation.created,
     city: args.city,
     title: args.quest.title,
     slug: args.quest.slug,
@@ -857,59 +881,18 @@ async function runColdPath(): Promise<PathReport> {
 // =====================================================================
 type CancelReport = {
   swept: number;
-  cancelled: Array<{ event_id: number; city: string | null; attendee_count: number }>;
+  cancelled: { event_id: number; city: string | null; participant_count: number }[];
 };
 
 async function runAutoCancel(): Promise<CancelReport> {
-  const now = Date.now();
-  const report: CancelReport = { swept: 0, cancelled: [] };
-
-  const { data: evs, error } = await admin
-    .from('events')
-    .select('id, city, date, created_at')
-    .eq('user_id', SYSTEM_HOST_USER_ID!)
-    .eq('status', 'active')
-    .gt('date', new Date(now).toISOString())
-    .lte('date', new Date(now + CANCEL_HORIZON_MS).toISOString());
+  const { data, error } = await admin.rpc('cancel_underfilled_autogen_events', {
+    p_system_host_user_id: SYSTEM_HOST_USER_ID!,
+    p_horizon_hours: CANCEL_HORIZON_MS / 3_600_000,
+    p_min_age_hours: CANCEL_MIN_AGE_MS / 3_600_000,
+    p_min_participants: CANCEL_MIN_ATTENDEES,
+  });
   if (error) throw error;
-
-  for (const ev of evs ?? []) {
-    report.swept++;
-    // Grace: a quest must have had ≥6h of join window before the sweep may
-    // kill it — otherwise same-day hot quests (created ~4h before start)
-    // would be cancelled by the very next hourly tick.
-    if (Date.parse(ev.created_at as string) > now - CANCEL_MIN_AGE_MS) continue;
-
-    const { count, error: cntErr } = await admin
-      .from('attendance')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_id', ev.id);
-    if (cntErr) throw cntErr;
-    const attendees = count ?? 0;
-    if (attendees >= CANCEL_MIN_ATTENDEES) continue;
-
-    const { error: updErr } = await admin
-      .from('events')
-      .update({ status: 'cancelled' })
-      .eq('id', ev.id)
-      .eq('status', 'active');
-    if (updErr) throw updErr;
-
-    const { error: evtErr } = await admin.from('engine_events').insert({
-      event_key: 'autogen.cancelled',
-      event_id: ev.id,
-      payload: { city: ev.city, attendee_count: attendees },
-    });
-    if (evtErr) throw evtErr;
-
-    report.cancelled.push({
-      event_id: ev.id as number,
-      city: ev.city as string | null,
-      attendee_count: attendees,
-    });
-  }
-
-  return report;
+  return data as CancelReport;
 }
 
 // =====================================================================
@@ -943,10 +926,13 @@ serve(async (req) => {
 
   try {
     const autoCancel = await runAutoCancel();
+    // Recover delivery work left by a crash or retriable provider error before
+    // discovering new cohorts. Newly reserved events drain their own rows too.
+    const recoveredInvites = await drainInviteOutbox(null, 50);
     const hot = await runHotPath();
     const cold = mode === 'daily' ? await runColdPath() : null;
 
-    return new Response(JSON.stringify({ mode, autoCancel, hot, cold }), {
+    return new Response(JSON.stringify({ mode, autoCancel, recoveredInvites, hot, cold }), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
     });

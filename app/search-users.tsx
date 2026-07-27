@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { AppImage } from '~/components/AppImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import debounce from 'lodash.debounce';
 import { Profile, FriendshipStatus } from '~/types/messaging';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { sendFriendRequest } from '~/utils/friendRequests';
 
 interface SearchResult extends Profile {
   friendship_status?: FriendshipStatus | null;
@@ -114,31 +116,20 @@ export default function SearchUsersScreen() {
     router.push(`/profile/${user.id}`);
   };
 
-  const sendFriendRequest = async (userId: string) => {
+  const handleSendFriendRequest = async (userId: string) => {
     if (!session?.user?.id) return;
 
     try {
-      const { error } = await supabase.from('friendships').insert({
-        requester_id: session.user.id,
-        addressee_id: userId,
-        status: 'pending',
-      });
-
-      if (!error) {
-        // Update local state
-        setSearchResults((prev) =>
-          prev.map((user) =>
-            user.id === userId ? { ...user, friendship_status: 'pending' } : user
-          )
-        );
-        setSuggestedUsers((prev) =>
-          prev.map((user) =>
-            user.id === userId ? { ...user, friendship_status: 'pending' } : user
-          )
-        );
-      }
+      await sendFriendRequest(userId);
+      setSearchResults((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, friendship_status: 'pending' } : user))
+      );
+      setSuggestedUsers((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, friendship_status: 'pending' } : user))
+      );
     } catch (error) {
       console.error('Error sending friend request:', error);
+      Alert.alert('Request unavailable', 'This person is not accepting friend requests.');
     }
   };
 
@@ -200,12 +191,16 @@ export default function SearchUsersScreen() {
           <View style={styles.pendingBadge}>
             <Text style={styles.pendingText}>Pending</Text>
           </View>
+        ) : item.friendship_status === 'declined' || item.friendship_status === 'blocked' ? (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingText}>Unavailable</Text>
+          </View>
         ) : (
           <Pressable
             style={styles.addButton}
             onPress={(e) => {
               e.stopPropagation();
-              sendFriendRequest(item.id);
+              handleSendFriendRequest(item.id);
             }}>
             <Ionicons name="person-add" size={18} color="#007AFF" />
           </Pressable>

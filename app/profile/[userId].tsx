@@ -31,7 +31,11 @@ import { getCountryFlag } from '~/utils/countryFlags';
 import { getCityImageUrl } from '~/utils/cityImages';
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
 import { presentUserSafetyActions } from '~/modules/safety';
-import { sendFriendRequest } from '~/utils/friendRequests';
+import {
+  cancelFriendRequest,
+  respondToFriendRequest,
+  sendFriendRequest,
+} from '~/utils/friendRequests';
 
 const LANGUAGE_BY_CODE = new Map<string, (typeof LANGUAGES)[number]>(
   LANGUAGES.map((l) => [l.code, l])
@@ -43,7 +47,7 @@ function formatLanguages(codes: readonly string[] | undefined): string {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type FriendshipStatus = 'pending' | 'accepted' | 'blocked' | null;
+type FriendshipStatus = 'pending' | 'accepted' | 'declined' | 'blocked' | null;
 
 interface UserProfile {
   id: string;
@@ -247,33 +251,18 @@ export default function UserProfileScreen() {
 
       if (!friendshipStatus) {
         // Send friend request (shared write path — utils/friendRequests)
-        await sendFriendRequest(session.user.id, userId);
+        await sendFriendRequest(userId);
         setFriendshipStatus('pending');
         setIsRequester(true);
         Alert.alert('Success', 'Friend request sent!');
       } else if (friendshipStatus === 'pending' && !isRequester) {
         // Accept friend request
-        const { error } = await supabase
-          .from('friendships')
-          .update({
-            status: 'accepted',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('requester_id', userId)
-          .eq('addressee_id', session.user.id);
-
-        if (error) throw error;
+        await respondToFriendRequest(userId, true);
         setFriendshipStatus('accepted');
         Alert.alert('Success', 'Friend request accepted!');
       } else if (friendshipStatus === 'pending' && isRequester) {
         // Cancel friend request
-        const { error } = await supabase
-          .from('friendships')
-          .delete()
-          .eq('requester_id', session.user.id)
-          .eq('addressee_id', userId);
-
-        if (error) throw error;
+        await cancelFriendRequest(userId);
         setFriendshipStatus(null);
         setIsRequester(false);
         Alert.alert('Cancelled', 'Friend request cancelled');
@@ -295,7 +284,7 @@ export default function UserProfileScreen() {
     if (!session?.user?.id || !userId || processingAction) return;
     try {
       setProcessingAction(true);
-      await sendFriendRequest(session.user.id, userId);
+      await sendFriendRequest(userId);
       setWarmPrompt(null);
       setFriendshipStatus('pending');
       setIsRequester(true);
@@ -378,6 +367,7 @@ export default function UserProfileScreen() {
       return isRequester ? 'Cancel Request' : 'Accept Request';
     }
     if (friendshipStatus === 'accepted') return 'Friends';
+    if (friendshipStatus === 'declined' || friendshipStatus === 'blocked') return 'Unavailable';
     return 'Add Friend';
   };
 
@@ -527,7 +517,13 @@ export default function UserProfileScreen() {
               <View style={styles.actionButtons}>
                 <Pressable
                   onPress={handleFriendRequest}
-                  disabled={processingAction || previewAsStranger}
+                  disabled={
+                    processingAction ||
+                    previewAsStranger ||
+                    friendshipStatus === 'accepted' ||
+                    friendshipStatus === 'declined' ||
+                    friendshipStatus === 'blocked'
+                  }
                   style={[
                     styles.actionButton,
                     friendshipStatus === 'accepted' && styles.actionButtonAccepted,

@@ -32,7 +32,7 @@ import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { getCountryFlag } from '~/utils/geographic';
 import { openReport } from '~/modules/safety';
-import { sendFriendRequest } from '~/utils/friendRequests';
+import { canSendFriendRequest, sendFriendRequest } from '~/utils/friendRequests';
 
 const { width, height } = Dimensions.get('window');
 
@@ -243,22 +243,15 @@ export default function PlanDetailsScreen() {
     }
   };
 
-  // Should the completion sheet graduate into "add them as a friend?" Only
-  // when NO friendships row exists in either direction (accepted = already
-  // friends, pending = already asked, declined/blocked = respect the no) and
-  // this exact prompt wasn't dismissed for this person before. Errs on the
-  // side of not prompting.
+  // Should the completion sheet graduate into "add them as a friend?" The
+  // server applies the same privacy, bilateral-block and existing-relationship
+  // gate used by the write RPC. The local dismissal is the prompt-specific
+  // final gate. Any read failure errs on the side of not prompting.
   const shouldPromptAddFriend = async (partnerId: string): Promise<boolean> => {
     const me = session?.user?.id;
     if (!me) return false;
-    const [{ data: existing, error: fErr }, { data: dismissed, error: dErr }] = await Promise.all([
-      supabase
-        .from('friendships')
-        .select('id')
-        .or(
-          `and(requester_id.eq.${me},addressee_id.eq.${partnerId}),and(requester_id.eq.${partnerId},addressee_id.eq.${me})`
-        )
-        .limit(1),
+    const [allowedResult, dismissalResult] = await Promise.allSettled([
+      canSendFriendRequest(partnerId),
       supabase
         .from('prompt_dismissals')
         .select('created_at')
@@ -267,8 +260,10 @@ export default function PlanDetailsScreen() {
         .eq('prompt_type', 'post_quest_add')
         .limit(1),
     ]);
-    if (fErr || dErr) return false;
-    return (existing?.length ?? 0) === 0 && (dismissed?.length ?? 0) === 0;
+    if (allowedResult.status !== 'fulfilled' || dismissalResult.status !== 'fulfilled')
+      return false;
+    if (dismissalResult.value.error) return false;
+    return allowedResult.value && (dismissalResult.value.data?.length ?? 0) === 0;
   };
 
   // Accept the graduation prompt: the shared friend-request write path plus
@@ -278,7 +273,7 @@ export default function PlanDetailsScreen() {
     if (!addFriendPrompt || !me || promptBusy) return;
     setPromptBusy(true);
     try {
-      await sendFriendRequest(me, addFriendPrompt.id);
+      await sendFriendRequest(addFriendPrompt.id);
       void supabase.rpc('log_engine_event', {
         p_event_key: 'confidence.prompt_accepted',
         p_payload: { type: 'post_quest_add', target_id: addFriendPrompt.id },
@@ -287,7 +282,7 @@ export default function PlanDetailsScreen() {
       Alert.alert('Request sent', `${addFriendPrompt.name} will be asked to confirm.`);
     } catch (error) {
       console.error('Error sending friend request from prompt:', error);
-      Alert.alert('Error', 'Could not send the request. You can add them from their profile.');
+      Alert.alert('Request unavailable', 'This person is not accepting friend requests.');
     } finally {
       setPromptBusy(false);
       partnerSheetRef.current?.close();

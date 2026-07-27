@@ -21,6 +21,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { FriendRequest, Profile, Event } from '~/types/messaging';
 import AuthProvider, { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { respondToFriendRequest } from '~/utils/friendRequests';
 
 export default function FriendRequestsScreen() {
   const { session } = useAuth();
@@ -104,15 +105,7 @@ export default function FriendRequestsScreen() {
     setProcessingIds((prev) => new Set(prev).add(requestId));
 
     try {
-      const { error } = await supabase
-        .from('friendships')
-        .update({
-          status: 'accepted',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', requestId);
-
-      if (error) throw error;
+      await respondToFriendRequest(requesterId, true);
 
       // Remove from list
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -130,7 +123,7 @@ export default function FriendRequestsScreen() {
     }
   };
 
-  const handleDecline = async (requestId: number) => {
+  const handleDecline = async (requestId: number, requesterId: string) => {
     Alert.alert('Decline Request', 'Are you sure you want to decline this friend request?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -140,15 +133,7 @@ export default function FriendRequestsScreen() {
           setProcessingIds((prev) => new Set(prev).add(requestId));
 
           try {
-            const { error } = await supabase
-              .from('friendships')
-              .update({
-                status: 'declined',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', requestId);
-
-            if (error) throw error;
+            await respondToFriendRequest(requesterId, false);
 
             // Remove from list
             setRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -230,7 +215,7 @@ export default function FriendRequestsScreen() {
 
           <Pressable
             style={[styles.button, styles.declineButton, isProcessing && styles.buttonDisabled]}
-            onPress={() => handleDecline(item.id)}
+            onPress={() => handleDecline(item.id, item.from_user.id)}
             disabled={isProcessing}>
             <Text style={styles.declineButtonText}>Decline</Text>
           </Pressable>

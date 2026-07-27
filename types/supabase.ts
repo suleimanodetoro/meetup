@@ -1212,8 +1212,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_send_friend_request: {
+        Args: { p_addressee_id: string }
+        Returns: boolean
+      }
       can_users_message: {
         Args: { receiver_id: string; sender_id: string }
+        Returns: boolean
+      }
+      cancel_friend_request: {
+        Args: { p_addressee_id: string }
         Returns: boolean
       }
       chemistry_score: {
@@ -1559,6 +1567,14 @@ export type Database = {
         Args: { p_event_id?: number; p_event_key: string; p_payload?: Json }
         Returns: undefined
       }
+      respond_to_friend_request: {
+        Args: { p_accept: boolean; p_requester_id: string }
+        Returns: string
+      }
+      send_friend_request: {
+        Args: { p_addressee_id: string }
+        Returns: number
+      }
       mark_conversation_as_read: {
         Args: { p_conversation_id: number; p_user_id: string }
         Returns: undefined
@@ -1768,4 +1784,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
