@@ -344,3 +344,9 @@ verify_jwt = false
 # (AUTO_GENERATE_AUTH) checked inside the function, so the JWT check is off.
 [functions.auto-generate]
 verify_jwt = false
+
+# Atlas plan is client-invoked (supabase.functions.invoke with the user's
+# session JWT), unlike the cron-driven functions above — so the platform JWT
+# check stays ON and the function resolves the requester from the token.
+[functions.atlas-plan]
+verify_jwt = true

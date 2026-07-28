@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit --pretty false",
     "quality": "npm run typecheck && npm run lint",
     "test:db": "bash scripts/test-db.sh",
+    "test:atlas": "node --experimental-strip-types --test supabase/functions/atlas-plan/tests/*.test.ts",
     "test": "npm run quality && npm run test:db",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "web": "expo start --web",
@@ -18,6 +19,8 @@
     "seed:reset": "tsx scripts/seed/reset.ts",
     "admin:teardown": "tsx scripts/admin/teardown.ts",
     "admin:create-system-host": "tsx scripts/admin/create-system-host.ts",
+    "atlas:embed-quests": "tsx scripts/atlas/backfill-quest-embeddings.ts",
+    "atlas:replay": "tsx scripts/atlas/replay.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

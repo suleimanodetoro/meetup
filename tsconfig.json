@@ -4,6 +4,11 @@
     "strict": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    // Atlas shares runtime-agnostic modules between the Deno edge function,
+    // Node's test runner, and tsx scripts — all of which require explicit .ts
+    // extensions on relative imports. Safe here because typecheck runs with
+    // --noEmit (Metro/Babel does the actual bundling).
+    "allowImportingTsExtensions": true,
     "paths": {
       "~/*": [
         "*"
