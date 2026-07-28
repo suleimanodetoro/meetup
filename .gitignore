@@ -62,3 +62,8 @@ google-play-service-account.json
 secrets/
 .secrets-quarantine/
 # <<< security-audit 2026-06-13 <<<
+
+# Store build artifacts (EAS output lives on expo.dev; 100MB+ binaries never belong in git)
+*.aab
+*.apk
+*.ipa
