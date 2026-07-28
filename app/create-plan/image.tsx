@@ -6,6 +6,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Platform,
   SafeAreaView,
   StyleSheet,
 } from 'react-native';
@@ -40,12 +41,17 @@ export default function PlanImageScreen() {
     try {
       setBusy(true);
 
-      // Ask for permission (idempotent; Expo handles caching)
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission required', 'Please allow photo library access to pick an image.');
-        setBusy(false);
-        return;
+      // iOS: ask for photo-library permission (idempotent; Expo handles caching).
+      // Android: skip — the system photo picker needs no permission, and the
+      // manifest deliberately blocks READ_MEDIA_* (Play photo/video policy), so
+      // requesting here would auto-deny and dead-end the flow.
+      if (Platform.OS === 'ios') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Permission required', 'Please allow photo library access to pick an image.');
+          setBusy(false);
+          return;
+        }
       }
 
       const res = await ImagePicker.launchImageLibraryAsync({

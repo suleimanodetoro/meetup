@@ -10,7 +10,7 @@ dotenv.config({ path: '.env.local', override: true });
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Waypoint',
   slug: 'waypoint',
-  version: '1.0.2',
+  version: '1.1.3',
   scheme: 'waypoint',
   web: {
     bundler: 'metro',
@@ -169,10 +169,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
       'android.permission.POST_NOTIFICATIONS',
-      // Android 13+ scoped media permission for the profile/trip photo picker
-      // (replaces the legacy READ_EXTERNAL_STORAGE the picker would otherwise
-      // fall back to). No CAMERA — the app is photo-library-only.
+    ],
+    // Image picking uses the Android system photo picker (no permission needed).
+    // Explicitly block media-read permissions so no library merges them back in —
+    // declaring READ_MEDIA_IMAGES triggers Google Play's photo/video policy review.
+    blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_EXTERNAL_STORAGE',
     ],
   },
   extra: {
