@@ -34,6 +34,7 @@ run_sql supabase/tests/fixtures.sql
 run_sql supabase/tests/friend_request_consent.sql
 run_sql supabase/tests/chemistry_security_symmetry.sql
 run_sql supabase/tests/intent_capture_atomicity.sql
+run_sql supabase/tests/atlas_engine.sql
 run_sql supabase/tests/autogen_transactional_idempotency.sql
 run_sql supabase/tests/autogen_concurrency_setup.sql
 
