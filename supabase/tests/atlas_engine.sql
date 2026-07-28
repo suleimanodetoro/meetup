@@ -100,10 +100,16 @@ begin
   v_y := '[0,1' || repeat(',0', 254) || ']';
   v_near_y := '[0.1,0.9' || repeat(',0', 254) || ']';
 
+  -- Upsert (not insert): after `npm run atlas:embed-quests` these quests
+  -- already have rows, and this whole transaction rolls back anyway.
   insert into public.atlas_quest_embeddings (quest_id, embedding, embedding_version, content_hash)
   values
     (v_short_id, v_x::extensions.vector(256), 'test-v0', 'hash-short'),
-    (v_long_id, v_y::extensions.vector(256), 'test-v0', 'hash-long');
+    (v_long_id, v_y::extensions.vector(256), 'test-v0', 'hash-long')
+  on conflict (quest_id) do update
+    set embedding = excluded.embedding,
+        embedding_version = excluded.embedding_version,
+        content_hash = excluded.content_hash;
 
   -- Nearest to y must be the long quest, and similarity must order the rows.
   select * into v_row

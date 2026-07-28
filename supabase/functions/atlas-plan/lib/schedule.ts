@@ -65,9 +65,21 @@ export function proposeSchedule(input: {
     targetLocalMs = atLocalTime(nowLocalMs + DAY_MS, start.hour, start.minute);
   } else if (intent.window.dateHint === 'weekend') {
     const dayOfWeek = new Date(Math.floor(nowLocalMs / DAY_MS) * DAY_MS).getUTCDay();
-    const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
     const hour = windowStated ? start.hour : WEEKEND_START_HOUR;
-    targetLocalMs = atLocalTime(nowLocalMs + daysUntilSaturday * DAY_MS, hour, windowStated ? start.minute : 0);
+    const minute = windowStated ? start.minute : 0;
+    // Saturday and Sunday ARE "this weekend": try today first, roll Sat→Sun
+    // when the start time has passed, and only then fall to next Saturday.
+    // Weekdays target the upcoming Saturday.
+    const dayOffsets =
+      dayOfWeek === 6 ? [0, 1, 7] : dayOfWeek === 0 ? [0, 6] : [(6 - dayOfWeek + 7) % 7];
+    targetLocalMs = atLocalTime(nowLocalMs + dayOffsets[dayOffsets.length - 1] * DAY_MS, hour, minute);
+    for (const d of dayOffsets) {
+      const candidate = atLocalTime(nowLocalMs + d * DAY_MS, hour, minute);
+      if (candidate > nowLocalMs + 30 * 60 * 1000) {
+        targetLocalMs = candidate;
+        break;
+      }
+    }
   } else {
     // 'today' or no hint: today at the stated/default time, rolling to
     // tomorrow if that moment has already passed (with a 30 min buffer).

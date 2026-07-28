@@ -113,7 +113,10 @@ async function main() {
   for (const row of rows) {
     const driftLines: string[] = [];
 
-    if (isCompiled(row.compiled_intent)) {
+    // Compile drift only makes sense for rows the rule-based compiler
+    // produced — recompiling an LLM-compiled row with the rules would report
+    // the two compilers' differences, not engine drift.
+    if (row.compiler_kind === 'mock' && isCompiled(row.compiled_intent)) {
       const currentCompiled = compileWithRules(row.raw_intent, {
         userId: 'replay',
         fullName: null,

@@ -134,3 +134,23 @@ test('schedule outside the stated window blocks', () => {
   const window = results.find((r) => r.id === 'within_intent_window');
   assert.ok(window && !window.pass && window.severity === 'block');
 });
+
+test('sociable hours are minutes-aware: 23:00 passes, 23:30 blocks', () => {
+  const at = (utcIso: string) => {
+    const proposal = proposalFor(photoQuest());
+    proposal.schedule = {
+      startsAtUtc: utcIso,
+      localLabel: 'x',
+      utcOffsetHours: 1,
+      withinIntentWindow: null,
+    };
+    const results = verifyPlan({ intent: DEMO, proposal, members: MEMBERS, now: FIXED_NOW });
+    return results.find((r) => r.id === 'sociable_hours');
+  };
+
+  const exactCap = at('2026-07-27T22:00:00.000Z'); // 23:00 local
+  assert.ok(exactCap?.pass, exactCap?.detail);
+
+  const pastCap = at('2026-07-27T22:30:00.000Z'); // 23:30 local
+  assert.ok(pastCap && !pastCap.pass, pastCap?.detail);
+});

@@ -59,10 +59,12 @@ export function compileWithRules(rawIntent: string, ctx: RequesterContext): Comp
   const notes: string[] = [];
   let signals = 0;
 
-  // City: "new to Leeds", "in Manchester", "visiting York".
+  // City: "new to Leeds", "around Manchester", "visiting York". Bare "in" is
+  // deliberately absent — it captures interest phrases ("interested in
+  // Music") far more often than cities; the profile city covers that case.
   let city: string | null = null;
   const cityMatch = text.match(
-    /\b(?:new to|visiting|in|around|based in|moved to)\s+([A-Z][A-Za-z''-]+(?:\s+[A-Z][A-Za-z''-]+)?)/
+    /\b(?:new to|visiting|around|based in|moved to)\s+([A-Z][A-Za-z''-]+(?:\s+[A-Z][A-Za-z''-]+)?)/
   );
   if (cityMatch) {
     city = cityMatch[1].trim();
@@ -76,8 +78,10 @@ export function compileWithRules(rawIntent: string, ctx: RequesterContext): Comp
   // Time window: "free 7–10 tonight", "7pm-10pm", "between 19:00 and 22:00".
   const window: IntentWindow = { dateHint: null, startLocal: null, endLocal: null };
   let durationMaxMin: number | null = null;
+  // The trailing negative lookahead keeps head-count ranges ("3-4 people",
+  // "5 to 6 new people") from parsing as 03:00–04:00 time windows.
   const windowMatch = text.match(
-    /\b(\d{1,2})(?::(\d{2}))?\s*(?:pm|am)?\s*(?:–|-|—|to|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(pm|am)?\b/i
+    /\b(\d{1,2})(?::(\d{2}))?\s*(?:pm|am)?\s*(?:–|-|—|to|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(pm|am)?\b(?!\s*(?:new\s+)?(?:people|person|of us|others?|friends|mates))/i
   );
   const saysTonight = /\btonight\b|\bthis evening\b/i.test(text);
   const saysTomorrow = /\btomorrow\b/i.test(text);

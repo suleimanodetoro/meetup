@@ -41,8 +41,31 @@ const ATLAS_MODEL = Deno.env.get('ATLAS_MODEL') ?? undefined;
 
 const MAX_INTENT_CHARS = 500;
 const MIN_INTENT_CHARS = 3;
+const MAX_REQUESTS_PER_HOUR = Math.max(
+  1,
+  parseInt(Deno.env.get('ATLAS_MAX_REQUESTS_PER_HOUR') ?? '20', 10) || 20
+);
 
 const admin: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+/** Constant-time string comparison — this gate decides service-caller privilege. */
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  let diff = ab.length ^ bb.length;
+  const len = Math.max(ab.length, bb.length);
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+/** UUIDs never belong in client-facing prose — full detail stays in the ledger. */
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+function sanitizeForClient(text: string): string {
+  return text.replace(UUID_RE, 'a member');
+}
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -70,11 +93,12 @@ async function compilePort(rawIntent: string, ctx: RequesterContext): Promise<Co
     } catch (error) {
       // The LLM proposes; when it can't (refusal, timeout, API error) the
       // deterministic compiler keeps the pipeline alive and the ledger
-      // records the degradation.
+      // records the degradation. Provider error text stays in server logs —
+      // the client-visible note is generic.
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`atlas-plan: anthropic compiler failed, using rules fallback: ${detail}`);
       const intent = compileWithRules(rawIntent, ctx);
-      intent.notes.unshift(`anthropic compiler unavailable (${detail.slice(0, 120)}); rule-based fallback used`);
+      intent.notes.unshift('anthropic compiler unavailable; rule-based fallback used');
       return { intent, kind: 'anthropic_fallback_mock', modelId: null, promptVersion: null };
     }
   }
@@ -350,7 +374,7 @@ serve(async (req) => {
       return json(400, { error: 'invalid JSON body' });
     }
 
-    const isServiceCaller = token === SERVICE_ROLE_KEY;
+    const isServiceCaller = timingSafeEqual(token, SERVICE_ROLE_KEY);
     let requesterId: string;
     if (isServiceCaller) {
       if (typeof body.user_id !== 'string' || body.user_id.length === 0) {
@@ -361,6 +385,24 @@ serve(async (req) => {
       const { data: userData, error: userError } = await admin.auth.getUser(token);
       if (userError || !userData?.user) return json(401, { error: 'invalid token' });
       requesterId = userData.user.id;
+    }
+
+    // Per-user throttle: each request can spend an LLM call and up to 66
+    // chemistry RPCs, so cap it against the decision ledger. Service callers
+    // (ops/tests, holding the master key) are exempt.
+    if (!isServiceCaller) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count, error: throttleError } = await admin
+        .from('atlas_decisions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', requesterId)
+        .gte('created_at', oneHourAgo);
+      if (throttleError) throw new Error(`throttle check failed: ${throttleError.message}`);
+      if ((count ?? 0) >= MAX_REQUESTS_PER_HOUR) {
+        return json(429, {
+          error: `rate limit: at most ${MAX_REQUESTS_PER_HOUR} Atlas requests per hour`,
+        });
+      }
     }
 
     const intentText = typeof body.intent_text === 'string' ? body.intent_text.trim() : '';
@@ -476,8 +518,10 @@ serve(async (req) => {
             },
           }
         : null,
-      verifier: trace.verifier,
-      rejection_reasons: trace.rejectionReasons,
+      // Client copies are sanitized (no UUIDs in prose); the ledger keeps the
+      // raw detail.
+      verifier: trace.verifier.map((r) => ({ ...r, detail: sanitizeForClient(r.detail) })),
+      rejection_reasons: trace.rejectionReasons.map(sanitizeForClient),
       meta: {
         engine_version: ENGINE_VERSION,
         compiler_kind: trace.compilerKind,

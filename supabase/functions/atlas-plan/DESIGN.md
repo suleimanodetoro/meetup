@@ -31,12 +31,13 @@ inspectable code whose every decision is recorded and replayable.
 │ 4 SCHEDULE         │   approximation, same as auto-generate), honoring the
 └─────────┬──────────┘   stated window.
           ▼
-┌────────────────────┐   15 pure checks: budget tier + amount, time fit,
-│ 5 DETERMINISTIC    │   risk vs comfort, hard-exclusion tags (word-boundary),
-│   VERIFIER         │   group size, chemistry floor, member eligibility
-│   AI proposes,     │   (re-asserted), future start, window honor, sociable
-│   code decides     │   hours, horizon. block fails kill the plan; warns ride
-└─────────┬──────────┘   along. Candidates are tried in retrieval order until
+┌────────────────────┐   16 pure checks (some conditional): budget tier and
+│ 5 DETERMINISTIC    │   amount, time fit, risk vs comfort, hard-exclusion
+│   VERIFIER         │   tags (word-boundary), group size, chemistry floor,
+│   AI proposes,     │   member eligibility (re-asserted), future start,
+│   code decides     │   window honor, sociable hours, horizon. block fails
+└─────────┬──────────┘   kill the plan; warns ride along. Candidates are
+          │              tried in retrieval order until
           ▼              one passes — rejected attempts keep their results.
 ┌────────────────────┐   One atlas_decisions row per request: raw intent,
 │ 6 DECISION LEDGER  │   compiled constraints, all candidates + rejection
@@ -112,6 +113,24 @@ verbatim. Nothing in the current response shape needs to change.
 - The LLM sees the requester's intent text and coarse profile context (city,
   country) — never other users' data; group composition happens entirely in
   deterministic code on the service side.
+- Client copies of verifier details and rejection reasons are sanitized (no
+  UUIDs in prose); the raw text lives only in the ledger. The dev screen is
+  additionally gated at the component level, so a production deep link to
+  `/atlas` redirects to the tabs.
+- Per-user throttle: `ATLAS_MAX_REQUESTS_PER_HOUR` (default 20) checked
+  against the decision ledger — each request can spend an LLM call and up to
+  66 chemistry RPCs, so the ceiling is per-caller, not just per-request.
+  Service-role callers are exempt.
+- The service-key check uses a constant-time comparison, and `toCityKey`
+  strips LIKE/PostgREST wildcards so a user-controlled city can never widen
+  the candidate match beyond one city.
+- Scope note: planning in an intent-stated city (not just the profile city)
+  exposes group members' names/ids for that city — the same class of
+  information the existing authenticated discovery RPCs
+  (`get_users_in_city`, `get_city_users_ranked`) already return for any
+  city, including a per-user chemistry column. Atlas returns strictly less
+  (≤5 members, aggregate chemistry only), now bounded further by the
+  throttle.
 
 ## Honest limitations (v0)
 

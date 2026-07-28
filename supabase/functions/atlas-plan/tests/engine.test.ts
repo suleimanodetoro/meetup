@@ -145,6 +145,12 @@ test('toCityKey matches the SQL normalization', () => {
   assert.equal(toCityKey('NEW   York'), 'new york');
 });
 
+test('toCityKey strips LIKE/PostgREST wildcards (candidate scoping cannot widen)', () => {
+  assert.equal(toCityKey('Le%eds_*'), 'leeds');
+  assert.equal(toCityKey('%'), '');
+  assert.equal(toCityKey('\\Leeds'), 'leeds');
+});
+
 test('assignRoles is deterministic per request and distinct per member', () => {
   const quest: QuestCandidate = photoQuest();
   const a = assignRoles(['r', 'a', 'b'], quest, 'req-1');

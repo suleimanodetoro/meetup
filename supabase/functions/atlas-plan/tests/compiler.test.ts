@@ -105,3 +105,19 @@ test('normalizeWireIntent survives garbage', () => {
   assert.equal(intent.city, null);
   assert.equal(intent.confidence, 0.5);
 });
+
+test('head-count ranges are not time windows', () => {
+  const dinner = compileWithRules('grab dinner with 3-4 people this weekend', CTX);
+  assert.equal(dinner.window.startLocal, null, '3-4 people must not become a 03:00 window');
+  assert.equal(dinner.window.dateHint, 'weekend');
+  assert.equal(dinner.groupSizeMax, 4);
+
+  const meet = compileWithRules('Meet 5 to 6 new people tonight', CTX);
+  assert.equal(meet.window.startLocal, null, '5 to 6 new people must not become a 05:00 window');
+  assert.equal(meet.window.dateHint, 'today');
+});
+
+test('bare "interested in X" does not become a city', () => {
+  const intent = compileWithRules("I'm interested in Music and want to meet people tonight", CTX);
+  assert.equal(intent.city, 'London', 'must fall back to the profile city, not capture "Music"');
+});

@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -100,6 +100,13 @@ export default function AtlasScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AtlasResponse | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+
+  // The Settings entry is __DEV__-gated, but the route itself is registered
+  // unconditionally in NavigationController — gate the screen too so a prod
+  // deep link to /atlas cannot reach the dev surface.
+  if (!__DEV__) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   const runAtlas = async () => {
     const text = intentText.trim();

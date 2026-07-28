@@ -219,18 +219,24 @@ export function verifyPlan(input: {
     )
   );
 
-  const localHour = (() => {
+  // Minutes-aware: an hour-only comparison against 23 can never fail (hours
+  // are 0..23), which would make 23:59 pass a "by 23:00" cap.
+  const localStartMinutes = (() => {
     if (!Number.isFinite(startsAt)) return null;
-    const localMs = startsAt + schedule.utcOffsetHours * 60 * 60 * 1000;
-    return new Date(localMs).getUTCHours();
+    const local = new Date(startsAt + schedule.utcOffsetHours * 60 * 60 * 1000);
+    return local.getUTCHours() * 60 + local.getUTCMinutes();
   })();
   results.push(
     check(
       'sociable_hours',
       `Starts between ${MIN_LOCAL_HOUR}:00 and ${MAX_LOCAL_HOUR}:00 city-local`,
       'block',
-      localHour !== null && localHour >= MIN_LOCAL_HOUR && localHour <= MAX_LOCAL_HOUR,
-      localHour === null ? 'unparseable start time' : `local start hour ${localHour}:xx`
+      localStartMinutes !== null &&
+        localStartMinutes >= MIN_LOCAL_HOUR * 60 &&
+        localStartMinutes <= MAX_LOCAL_HOUR * 60,
+      localStartMinutes === null
+        ? 'unparseable start time'
+        : `local start ${Math.floor(localStartMinutes / 60)}:${String(localStartMinutes % 60).padStart(2, '0')}`
     )
   );
 

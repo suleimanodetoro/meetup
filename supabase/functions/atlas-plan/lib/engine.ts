@@ -31,9 +31,18 @@ export const MAX_GROUP_CANDIDATES = 11;
 /** How many retrieval candidates the engine will try to verify before giving up. */
 export const MAX_QUEST_ATTEMPTS = 6;
 
-/** Same normalization as the SQL side (lower + trim + collapse whitespace). */
+/**
+ * Same normalization as the SQL side (lower + trim + collapse whitespace),
+ * plus stripping LIKE/PostgREST pattern metacharacters (% _ * \) — the key is
+ * used in an ilike match, and a user-controlled wildcard would turn "my city"
+ * into "every city". No real city name contains these characters.
+ */
 export function toCityKey(city: string): string {
-  return city.trim().replace(/\s+/g, ' ').toLowerCase();
+  return city
+    .replace(/[\\%_*]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 const ROLE_POOLS: Array<{ pattern: RegExp; roles: string[] }> = [
@@ -145,13 +154,21 @@ export async function runAtlasPipeline(
     if (!requester) {
       throw new Error('requester profile missing from candidate load');
     }
-    const others = loaded.filter((m) => m.userId !== ctx.userId).slice(0, MAX_GROUP_CANDIDATES);
+    // Filter for cheap eligibility BEFORE capping so ineligible profiles
+    // don't consume candidate slots; the ineligible ones still flow to the
+    // optimizer for provenance reporting. The chemistry budget is unchanged:
+    // requester + MAX_GROUP_CANDIDATES eligibles = 66 pairwise calls.
+    const allOthers = loaded.filter((m) => m.userId !== ctx.userId);
+    const cheaplyEligible = allOthers
+      .filter((m) => m.onboarded && !m.isPrivate && !m.isSystemHost && !m.invitedThisWeek)
+      .slice(0, MAX_GROUP_CANDIDATES);
+    const cheaplyIneligible = allOthers.filter(
+      (m) => !(m.onboarded && !m.isPrivate && !m.isSystemHost && !m.invitedThisWeek)
+    );
+    const others = [...cheaplyIneligible, ...cheaplyEligible];
 
     const matrix = new Map<string, number>();
     const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-    const cheaplyEligible = others.filter(
-      (m) => m.onboarded && !m.isPrivate && !m.isSystemHost && !m.invitedThisWeek
-    );
     const scoringSet = [requester, ...cheaplyEligible];
     for (let i = 0; i < scoringSet.length; i++) {
       for (let j = i + 1; j < scoringSet.length; j++) {
