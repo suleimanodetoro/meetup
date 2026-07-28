@@ -26,9 +26,9 @@
 // The site creates Checkout Sessions with:
 //   client_reference_id = <supabase user uuid>
 //   metadata            = { supabase_uid, entitlement: 'premium' | 'founder' }
-//   subscription_data.metadata = { supabase_uid, entitlement: 'premium' }  (sub mode)
-// Premium = recurring subscription. Founder = one-time `mode: 'payment'`
-// lifetime purchase.
+//   subscription_data.metadata = same { supabase_uid, entitlement }  (sub mode)
+// Premium and Founder Annual are recurring subscriptions. Founder Forever is
+// a one-time `mode: 'payment'` lifetime purchase.
 //
 // See ./README.md for the deploy + secrets checklist.
 
@@ -80,9 +80,12 @@ async function getRow(userId: string): Promise<SubRow | null> {
   return (data ?? null) as SubRow | null;
 }
 
-/** Founder is a lifetime entitlement; a premium event must never clobber it. */
-function isFounderRow(row: SubRow | null): boolean {
-  return row?.subscription_type === 'founder' || row?.entitlement_id === 'founder';
+/** An active Founder entitlement (annual or lifetime) must beat Premium. */
+function isActiveFounderRow(row: SubRow | null): boolean {
+  const isFounder = row?.subscription_type === 'founder' || row?.entitlement_id === 'founder';
+  if (!isFounder) return false;
+  if (row?.expires_at === null) return true; // Founder Forever
+  return Boolean(row?.expires_at && new Date(row.expires_at) > new Date());
 }
 
 /**
@@ -129,11 +132,63 @@ async function grantFounder(
   };
   if (startedAtIso) patch.started_at = startedAtIso;
 
-  const { error } = await admin
-    .from('user_subscriptions')
-    .upsert(patch, { onConflict: 'user_id' });
+  const { error } = await admin.from('user_subscriptions').upsert(patch, { onConflict: 'user_id' });
   if (error) throw error;
 
+  const { error: profileError } = await admin
+    .from('profiles')
+    .update({ is_founder: true, founder_year: founderYear, updated_at: nowIso() })
+    .eq('id', userId);
+  if (profileError) throw profileError;
+
+  await storeStripeCustomerId(userId, customerId);
+}
+
+/** Grant / renew the recurring Founder Annual entitlement. */
+async function grantFounderSubscription(
+  userId: string,
+  subscriptionId: string,
+  periodEndIso: string,
+  startedAtIso: string | null,
+  customerId: string | null
+) {
+  const existing = await getRow(userId);
+  // Founder Forever always wins over a later recurring event.
+  if (
+    (existing?.subscription_type === 'founder' || existing?.entitlement_id === 'founder') &&
+    existing.expires_at === null
+  ) {
+    await storeStripeCustomerId(userId, customerId);
+    return;
+  }
+
+  let expiresAt = periodEndIso;
+  if (
+    existing?.entitlement_id === 'founder' &&
+    existing.original_transaction_id === subscriptionId &&
+    existing.expires_at &&
+    new Date(existing.expires_at) > new Date(periodEndIso)
+  ) {
+    expiresAt = existing.expires_at;
+  }
+
+  const patch: Record<string, unknown> = {
+    user_id: userId,
+    subscription_type: 'founder',
+    entitlement_id: 'founder',
+    provider: 'stripe',
+    original_transaction_id: subscriptionId,
+    expires_at: expiresAt,
+    updated_at: nowIso(),
+  };
+  if (startedAtIso) patch.started_at = startedAtIso;
+
+  const { error } = await admin.from('user_subscriptions').upsert(patch, { onConflict: 'user_id' });
+  if (error) throw error;
+
+  const founderYear = startedAtIso
+    ? new Date(startedAtIso).getUTCFullYear()
+    : new Date().getUTCFullYear();
   const { error: profileError } = await admin
     .from('profiles')
     .update({ is_founder: true, founder_year: founderYear, updated_at: nowIso() })
@@ -157,8 +212,8 @@ async function grantPremium(
   customerId: string | null
 ) {
   const row = await getRow(userId);
-  if (isFounderRow(row)) {
-    // Founder supersedes premium — leave the lifetime row untouched.
+  if (isActiveFounderRow(row)) {
+    // An active Founder entitlement supersedes Premium.
     await storeStripeCustomerId(userId, customerId);
     return;
   }
@@ -190,25 +245,24 @@ async function grantPremium(
   // doesn't already carry a meaningful start; otherwise leave the existing one.
   if (startedAtIso) patch.started_at = startedAtIso;
 
-  const { error } = await admin
-    .from('user_subscriptions')
-    .upsert(patch, { onConflict: 'user_id' });
+  const { error } = await admin.from('user_subscriptions').upsert(patch, { onConflict: 'user_id' });
   if (error) throw error;
 
   await storeStripeCustomerId(userId, customerId);
 }
 
 /**
- * Expire premium (cancel / unpaid / deleted). Guards:
- *   - never clobber a founder-lifetime row,
+ * Expire a recurring Premium or Founder Annual subscription. Guards:
+ *   - never clobber a Founder Forever row,
  *   - never let an OLD subscription's expiry event kill a NEWER active row
  *     (compare original_transaction_id).
  */
-async function expirePremium(userId: string, subscriptionId: string | null) {
+async function expireSubscription(userId: string, subscriptionId: string | null) {
   const row = await getRow(userId);
   if (!row) return;
-  if (isFounderRow(row)) return; // founder is lifetime; ignore premium expiry
-  if (row.entitlement_id !== 'premium') return; // already free / nothing to do
+  const wasFounder = row.subscription_type === 'founder' || row.entitlement_id === 'founder';
+  if (wasFounder && row.expires_at === null) return; // Founder Forever
+  if (row.entitlement_id !== 'premium' && row.entitlement_id !== 'founder') return;
   if (
     subscriptionId &&
     row.original_transaction_id &&
@@ -232,11 +286,19 @@ async function expirePremium(userId: string, subscriptionId: string | null) {
     })
     .eq('user_id', userId);
   if (error) throw error;
+
+  if (wasFounder) {
+    const { error: profileError } = await admin
+      .from('profiles')
+      .update({ is_founder: false, founder_year: null, updated_at: nowIso() })
+      .eq('id', userId);
+    if (profileError) throw profileError;
+  }
 }
 
 /**
  * Revoke the entitlement created by a specific Stripe transaction (refund /
- * async payment failure). Unlike expirePremium this is allowed to clear a
+ * async payment failure). Unlike expireSubscription this is allowed to clear a
  * founder row, because it is explicitly targeted at the exact transaction that
  * granted it (matched by original_transaction_id), i.e. the founder purchase
  * itself was refunded.
@@ -272,13 +334,15 @@ async function findRowByTransaction(transactionId: string) {
     .eq('original_transaction_id', transactionId)
     .maybeSingle();
   if (error) throw error;
-  return data as
-    | { user_id: string; subscription_type: string | null; entitlement_id: string | null }
-    | null;
+  return data as {
+    user_id: string;
+    subscription_type: string | null;
+    entitlement_id: string | null;
+  } | null;
 }
 
 const asId = (v: string | { id: string } | null | undefined): string | null =>
-  typeof v === 'string' ? v : v?.id ?? null;
+  typeof v === 'string' ? v : (v?.id ?? null);
 
 /**
  * current_period_end moved from the subscription onto the subscription item in
@@ -314,13 +378,26 @@ async function handleSubscription(sub: Stripe.Subscription) {
 
   const entitledStatuses = ['active', 'trialing', 'past_due'];
   const expireStatuses = ['canceled', 'unpaid', 'incomplete_expired'];
+  const entitlement = sub.metadata?.entitlement;
 
   if (entitledStatuses.includes(sub.status)) {
     // active/trialing entitled; past_due stays entitled until period end (the
     // hook's own `expires_at > now` check locks them out when it lapses).
-    await grantPremium(userId, sub.id, periodEndIso, startedAtIso, customerId);
+    if (!periodEndIso) {
+      // A recurring purchase without a period end must never become a
+      // non-expiring entitlement. Wait for a complete follow-up event.
+      console.warn('[stripe-webhook] refusing subscription grant without period end:', sub.id);
+      await storeStripeCustomerId(userId, customerId);
+    } else if (entitlement === 'founder') {
+      await grantFounderSubscription(userId, sub.id, periodEndIso, startedAtIso, customerId);
+    } else if (entitlement === 'premium') {
+      await grantPremium(userId, sub.id, periodEndIso, startedAtIso, customerId);
+    } else {
+      console.warn('[stripe-webhook] subscription has unknown entitlement:', sub.id, entitlement);
+      await storeStripeCustomerId(userId, customerId);
+    }
   } else if (expireStatuses.includes(sub.status)) {
-    await expirePremium(userId, sub.id);
+    await expireSubscription(userId, sub.id);
   } else {
     // 'incomplete' (first payment not settled) / 'paused': don't grant, but
     // don't clobber an existing row either. Still persist the customer link.
@@ -379,7 +456,10 @@ serve(async (req) => {
           // One-time founder lifetime purchase. Only grant once the payment
           // has actually settled; async (delayed) methods land via
           // async_payment_succeeded above.
-          if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+          if (
+            session.payment_status !== 'paid' &&
+            session.payment_status !== 'no_payment_required'
+          ) {
             console.log('[stripe-webhook] founder session not yet paid, waiting:', session.id);
             break;
           }
@@ -395,7 +475,11 @@ serve(async (req) => {
           // Here we just persist the customer link for the portal flow.
           await storeStripeCustomerId(userId, customerId);
         } else {
-          console.log('[stripe-webhook] unhandled checkout session shape:', session.mode, entitlement);
+          console.log(
+            '[stripe-webhook] unhandled checkout session shape:',
+            session.mode,
+            entitlement
+          );
         }
         break;
       }
@@ -427,7 +511,7 @@ serve(async (req) => {
         const sub = event.data.object as Stripe.Subscription;
         const userId = sub.metadata?.supabase_uid ?? null;
         if (userId) {
-          await expirePremium(userId, sub.id);
+          await expireSubscription(userId, sub.id);
         } else {
           console.warn('[stripe-webhook] deleted subscription has no supabase_uid:', sub.id);
         }

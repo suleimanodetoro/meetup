@@ -17,23 +17,24 @@ The site creates Checkout Sessions with:
 
 - `client_reference_id = <supabase user uuid>`
 - `metadata = { supabase_uid, entitlement: 'premium' | 'founder' }`
-- subscription-mode sessions also set `subscription_data.metadata = { supabase_uid, entitlement: 'premium' }`
+- subscription-mode sessions also set `subscription_data.metadata = { supabase_uid, entitlement: 'premium' | 'founder' }`
 
-**Premium** = recurring subscription (monthly/annual). **Founder** = one-time
-`mode: 'payment'` lifetime purchase.
+**Premium** = recurring subscription (weekly/monthly/annual). **Founder Annual**
+is a recurring subscription. **Founder Forever** = one-time `mode: 'payment'`
+lifetime purchase.
 
 ## Entitlement mapping
 
-| Stripe event | Action |
-| --- | --- |
+| Stripe event                                                                                                            | Action                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `checkout.session.completed` / `checkout.session.async_payment_succeeded` (`mode=payment`, `entitlement=founder`, paid) | Upsert founder lifetime (`expires_at` NULL, `original_transaction_id` = payment_intent id), set `profiles.is_founder = true` + `founder_year` |
-| `checkout.session.completed` (`mode=subscription`) | Persist Stripe customer link only; entitlement comes from the subscription events |
-| `customer.subscription.created` / `.updated`, status `active`/`trialing` | Upsert premium, `expires_at` = current period end |
-| `customer.subscription.updated`, status `past_due` | Keep entitled until period end |
-| `customer.subscription.updated`, status `canceled`/`unpaid`/`incomplete_expired` | Expire premium |
-| `customer.subscription.deleted` | Expire premium |
-| `charge.refunded` (full refund) | Revoke the entitlement that transaction granted (founder maps via payment_intent) |
-| `checkout.session.async_payment_failed` | Revoke if it can be tied to the exact transaction |
+| `checkout.session.completed` (`mode=subscription`)                                                                      | Persist Stripe customer link only; entitlement comes from the subscription events                                                             |
+| `customer.subscription.created` / `.updated`, status `active`/`trialing`                                                | Upsert the metadata-selected Premium or Founder entitlement, `expires_at` = current period end                                                |
+| `customer.subscription.updated`, status `past_due`                                                                      | Keep the selected entitlement until period end                                                                                                |
+| `customer.subscription.updated`, status `canceled`/`unpaid`/`incomplete_expired`                                        | Expire the matching recurring entitlement                                                                                                     |
+| `customer.subscription.deleted`                                                                                         | Expire the matching recurring entitlement; never revoke Founder Forever                                                                       |
+| `charge.refunded` (full refund)                                                                                         | Revoke the entitlement that transaction granted (founder maps via payment_intent)                                                             |
+| `checkout.session.async_payment_failed`                                                                                 | Revoke if it can be tied to the exact transaction                                                                                             |
 
 Guards: a premium expiry/downgrade never clobbers a founder-lifetime row; an old
 subscription's expiry event never regresses a newer active row (compared by
