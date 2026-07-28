@@ -223,6 +223,16 @@ export default function SettingsScreen() {
                 right={<Chevron />}
               />
             </Card>
+
+            <SectionHeader title="Dev — Atlas" />
+            <Card>
+              <Row
+                icon="planet-outline"
+                label="Atlas planner (shadow mode)"
+                onPress={() => router.push('/atlas' as never)}
+                right={<Chevron />}
+              />
+            </Card>
           </>
         )}
 

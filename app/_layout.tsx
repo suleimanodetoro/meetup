@@ -104,6 +104,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
       'my-sidequests',
       'search',
       'report',
+      'atlas', // Atlas planner (dev-gated entry from Settings)
     ];
 
     const isAllowedRoute =
