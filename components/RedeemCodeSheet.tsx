@@ -137,7 +137,7 @@ export function RedeemCodeSheet({ visible, onClose }: RedeemCodeSheetProps) {
                 <Text style={styles.title}>Code redeemed!</Text>
                 <Text style={styles.subtitle}>
                   You have full Waypoint access{untilLabel ? ` until ${untilLabel}` : ''}. Enjoy —
-                  and thanks for being early.
+                  and thanks for supporting Waypoint.
                 </Text>
                 <GradientButton
                   label="Done"

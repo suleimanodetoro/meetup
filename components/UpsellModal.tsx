@@ -55,7 +55,7 @@ const PREMIUM_BENEFITS = [
 const FOUNDER_BENEFITS = [
   'Lifetime Founder recognition on your profile',
   'Everything included in Premium',
-  'Early supporter status as Waypoint grows',
+  'Permanent supporter recognition as Waypoint grows',
   'Your support helps fund the first community',
 ];
 
@@ -71,7 +71,7 @@ const PAYWALL_PAGES = [
   },
   {
     mode: 'founder' as const,
-    title: 'back the early days.',
+    title: 'back what comes next.',
     eyebrow: 'Founder Supporter',
     icon: 'diamond' as const,
     subtitle: 'Get Premium plus profile-only Founder recognition.',

@@ -88,7 +88,7 @@ export async function requestWaypointReview() {
 export function TakeABowBody() {
   const pulse = useRef(new Animated.Value(0)).current;
   const confetti = useRef(new Animated.Value(0)).current;
-  // Pilot users arrive with an invite code; this is where they redeem it —
+  // Invite-code members redeem access here —
   // before they ever meet a paywall.
   const [showRedeemSheet, setShowRedeemSheet] = useState(false);
 
@@ -278,7 +278,9 @@ export function RatingBody() {
               ))}
             </View>
           </View>
-          <Text style={styles.ratingScoreLabel}>Most common rating from early Waypoint survey</Text>
+          <Text style={styles.ratingScoreLabel}>
+            Most common rating from the Waypoint community survey
+          </Text>
         </View>
         <MyLaurelWreathRight size={52} color={authColors.accent} />
       </View>
@@ -294,9 +296,7 @@ export function RatingBody() {
             </View>
           ))}
         </View>
-        <Text style={styles.ratingSocialCaption}>
-          Early testers are already shaping the community
-        </Text>
+        <Text style={styles.ratingSocialCaption}>Members are shaping the community</Text>
       </View>
 
       <View style={styles.reviewCard}>

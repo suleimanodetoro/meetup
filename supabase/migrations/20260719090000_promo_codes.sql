@@ -1,5 +1,5 @@
 -- =====================================================
--- promo_codes — self-serve promotional access (pilot cohorts)
+-- promo_codes — self-serve promotional access (community cohorts)
 -- =====================================================
 -- Waypoint-issued codes that grant the 'premium' entitlement for a fixed
 -- number of days, written straight into user_subscriptions with
@@ -8,10 +8,10 @@
 -- revenuecat-webhook is taught (same commit) never to clobber an active
 -- promotional row with a non-entitled RC event.
 --
--- Codes are created by hand (SQL console), e.g. a 6-month pilot code:
+-- Codes are created by hand (SQL console), e.g. a 6-month access code:
 --
 --   insert into public.promo_codes (code, note, duration_days, max_redemptions)
---   values ('PILOT6M', 'Founding pilot cohort — 6 months free', 180, 50);
+--   values ('WELCOME6M', 'Community access — 6 months free', 180, 50);
 --
 -- When a promo lapses nothing bespoke happens: expires_at passes, the hook's
 -- derivation flips hasSubscription to false, and the user meets the normal

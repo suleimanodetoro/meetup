@@ -13,7 +13,7 @@
 --   - Collapse the 'free' | 'premium' | 'pro' enum to 'free' | 'premium'.
 --     The 'pro' tier was never differentiated from 'premium' anywhere in
 --     the app (the hook exported isPremium and isPro but only hasSubscription
---     was consumed). MVP ships one paid tier; multi-tier is feature-flagged
+--     was consumed). The product ships one paid tier; multi-tier is feature-flagged
 --     via RC entitlements when there's a real reason for it.
 --   - Add columns RevenueCat's webhook will populate:
 --       entitlement_id text          -- 'premium' when active, NULL when free
@@ -35,7 +35,7 @@ ALTER TABLE public.user_subscriptions
 DROP INDEX IF EXISTS public.idx_user_subscriptions_active;
 ALTER TABLE public.user_subscriptions DROP COLUMN IF EXISTS is_active;
 
--- 3. Collapse 'pro' into 'premium' for the single-tier MVP.
+-- 3. Collapse 'pro' into 'premium' for the single-tier entitlement model.
 ALTER TABLE public.user_subscriptions
   DROP CONSTRAINT IF EXISTS user_subscriptions_subscription_type_check;
 UPDATE public.user_subscriptions

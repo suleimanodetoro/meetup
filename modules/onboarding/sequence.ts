@@ -83,7 +83,7 @@ function confirmAge(birthDateISO: string): Promise<boolean> {
 }
 
 /**
- * The 14-step onboarding flow, in order. Reordering this array reorders
+ * The 17-stage onboarding flow, in order. Reordering this array reorders
  * the flow. The slug is the URL segment under /onboarding/.
  */
 export const ONBOARDING_SEQUENCE: readonly StepDef<any>[] = [
