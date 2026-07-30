@@ -12,7 +12,7 @@
     "quality": "npm run typecheck && npm run lint",
     "test:db": "bash scripts/test-db.sh",
     "test:atlas": "node --experimental-strip-types --test supabase/functions/atlas-plan/tests/*.test.ts",
-    "test": "npm run quality && npm run test:db",
+    "test": "npm run quality && npm run test:atlas && npm run test:db",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "web": "expo start --web",
     "seed": "tsx scripts/seed/seed.ts",

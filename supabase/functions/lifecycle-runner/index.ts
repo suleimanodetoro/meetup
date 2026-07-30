@@ -161,17 +161,15 @@ async function selectWelcomeIncompleteOnboarding(admin: Admin): Promise<Candidat
   return candidates;
 }
 
-// --- Email template (PLACEHOLDER) --------------------------------------------
-// Minimal, clearly-provisional branded HTML. Replace copy, colours, and the
-// store links with the real ones when the campaign is finalised.
-const APP_STORE_URL = 'https://apps.apple.com/app/waypoint/id0000000000'; // TODO placeholder
-const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=app.usewaypoint'; // TODO placeholder
+// --- Onboarding completion email ---------------------------------------------
+// Store links are deployment configuration. Falling back to the live product
+// site keeps the email useful without ever shipping a dead or fabricated URL.
+const APP_STORE_URL = Deno.env.get('WAYPOINT_APP_STORE_URL') ?? 'https://usewaypoint.app';
+const PLAY_STORE_URL = Deno.env.get('WAYPOINT_PLAY_STORE_URL') ?? 'https://usewaypoint.app';
 
 function welcomeEmailHtml(fullName: string | null): string {
   const hi = fullName ? `Hi ${fullName},` : 'Hi there,';
-  // NOTE: placeholder template — intentionally bare. Real design TBD.
-  return `<!-- PLACEHOLDER lifecycle template: welcome_incomplete_onboarding -->
-<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111;">
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111;">
   <h1 style="font-size:20px;margin:0 0 16px;">Finish setting up Waypoint</h1>
   <p style="font-size:15px;line-height:1.5;margin:0 0 16px;">${hi}</p>
   <p style="font-size:15px;line-height:1.5;margin:0 0 16px;">
@@ -182,13 +180,13 @@ function welcomeEmailHtml(fullName: string | null): string {
     <a href="${APP_STORE_URL}" style="color:#2563eb;">Download on the App Store</a><br/>
     <a href="${PLAY_STORE_URL}" style="color:#2563eb;">Get it on Google Play</a>
   </p>
-  <p style="font-size:12px;color:#888;margin:0;">Waypoint · placeholder warm-up email</p>
+  <p style="font-size:12px;color:#888;margin:0;">Waypoint · Make plans. Meet your people.</p>
 </div>`;
 }
 
 const welcomeIncompleteOnboarding: LifecycleJob = {
   key: 'welcome_incomplete_onboarding',
-  enabled: false, // ← flip to true (and finalise the template) to activate
+  enabled: false, // Optional campaign; enable only when this lifecycle job is wanted.
   description:
     'Web-signup straggler: account created >24h ago with onboarding_completed=false — nudge them to finish setup in the app.',
   selectUsers: selectWelcomeIncompleteOnboarding,

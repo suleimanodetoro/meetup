@@ -275,7 +275,7 @@ Service-role keys, webhook secrets, lifecycle credentials, and model credentials
 npm run quality       # strict TypeScript + zero-warning ESLint
 npm run test:atlas    # compiler, embedder, optimizer, verifier, engine
 npx supabase start
-npm test              # quality + local database regression suite
+npm test              # quality + Atlas + local database regression suites
 ```
 
 Useful operations:

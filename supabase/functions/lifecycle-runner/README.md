@@ -67,17 +67,18 @@ is the classic once-per-user-forever.
 **Selecting on account age / email:** `public.profiles` has **no `created_at` and no
 `email`** column — the signup timestamp and email live only in `auth.users`, which
 the service-role PostgREST client can't query directly (the `auth` schema isn't
-exposed). The example job uses `admin.auth.admin.listUsers()` for `created_at` +
-`email` and intersects with the not-yet-onboarded profiles. It works but is awkward
-and only scans a bounded window; a production campaign should add a `SECURITY DEFINER`
-SQL selector over `auth.users` and call it from `selectUsers`.
+exposed). The optional onboarding job uses `admin.auth.admin.listUsers()` for
+`created_at` + `email` and intersects with the not-yet-onboarded profiles. It scans a
+deliberately bounded window; a larger campaign can replace that selector with a
+`SECURITY DEFINER` SQL function over `auth.users`.
 
-## The example job (disabled)
+## Optional onboarding-completion job
 
 `welcome_incomplete_onboarding` — selects accounts created >24h ago whose
-`profiles.onboarding_completed = false` and sends a **placeholder** "finish setting up
-Waypoint" email with app-store links. `enabled: false`. Flip it to `true`, finalise
-the email template + real store URLs, then deploy to activate.
+`profiles.onboarding_completed = false` and sends a "finish setting up Waypoint"
+email with deployment-configured app-store links. It is disabled by default because
+the lifecycle runner's enabled jobs are selected explicitly, not because the core
+product is awaiting launch. Set `enabled: true` and deploy when this campaign is wanted.
 
 ## cooling_pair_nudge (ENABLED — Pulse Monitor drift re-engagement)
 
@@ -104,6 +105,8 @@ supabase secrets set LIFECYCLE_RUNNER_AUTH=$(openssl rand -hex 32)
 # and the pipeline still runs end-to-end (dry plumbing).
 supabase secrets set RESEND_API_KEY=re_xxx
 supabase secrets set LIFECYCLE_FROM_EMAIL="Waypoint <hello@usewaypoint.app>"
+supabase secrets set WAYPOINT_APP_STORE_URL="https://apps.apple.com/app/..."
+supabase secrets set WAYPOINT_PLAY_STORE_URL="https://play.google.com/store/apps/details?id=..."
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically by the Edge

@@ -145,8 +145,8 @@ verbatim. Nothing in the current response shape needs to change.
 - **A "tonight" window that has already passed rolls to tomorrow** at the
   same wall-clock time (labeled truthfully) rather than rejecting.
 - **`npm run test:atlas` needs Node ≥ 22.6** (`--experimental-strip-types`).
-  CI currently runs Node 20, so the suite is not yet wired into `npm test`;
-  bumping CI to Node 22 is a one-line workflow change.
+  The repository's quality workflow pins Node 22.6 and runs the Atlas suite as
+  part of `npm test` before the database regression suite.
 - Compiled-intent budget semantics are GBP (matching quest_catalog).
 
 ## Roadmap
