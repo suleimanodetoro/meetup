@@ -4,6 +4,8 @@
 
 Waypoint is a full-stack mobile platform for turning shared intent into real-world activity and durable friendship. People log where they are, where they are going, and what they want to do; Waypoint uses those signals to surface compatible people, compose small-group sidequests, coordinate attendance and conversation, and support the relationship after the first meeting.
 
+**Production status:** Waypoint is live at [usewaypoint.app](https://usewaypoint.app). The Atlas section below describes a separately staged planning subsystem; its decision-only execution boundary is not the launch status of the core product.
+
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey)](https://usewaypoint.app)
 [![Expo](https://img.shields.io/badge/Expo-SDK%2053-000020?logo=expo)](https://expo.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
