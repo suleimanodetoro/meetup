@@ -45,8 +45,12 @@ item.
 ## Secrets to set
 
 ```bash
-# Stripe dashboard -> Developers -> Webhooks -> your endpoint -> "Signing secret"
+# Stripe live mode -> Workbench -> Webhooks -> your endpoint -> "Signing secret"
 supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_xxx
+
+# Stripe Waypoint E2E sandbox -> its own endpoint -> "Signing secret".
+# This is additive; never replace the live secret with it.
+supabase secrets set STRIPE_SANDBOX_WEBHOOK_SECRET=whsec_xxx
 
 # Optional. Not used for signature verification and no API calls are made in this
 # handler, but recommended so future expanded-object lookups work.
@@ -84,7 +88,12 @@ explicit flag makes it unambiguous.
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `charge.refunded`
-4. Copy the endpoint's **Signing secret** (`whsec_...`) into `STRIPE_WEBHOOK_SECRET`.
+4. Copy the live endpoint's **Signing secret** (`whsec_...`) into
+   `STRIPE_WEBHOOK_SECRET`.
+5. The isolated Stripe sandbox may send the same events to the same URL. Store
+   that destination's different signing secret as
+   `STRIPE_SANDBOX_WEBHOOK_SECRET`; the handler verifies both and requires the
+   event's `livemode` flag to match the secret that accepted it.
 
 ## Database migration (apply before/with deploy)
 

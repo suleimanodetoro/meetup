@@ -37,9 +37,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import Stripe from 'https://esm.sh/stripe@17.7.0?target=deno';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+// A Stripe sandbox/test destination has a different signing secret even when
+// it posts to the same URL. Keep it separate so sandbox E2E tests never rotate
+// or replace the live secret.
+const STRIPE_SANDBOX_WEBHOOK_SECRET = Deno.env.get('STRIPE_SANDBOX_WEBHOOK_SECRET');
 // Optional: only used to satisfy the Stripe SDK constructor (which refuses an
 // empty api key) and for any future expanded-object API lookups. Signature
-// verification does NOT need it — it uses STRIPE_WEBHOOK_SECRET only. We make
+// verification does NOT need it — it uses the webhook signing secrets. We make
 // no outbound Stripe API calls in this handler, so an unset key is fine.
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -407,9 +411,9 @@ async function handleSubscription(sub: Stripe.Subscription) {
 }
 
 serve(async (req) => {
-  // Fail closed: without the signing secret we cannot verify authenticity, so
+  // Fail closed: without a signing secret we cannot verify authenticity, so
   // refuse everything (mirrors revenuecat-webhook's unset-auth 503).
-  if (!STRIPE_WEBHOOK_SECRET) {
+  if (!STRIPE_WEBHOOK_SECRET && !STRIPE_SANDBOX_WEBHOOK_SECRET) {
     return new Response('webhook not configured', { status: 503 });
   }
   if (req.method !== 'POST') {
@@ -424,17 +428,47 @@ serve(async (req) => {
   // Raw body required for HMAC verification — do not JSON.parse before this.
   const body = await req.text();
 
-  let event: Stripe.Event;
-  try {
-    event = await stripe.webhooks.constructEventAsync(
-      body,
-      signature,
-      STRIPE_WEBHOOK_SECRET,
-      undefined,
-      cryptoProvider
+  let event: Stripe.Event | null = null;
+  let lastSignatureError: Error | null = null;
+  const signingSecrets = [
+    STRIPE_WEBHOOK_SECRET
+      ? { secret: STRIPE_WEBHOOK_SECRET, livemode: true, label: 'live' }
+      : null,
+    STRIPE_SANDBOX_WEBHOOK_SECRET
+      ? { secret: STRIPE_SANDBOX_WEBHOOK_SECRET, livemode: false, label: 'sandbox' }
+      : null,
+  ].filter(
+    (candidate): candidate is { secret: string; livemode: boolean; label: string } =>
+      candidate !== null
+  );
+
+  for (const candidate of signingSecrets) {
+    try {
+      const verified = await stripe.webhooks.constructEventAsync(
+        body,
+        signature,
+        candidate.secret,
+        undefined,
+        cryptoProvider
+      );
+      if (verified.livemode !== candidate.livemode) {
+        console.error(
+          `[stripe-webhook] ${candidate.label} secret received mismatched livemode event`
+        );
+        return new Response('invalid event mode', { status: 400 });
+      }
+      event = verified;
+      break;
+    } catch (err) {
+      lastSignatureError = err as Error;
+    }
+  }
+
+  if (!event) {
+    console.error(
+      '[stripe-webhook] signature verification failed:',
+      lastSignatureError?.message ?? 'no matching signing secret'
     );
-  } catch (err) {
-    console.error('[stripe-webhook] signature verification failed:', (err as Error).message);
     return new Response('invalid signature', { status: 400 });
   }
 
