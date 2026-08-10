@@ -91,6 +91,23 @@ serve(async (req) => {
     return new Response('missing event fields', { status: 400 });
   }
 
+  // RevenueCat also reports purchases that it ingests from Stripe. Those
+  // events are valuable in RevenueCat's analytics, but the signed direct
+  // Stripe webhook is the source of truth for web entitlements in Supabase.
+  // Letting both handlers write the same row creates a race: RevenueCat uses a
+  // Stripe subscription-item / line-item id while the direct handler uses the
+  // subscription / payment-intent id needed to match cancellations and
+  // refunds. Acknowledge Stripe-origin RevenueCat events without mutating the
+  // entitlement row. App Store, Play Store, and promotional events continue
+  // through the normal RevenueCat path below.
+  if (event.store === 'STRIPE') {
+    console.log('[rc-webhook] Stripe event acknowledged; direct Stripe webhook owns web state');
+    return new Response(JSON.stringify({ ok: true, ignored: 'stripe' }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  }
+
   // Ignore sandbox traffic against prod. RC dashboard lets you point a
   // separate webhook URL at sandbox if needed; this one is whichever
   // env you pointed it at.
