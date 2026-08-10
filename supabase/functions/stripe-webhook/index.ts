@@ -259,22 +259,27 @@ async function grantPremium(
  * Expire a recurring Premium or Founder Annual subscription. Guards:
  *   - never clobber a Founder Forever row,
  *   - never let an OLD subscription's expiry event kill a NEWER active row
- *     (compare original_transaction_id).
+ *     (compare original_transaction_id against both Stripe's subscription and
+ *     subscription-item ids; RevenueCat records Stripe web purchases with the
+ *     item id while the direct Stripe event carries the subscription id).
  */
-async function expireSubscription(userId: string, subscriptionId: string | null) {
+async function expireSubscription(userId: string, transactionIds: string[]) {
   const row = await getRow(userId);
   if (!row) return;
   const wasFounder = row.subscription_type === 'founder' || row.entitlement_id === 'founder';
   if (wasFounder && row.expires_at === null) return; // Founder Forever
   if (row.entitlement_id !== 'premium' && row.entitlement_id !== 'founder') return;
   if (
-    subscriptionId &&
+    transactionIds.length > 0 &&
     row.original_transaction_id &&
-    row.original_transaction_id !== subscriptionId
+    !transactionIds.includes(row.original_transaction_id)
   ) {
     // The active row belongs to a different (newer) subscription than the one
     // this expiry event is about — out of order / superseded. Leave it.
-    console.log('[stripe-webhook] skipping expiry for superseded subscription', subscriptionId);
+    console.log(
+      '[stripe-webhook] skipping expiry for superseded subscription',
+      transactionIds.join(',')
+    );
     return;
   }
 
@@ -363,6 +368,17 @@ function getPeriodEndUnix(sub: Stripe.Subscription): number | null {
   return null;
 }
 
+/**
+ * RevenueCat's Stripe ingestion identifies a recurring purchase by the
+ * subscription-item id (`si_...`), while Stripe's subscription events identify
+ * it by the parent subscription id (`sub_...`). Both describe the same
+ * purchase, so cancellation matching must accept either value.
+ */
+function getSubscriptionTransactionIds(sub: Stripe.Subscription): string[] {
+  const itemIds = sub.items?.data?.map((item) => item.id).filter(Boolean) ?? [];
+  return [sub.id, ...itemIds];
+}
+
 const unixToIso = (secs: number | null | undefined): string | null =>
   typeof secs === 'number' ? new Date(secs * 1000).toISOString() : null;
 
@@ -401,7 +417,7 @@ async function handleSubscription(sub: Stripe.Subscription) {
       await storeStripeCustomerId(userId, customerId);
     }
   } else if (expireStatuses.includes(sub.status)) {
-    await expireSubscription(userId, sub.id);
+    await expireSubscription(userId, getSubscriptionTransactionIds(sub));
   } else {
     // 'incomplete' (first payment not settled) / 'paused': don't grant, but
     // don't clobber an existing row either. Still persist the customer link.
@@ -545,7 +561,7 @@ serve(async (req) => {
         const sub = event.data.object as Stripe.Subscription;
         const userId = sub.metadata?.supabase_uid ?? null;
         if (userId) {
-          await expireSubscription(userId, sub.id);
+          await expireSubscription(userId, getSubscriptionTransactionIds(sub));
         } else {
           console.warn('[stripe-webhook] deleted subscription has no supabase_uid:', sub.id);
         }
