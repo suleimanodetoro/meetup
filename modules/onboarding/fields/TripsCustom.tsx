@@ -11,8 +11,11 @@ import {
   View,
 } from 'react-native';
 import DatePicker from 'react-native-date-picker';
+import { uuid } from 'expo-modules-core';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
+import { getCountryFlag } from '~/utils/countryFlags';
+import { formatCalendarDate } from '~/utils/calendarDate';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
 import { authColors } from '~/utils/authTheme';
 import { triggerLightHaptic } from '~/utils/haptics';
@@ -32,15 +35,6 @@ interface Suggestion {
   country_code: string;
   flag: string;
   full_address?: string;
-}
-
-function getCountryFlag(countryCode: string): string {
-  if (!countryCode || countryCode.length !== 2) return '🌍';
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map((char) => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
 }
 
 /**
@@ -75,8 +69,8 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
         city: destination.city,
         country: destination.country,
         country_code: destination.country_code,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: formatCalendarDate(startDate),
+        end_date: formatCalendarDate(endDate),
       });
       if (error) throw error;
       await advance({});
@@ -170,7 +164,6 @@ export function TripsCustom({ step, advance, goBack }: CustomStepProps) {
           triggerLightHaptic();
           setShowDestinationModal(false);
         }}
-        accessToken={session?.access_token ?? null}
         selected={destination}
         onSelect={(d) => {
           triggerLightHaptic();
@@ -257,17 +250,16 @@ function DateButton({
 function DestinationModal({
   visible,
   onClose,
-  accessToken,
   selected,
   onSelect,
 }: {
   visible: boolean;
   onClose: () => void;
-  accessToken: string | null;
   selected: Destination | null;
   onSelect: (d: Destination) => void;
 }) {
   const [query, setQuery] = useState('');
+  const [mapboxSessionToken] = useState(() => uuid.v4());
   const [results, setResults] = useState<Suggestion[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -279,7 +271,7 @@ function DestinationModal({
       }
       setSearching(true);
       try {
-        const data = await getSuggestions(query, accessToken || 'session-' + Date.now(), {
+        const data = await getSuggestions(query, mapboxSessionToken, {
           types: ['place', 'locality'],
         });
         const cityResults: Suggestion[] = ((data?.suggestions ?? []) as any[])
@@ -300,7 +292,7 @@ function DestinationModal({
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [query, accessToken]);
+  }, [query, mapboxSessionToken]);
 
   return (
     <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onClose}>

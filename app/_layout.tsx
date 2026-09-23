@@ -13,10 +13,9 @@ import { ErrorBoundary } from '~/components/ErrorBoundary';
 import { FONTS_TO_LOAD, applyGlobalFont } from '~/utils/fonts';
 import { configureRevenueCat } from '~/lib/revenuecat';
 import { waypointNotifications } from '~/modules/notifications';
-// Slug-only import — dependency-free. Importing from ./sequence.ts here
-// would pull react-native-date-picker through BirthdayField/TripsCustom
-// into app boot and crash with a `nullthrows` at requireNativeComponent.
-import { ONBOARDING_SLUGS } from '~/modules/onboarding/slugs';
+// The canonical sequence is dependency-free, so reading a resume position
+// does not load native onboarding fields during app boot.
+import { getOnboardingResumeSlug } from '~/modules/onboarding/sequence';
 
 // Configure the RC SDK once at module load. Idempotent; no-op when the
 // platform's API key env var isn't set, so dev environments without an
@@ -133,8 +132,7 @@ function NavigationController({ children }: { children: React.ReactNode }) {
         // every Continue, so returning users continue where they left off
         // instead of always landing back on /name. Clamp into the sequence
         // bounds defensively.
-        const resumeIndex = Math.max(0, Math.min(onboardingStep, ONBOARDING_SLUGS.length - 1));
-        const resumeSlug = ONBOARDING_SLUGS[resumeIndex];
+        const resumeSlug = getOnboardingResumeSlug(onboardingStep);
         router.replace(`/onboarding/${resumeSlug}`); // lives in (auth)/onboarding/[step]
       }
       return;

@@ -13,10 +13,11 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
+import { uuid } from 'expo-modules-core';
 import { supabase } from '~/utils/supabase';
 import { getCountryFlag } from '~/utils/countryFlags';
+import { formatCalendarDate } from '~/utils/calendarDate';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
-import { useAuth } from '~/contexts/AuthProvider';
 
 interface CityResult {
   city: string;
@@ -26,20 +27,11 @@ interface CityResult {
   source: 'db' | 'mapbox';
 }
 
-/** YYYY-MM-DD in local time, suitable for postgres DATE columns. */
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 function formatChip(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default function SearchScreen() {
-  const { session } = useAuth();
   const [query, setQuery] = useState('');
   const [dbResults, setDbResults] = useState<CityResult[]>([]);
   const [mapboxResults, setMapboxResults] = useState<CityResult[]>([]);
@@ -50,7 +42,7 @@ export default function SearchScreen() {
   const [toPickerOpen, setToPickerOpen] = useState(false);
   const requestId = useRef(0);
   // Stable Mapbox session token for billing — one session per screen lifetime.
-  const mapboxSessionRef = useRef(`search-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const [mapboxSessionToken] = useState(() => uuid.v4());
 
   useEffect(() => {
     const myId = ++requestId.current;
@@ -76,7 +68,7 @@ export default function SearchScreen() {
           try {
             const mb = await getSuggestions(
               query.trim(),
-              session?.access_token ?? mapboxSessionRef.current,
+              mapboxSessionToken,
               { types: ['place', 'locality'], language: 'en' },
             );
             if (myId !== requestId.current) return;
@@ -116,13 +108,13 @@ export default function SearchScreen() {
       }
     }, query.trim() ? 200 : 0);
     return () => clearTimeout(timer);
-  }, [query, session?.access_token]);
+  }, [query, mapboxSessionToken]);
 
   const openCity = useCallback(
     (item: CityResult) => {
       const qs = new URLSearchParams();
-      if (fromDate) qs.append('from', toIsoDate(fromDate));
-      if (toDate) qs.append('to', toIsoDate(toDate));
+      if (fromDate) qs.append('from', formatCalendarDate(fromDate));
+      if (toDate) qs.append('to', formatCalendarDate(toDate));
       // Forward the country hint the user just picked. When the DB has no
       // row for this city yet, the detail screen falls back to these so we
       // don't lose Mapbox's answer across navigation.

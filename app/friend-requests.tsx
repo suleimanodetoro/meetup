@@ -78,6 +78,7 @@ export default function FriendRequestsScreen() {
 
             return {
               id: friendship.id,
+              from_user_id: requesterId,
               from_user: friendship.requester,
               created_at: friendship.created_at,
               mutual_friends: mutualFriends || [],
@@ -159,20 +160,21 @@ export default function FriendRequestsScreen() {
       <View style={styles.requestCard}>
         <Pressable
           style={styles.profileSection}
-          onPress={() => router.push(`/profile/${item.from_user.id}`)}>
-          {item.from_user.avatar_url ? (
+          disabled={!item.from_user}
+          onPress={() => router.push(`/profile/${item.from_user_id}`)}>
+          {item.from_user?.avatar_url ? (
             <AppImage source={{ uri: item.from_user.avatar_url }} style={styles.avatar} />
           ) : (
             <InitialsAvatar
-              name={item.from_user.full_name || item.from_user.username}
-              id={item.from_user.id}
+              name={item.from_user?.full_name || item.from_user?.username}
+              id={item.from_user_id}
               size={60}
               style={styles.avatar}
             />
           )}
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
-              {item.from_user.full_name || item.from_user.username || 'Unknown User'}
+              {item.from_user?.full_name || item.from_user?.username || 'Unavailable profile'}
             </Text>
             <Text style={styles.timeAgo}>
               {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
@@ -207,7 +209,7 @@ export default function FriendRequestsScreen() {
         <View style={styles.actionButtons}>
           <GradientButton
             label="Accept"
-            onPress={() => handleAccept(item.id, item.from_user.id)}
+            onPress={() => handleAccept(item.id, item.from_user_id)}
             loading={isProcessing}
             size="md"
             style={{ flex: 1 }}
@@ -215,7 +217,7 @@ export default function FriendRequestsScreen() {
 
           <Pressable
             style={[styles.button, styles.declineButton, isProcessing && styles.buttonDisabled]}
-            onPress={() => handleDecline(item.id, item.from_user.id)}
+            onPress={() => handleDecline(item.id, item.from_user_id)}
             disabled={isProcessing}>
             <Text style={styles.declineButtonText}>Decline</Text>
           </Pressable>

@@ -1,0 +1,313 @@
+import { decode } from 'base64-arraybuffer';
+import { Alert } from 'react-native';
+import { waypointNotifications } from '~/modules/notifications';
+import { supabase } from '~/utils/supabase';
+import type { InterestId } from '~/utils/constants';
+import { calculateAge, parseCalendarDate } from '~/utils/calendarDate';
+import { BioField } from './fields/BioField';
+import { BirthdayField } from './fields/BirthdayField';
+import { GenderField } from './fields/GenderField';
+import { GenderPreferenceField } from './fields/GenderPreferenceField';
+import { InterestsField } from './fields/InterestsField';
+import { LanguagesField } from './fields/LanguagesField';
+import { LocationIntroBody } from './fields/LocationIntroBody';
+import { detectCurrentCity, LocationField, type LocationValue } from './fields/LocationField';
+import { NameField } from './fields/NameField';
+import { NationalityField, type NationalityValue } from './fields/NationalityField';
+import { NotificationsBody } from './fields/NotificationsBody';
+import { PauseBody } from './fields/PauseBody';
+import { PictureField, type PictureValue } from './fields/PictureField';
+import { PreferencesField } from './fields/PreferencesField';
+import { RatingBody, requestWaypointReview, TakeABowBody } from './fields/FinaleBodies';
+import { TripsCustom } from './fields/TripsCustom';
+import { StepCancelled, type StepDef } from './types';
+import { ONBOARDING_SEQUENCE, type OnboardingSlug } from './sequence';
+
+async function uploadAvatar(userId: string, base64: string): Promise<string> {
+  // Per-user folder so the owner-scoped storage policy matches ((foldername)[1] = uid).
+  const fileName = `${userId}/${Date.now()}.jpg`;
+  const { error } = await supabase.storage.from('avatars').upload(fileName, decode(base64), {
+    contentType: 'image/jpeg',
+    upsert: true,
+  });
+  if (error) throw error;
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from('avatars').getPublicUrl(fileName);
+  return publicUrl;
+}
+
+// Waypoint is an 18+ service (see Terms of Service + App Store age rating).
+// The birthday step MUST reject anyone who declares an age below this, both for
+// legal reasons (COPPA / under-18 safety) and to keep our published "you must be
+// 18+" claim truthful. This is a self-declared gate (we cannot verify a real DOB),
+// but it must actually refuse under-18 dates rather than wave them through.
+const MINIMUM_AGE = 18;
+
+/**
+ * Hard block for users who declare an under-18 birthday. Shows an explanatory
+ * alert and resolves once dismissed; the caller then aborts the step so the
+ * user cannot complete onboarding (and therefore cannot use the social Service).
+ */
+function rejectUnderage(age: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    Alert.alert(
+      'You must be 18 to use Waypoint',
+      `Based on the birthday you entered, you are ${age}. Waypoint is only for people aged ${MINIMUM_AGE} and over, so we can't set up your account. If you entered the wrong date, tap back and try again.`,
+      [{ text: 'OK', onPress: () => resolve() }],
+      { cancelable: false }
+    );
+  });
+}
+
+/**
+ * Prompts the user to confirm their age before persisting the birthday.
+ * Resolves true on confirm, false on cancel. Inspired by Swarm's
+ * "Are you X years old?" sheet.
+ */
+function confirmAge(birthDateISO: string): Promise<boolean> {
+  const age = calculateAge(parseCalendarDate(birthDateISO));
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      `Are you ${age} years old?`,
+      'Please confirm your correct birthday — we require it to allow use of Waypoint.',
+      [
+        {
+          text: 'No, I entered the wrong birthday',
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        { text: 'Yes, I confirm', onPress: () => resolve(true) },
+      ],
+      { cancelable: false }
+    );
+  });
+}
+
+// Keep component imports here so the navigation gate can read sequence.ts
+// without loading native onboarding fields at app boot. The registry must
+// provide exactly one definition for every slug in the canonical sequence.
+const STEP_DEFINITIONS: Record<OnboardingSlug, Omit<StepDef<any>, 'slug'>> = {
+  'name': {
+    title: 'What should we call you?',
+    Body: NameField,
+    hideCta: true,
+    read: (p): string | undefined => p.full_name ?? undefined,
+    isValid: (v: string | undefined) => !!v?.trim(),
+    commit: async (v: string | undefined) => ({
+      full_name: v?.trim() ?? null,
+    }),
+  },
+  'birthday': {
+    title: "When's your birthday?",
+    subtitle: 'We require your birthday to keep Waypoint a safe place :)',
+    Body: BirthdayField,
+    read: (p): string | undefined => p.birth_date ?? undefined,
+    isValid: (v: string | undefined) => !!v,
+    commit: async (v: string | undefined) => {
+      if (!v) throw new StepCancelled('No birthday set');
+      const age = calculateAge(parseCalendarDate(v));
+      if (age < MINIMUM_AGE) {
+        await rejectUnderage(age);
+        // Abort the step: the user stays on the birthday screen and cannot
+        // advance, so onboarding never completes for an under-18 account.
+        throw new StepCancelled('User is under the minimum age');
+      }
+      const ok = await confirmAge(v);
+      if (!ok) throw new StepCancelled('User declined age confirmation');
+      return { birth_date: v };
+    },
+  },
+  'nationality': {
+    title: 'What is your nationality?',
+    subtitle: 'This is about your background, not where you are right now.',
+    Body: NationalityField,
+    read: (p): NationalityValue | undefined =>
+      p.nationality_code ? { code: p.nationality_code, name: p.nationality ?? '' } : undefined,
+    isValid: (v: NationalityValue | undefined) => !!v?.code,
+    commit: async (v: NationalityValue | undefined) => ({
+      nationality_code: v?.code ?? null,
+      nationality: v?.name ?? null,
+    }),
+  },
+  'gender': {
+    title: 'How do you identify yourself?',
+    Body: GenderField,
+    read: (p) => p.gender ?? undefined,
+    isValid: (v: string | undefined) => !!v,
+    commit: async (v: string | undefined) => ({ gender: v ?? null }),
+  },
+  'interests': {
+    title: 'select up to 5\ninterests',
+    subtitle: 'connect with people who share your vibe 🤝',
+    skippable: true,
+    Body: InterestsField,
+    read: (p) => (Array.isArray(p.interests) ? (p.interests as InterestId[]) : undefined),
+    isValid: (v: InterestId[] | undefined) => Array.isArray(v) && v.length > 0,
+    commit: async (v: InterestId[] | undefined, { skipped }) => ({
+      interests: skipped ? [] : (v ?? []),
+    }),
+  },
+  'pause': {
+    title: "you're almost\nthere!",
+    subtitle: "Just a few more steps and you'll be ready for your first sidequest.",
+    Body: PauseBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => ({}),
+  },
+  'picture': {
+    title: 'Add a picture',
+    subtitle: 'let others know what you look like 📸',
+    skippable: true,
+    Body: PictureField,
+    read: (p): PictureValue | undefined =>
+      p.avatar_url ? { uri: p.avatar_url, base64: null } : undefined,
+    isValid: () => true,
+    commit: async (v: PictureValue | undefined, { userId, skipped }) => {
+      if (skipped || !v) return { avatar_url: null };
+      // If the user kept the existing picture (base64 is null but uri is set),
+      // don't re-upload — just preserve the URL.
+      if (!v.base64) return { avatar_url: v.uri };
+      const url = await uploadAvatar(userId, v.base64);
+      return { avatar_url: url };
+    },
+  },
+  'languages': {
+    title: 'Languages you speak',
+    subtitle: 'select all that apply 🌍',
+    skippable: true,
+    Body: LanguagesField,
+    read: (p) => (Array.isArray(p.languages) ? (p.languages as string[]) : undefined),
+    isValid: (v: string[] | undefined) => Array.isArray(v) && v.length > 0,
+    commit: async (v: string[] | undefined, { skipped }) => ({
+      languages: skipped ? ['en'] : (v ?? ['en']),
+    }),
+  },
+  'bio': {
+    title: 'Tell us a bit about you',
+    subtitle: 'what should people know 👀',
+    skippable: true,
+    Body: BioField,
+    read: (p) => p.bio ?? undefined,
+    isValid: (v: string | undefined) => typeof v === 'string' && v.trim().length > 0,
+    commit: async (v: string | undefined, { skipped }) => ({
+      bio: skipped ? null : (v?.trim() ?? null),
+    }),
+  },
+  'preferences': {
+    title: 'How do you prefer to\nmeet up?',
+    subtitle: 'helps us suggest the right kind of sidequests',
+    Body: PreferencesField,
+    read: (p) => p.meeting_preference ?? undefined,
+    isValid: (v: string | undefined) => !!v,
+    commit: async (v: string | undefined) => ({
+      meeting_preference: v ?? null,
+    }),
+  },
+  'gender-preference': {
+    title: 'Who would you like to\nmeet?',
+    subtitle: 'this helps keep your suggestions relevant',
+    Body: GenderPreferenceField,
+    read: (p) => p.gender_preference ?? undefined,
+    isValid: (v: string | undefined) => !!v,
+    commit: async (v: string | undefined) => ({
+      gender_preference: v ?? null,
+    }),
+  },
+  'trips': {
+    title: 'any upcoming trips?',
+    subtitle:
+      'got a visit planned? add it here to match with other people going to the same place!',
+    skippable: true,
+    custom: TripsCustom,
+  },
+  'location-intro': {
+    title: 'Share your world,\nmeet better',
+    hideHeader: true,
+    noScroll: true,
+    Body: LocationIntroBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => ({}),
+    continueLabel: "I'm based in...",
+  },
+  'location': {
+    title: 'Find sidequests and\npeople near you',
+    noScroll: true,
+    Body: LocationField,
+    read: (p): LocationValue | undefined =>
+      p.location
+        ? {
+            city: p.location,
+            country: p.location_country ?? null,
+            country_code: p.location_country_code ?? null,
+          }
+        : undefined,
+    isValid: () => true,
+    commit: async (v: LocationValue | undefined) => {
+      const location = v ?? (await detectCurrentCity());
+      return {
+        location: location.city,
+        location_country: location.country,
+        location_country_code: location.country_code,
+        location_updated_at: new Date().toISOString(),
+      };
+    },
+  },
+  'notifications': {
+    title: 'Turn on notifications',
+    skippable: true,
+    hideHeader: true,
+    Body: NotificationsBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async (_value, { skipped, userId }) => {
+      if (skipped) return {};
+
+      try {
+        const access = await waypointNotifications.requestAccess({
+          userId,
+          source: 'onboarding',
+        });
+        if (access.permission === 'granted' || access.permission === 'provisional') {
+          await waypointNotifications.sync({
+            userId,
+            reason: 'onboarding-accepted',
+          });
+        }
+      } catch (err) {
+        console.warn('Notification onboarding setup failed:', err);
+      }
+
+      return {};
+    },
+  },
+  'rating': {
+    title: 'Enjoying the app?',
+    hideHeader: true,
+    noScroll: true,
+    Body: RatingBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => {
+      await requestWaypointReview();
+      return {};
+    },
+    continueLabel: 'Continue',
+  },
+  'take-a-bow': {
+    title: 'Take a bow',
+    hideHeader: true,
+    noScroll: true,
+    Body: TakeABowBody,
+    read: () => undefined,
+    isValid: () => true,
+    commit: async () => ({}),
+  },
+};
+
+export const ONBOARDING_STEPS: readonly StepDef<any>[] = ONBOARDING_SEQUENCE.map((slug) => ({
+  ...STEP_DEFINITIONS[slug],
+  slug,
+}));

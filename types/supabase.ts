@@ -1533,33 +1533,6 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_visit_details: {
-        Args: { visit_id_param: number }
-        Returns: {
-          city: string
-          country: string
-          country_code: string
-          end_date: string
-          id: number
-          plan_count: number
-          start_date: string
-          user_count: number
-        }[]
-      }
-      get_visit_users: {
-        Args: { limit_param?: number; visit_id_param: number }
-        Returns: {
-          avatar_url: string
-          bio: string
-          full_name: string
-          is_verified: boolean
-          nationality_code: string
-          overlap_days: number
-          user_id: string
-          visit_end: string
-          visit_start: string
-        }[]
-      }
       is_conversation_member: { Args: { conv_id: number }; Returns: boolean }
       is_user_founder: { Args: { uid: string }; Returns: boolean }
       is_user_premium: { Args: { uid: string }; Returns: boolean }

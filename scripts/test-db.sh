@@ -31,6 +31,8 @@ cleanup_concurrency() {
 trap cleanup_concurrency EXIT
 
 run_sql supabase/tests/fixtures.sql
+run_sql supabase/tests/profile_visit_privacy.sql
+run_sql supabase/tests/signup_capacity_hook.sql
 run_sql supabase/tests/friend_request_consent.sql
 run_sql supabase/tests/chemistry_security_symmetry.sql
 run_sql supabase/tests/intent_capture_atomicity.sql

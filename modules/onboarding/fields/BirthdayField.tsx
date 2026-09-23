@@ -4,38 +4,29 @@ import { StyleSheet, Text, View } from 'react-native';
 import DatePicker from 'react-native-date-picker';
 
 import { authColors, authRadius, authSpace, authType } from '~/utils/authTheme';
+import { formatCalendarDate, parseCalendarDate } from '~/utils/calendarDate';
 import type { StepBodyProps } from '../types';
 
 const DEFAULT_DATE = new Date(1998, 0, 1);
 const MIN_DATE = new Date(1920, 0, 1);
 
-export function calculateAge(date: Date): number {
-  const today = new Date();
-  let age = today.getFullYear() - date.getFullYear();
-  const monthDiff = today.getMonth() - date.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 /**
  * Swarm-inspired birthday picker. Renders the picked date inside a pill-
  * outline input above an inline wheel-spinner DatePicker. The age
- * confirmation modal is owned by the step's `commit` (see sequence.ts) so
+ * confirmation modal is owned by the step's `commit` (see steps.ts) so
  * that "Continue" → "Are you X years old?" → advance is one fluid action.
  */
 export function BirthdayField({ value, setValue }: StepBodyProps<string>) {
   const today = useMemo(() => new Date(), []);
 
-  const date = value ? new Date(value) : DEFAULT_DATE;
+  const date = value ? parseCalendarDate(value) : DEFAULT_DATE;
 
   // Seed the slot with the default date so the user can tap Continue right
   // away (matches Swarm's pre-filled wheel UX). We do this in an effect to
   // avoid a setState-during-render warning.
   useEffect(() => {
     if (!value) {
-      setValue(DEFAULT_DATE.toISOString().split('T')[0]);
+      setValue(formatCalendarDate(DEFAULT_DATE));
     }
     // Intentionally only seeding once on mount; the wheel handles subsequent
     // updates via onDateChange.
@@ -62,7 +53,7 @@ export function BirthdayField({ value, setValue }: StepBodyProps<string>) {
           mode="date"
           maximumDate={today}
           minimumDate={MIN_DATE}
-          onDateChange={(d) => setValue(d.toISOString().split('T')[0])}
+          onDateChange={(d) => setValue(formatCalendarDate(d))}
           theme="light"
         />
       </View>

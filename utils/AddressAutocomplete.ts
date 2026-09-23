@@ -1,70 +1,47 @@
-// utils/AddressAutocomplete.ts
-const API_BASE_URL = "https://api.mapbox.com/search/searchbox/v1";
-const access_token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-
-// Ensure access token is present
-if (!access_token) {
-  throw new Error("Missing Mapbox access token.");
-}
+const API_BASE_URL = 'https://api.mapbox.com/search/searchbox/v1';
+const SESSION_TOKEN_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface SearchOptions {
-  types?: string[];  // e.g., ['place', 'locality', 'poi', 'address']
-  proximity?: string;  // e.g., "lng,lat"
-  country?: string[];  // e.g., ['US', 'CA']
-  language?: string;  // e.g., 'en'
+  types?: string[];
+  proximity?: string;
+  country?: string[];
+  language?: string;
 }
 
-/**
- * Get search suggestions from Mapbox Search Box API.
- * @param input - User's typed input
- * @param session_token - Unique session token (UUID)
- * @param options - Optional search parameters
- */
+async function request(path: string, sessionToken: string, params = new URLSearchParams()) {
+  // Only an independent UUID belongs here. In particular, never send a user's
+  // Supabase bearer token to Mapbox as a search billing identifier.
+  if (!SESSION_TOKEN_PATTERN.test(sessionToken)) {
+    throw new Error('Mapbox search requires an independent UUID session token.');
+  }
+
+  const accessToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  if (!accessToken) throw new Error('Missing Mapbox access token.');
+
+  params.append('session_token', sessionToken);
+  params.append('access_token', accessToken);
+  const response = await fetch(`${API_BASE_URL}/${path}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Mapbox search failed (${response.status}).`);
+  }
+  return response.json();
+}
+
+/** Fetch suggestions using an independent UUID shared with the matching retrieve call. */
 export const getSuggestions = async (
-  input: string, 
-  session_token: string,
+  input: string,
+  sessionToken: string,
   options?: SearchOptions
 ) => {
-  // Build query parameters
-  let url = `${API_BASE_URL}/suggest?q=${encodeURIComponent(input)}&session_token=${session_token}&access_token=${access_token}`;
-  
-  // Add types parameter for filtering (most important for your use case)
-  if (options?.types && options.types.length > 0) {
-    url += `&types=${options.types.join(',')}`;
-  }
-  
-  // Add proximity for geographic biasing
-  if (options?.proximity) {
-    url += `&proximity=${options.proximity}`;
-  }
-  
-  // Add country filtering
-  if (options?.country && options.country.length > 0) {
-    url += `&country=${options.country.join(',')}`;
-  }
-  
-  // Add language
-  if (options?.language) {
-    url += `&language=${options.language}`;
-  }
-
-  const response = await fetch(url);
-  const json = await response.json();
-  console.log("Suggestions response:", json);
-  return json;
+  const params = new URLSearchParams({ q: input });
+  if (options?.types?.length) params.append('types', options.types.join(','));
+  if (options?.proximity) params.append('proximity', options.proximity);
+  if (options?.country?.length) params.append('country', options.country.join(','));
+  if (options?.language) params.append('language', options.language);
+  return request('suggest', sessionToken, params);
 };
 
-/**
- * Retrieve full place details using a mapbox_id from a suggestion.
- * @param id - Mapbox feature ID
- * @param session_token - Same session token used with `getSuggestions`
- */
-export const retrieveDetails = async (id: string, session_token: string) => {
-  const response = await fetch(
-    `${API_BASE_URL}/retrieve/${id}?session_token=${session_token}&access_token=${access_token}`
-  );
-
-  const json = await response.json();
-  console.log("Retrieve response:", json);
-  return json;
-};
+/** Retrieve a suggestion using the same UUID, then start a new search session. */
+export const retrieveDetails = async (id: string, sessionToken: string) =>
+  request(`retrieve/${encodeURIComponent(id)}`, sessionToken);

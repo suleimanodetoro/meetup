@@ -39,7 +39,7 @@ export interface ConversationParticipant {
   is_muted: boolean;
 
   // Joined data
-  profile?: Profile;
+  profile?: Profile | null;
 }
 
 // Enhanced Message Interface
@@ -59,8 +59,8 @@ export interface Message {
   metadata?: MessageMetadata | null;
 
   // Joined data
-  user?: Profile;
-  reply_to?: Message;
+  user?: Profile | null;
+  reply_to?: Message | null;
   read_receipts?: MessageReadReceipt[];
 }
 
@@ -95,13 +95,14 @@ export interface Friendship {
   updated_at: string;
 
   // Joined data
-  requester?: Profile;
-  addressee?: Profile;
+  requester?: Profile | null;
+  addressee?: Profile | null;
 }
 
 export interface FriendRequest {
   id: number;
-  from_user: Profile;
+  from_user_id: string;
+  from_user: Profile | null;
   created_at: string;
   mutual_friends?: Profile[];
   mutual_plans?: Event[];
@@ -131,7 +132,7 @@ export interface BlockedUser {
   reason?: string | null;
 
   // Joined data
-  blocked_profile?: Profile;
+  blocked_profile?: Profile | null;
 }
 
 // =====================================================
@@ -242,14 +243,14 @@ export interface ChatListItem {
 // =====================================================
 
 export interface ConversationWithDetails extends Conversation {
-  participants: (ConversationParticipant & { profile: Profile })[];
-  last_message?: Message & { user: Profile };
+  participants: (ConversationParticipant & { profile: Profile | null })[];
+  last_message?: Message & { user: Profile | null };
   unread_count: number;
 }
 
 export interface MessageWithDetails extends Message {
-  user: Profile;
-  reply_to?: Message & { user: Profile };
+  user: Profile | null;
+  reply_to?: (Message & { user: Profile | null }) | null;
   read_by: Profile[];
 }
 

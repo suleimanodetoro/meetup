@@ -19,6 +19,7 @@ import DatePicker from 'react-native-date-picker';
 import { supabase } from '~/utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import { COUNTRIES } from '~/utils/countryFlags';
+import { formatCalendarDate, parseCalendarDate } from '~/utils/calendarDate';
 import { GENDER_OPTIONS, type GenderId, LANGUAGES, MEETING_PREFERENCES } from '~/utils/constants';
 import { useAuth } from '~/contexts/AuthProvider';
 import { pickAndEncodeImage } from '~/utils/pickAndEncodeImage';
@@ -257,7 +258,7 @@ export default function EditProfile() {
           // appending a local time avoids the UTC-midnight-drift-into-prev-day
           // bug in negative-UTC timezones.
           if (profile.birth_date) {
-            const dobDate = new Date(`${profile.birth_date}T00:00:00`);
+            const dobDate = parseCalendarDate(profile.birth_date);
             if (!isNaN(dobDate.getTime())) setDob(dobDate);
           }
 
@@ -391,7 +392,7 @@ export default function EditProfile() {
         avatar_url: mainImage || null,
         avatar_url_2: secondImage || null,
         avatar_url_3: thirdImage || null,
-        birth_date: dob ? new Date(dob).toISOString().slice(0, 10) : null,
+        birth_date: dob ? formatCalendarDate(new Date(dob)) : null,
         languages,
         gender: gender ?? null,
         nationality: country?.name ?? null,

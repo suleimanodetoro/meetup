@@ -2,9 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '~/contexts/AuthProvider';
+import ErrorBanner from '~/components/ErrorBanner';
 import { authColors } from '~/utils/authTheme';
 import { OnboardingFrame } from './OnboardingFrame';
-import { FIRST_STEP_SLUG, ONBOARDING_SEQUENCE, STEP_INDEX } from './sequence';
+import {
+  FIRST_STEP_SLUG,
+  ONBOARDING_SEQUENCE,
+  getOnboardingResumeSlug,
+  getOnboardingStepIndex,
+} from './sequence';
+import { ONBOARDING_STEPS } from './steps';
 import { commitStep, loadProfile } from './persist';
 import { isCustomStep, StepCancelled, type ProfileRow } from './types';
 
@@ -28,9 +35,10 @@ export function OnboardingStep() {
   const [slotValue, setSlotValue] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
-  const stepIndex = slug ? STEP_INDEX[slug] : undefined;
-  const step = stepIndex !== undefined ? ONBOARDING_SEQUENCE[stepIndex] : undefined;
+  const stepIndex = slug ? getOnboardingStepIndex(slug) : undefined;
+  const step = stepIndex !== undefined ? ONBOARDING_STEPS[stepIndex] : undefined;
 
   const redirectedRef = useRef(false);
 
@@ -53,7 +61,7 @@ export function OnboardingStep() {
         const persistedStep = typeof row.onboarding_step === 'number' ? row.onboarding_step : 0;
         if (stepIndex !== undefined && stepIndex > persistedStep && !redirectedRef.current) {
           redirectedRef.current = true;
-          const targetSlug = ONBOARDING_SEQUENCE[persistedStep]?.slug ?? FIRST_STEP_SLUG;
+          const targetSlug = getOnboardingResumeSlug(persistedStep);
           if (targetSlug !== slug) {
             router.replace(`/onboarding/${targetSlug}` as never);
             return;
@@ -65,7 +73,7 @@ export function OnboardingStep() {
       } catch (err) {
         if (!cancelled) {
           console.error('Onboarding load error:', err);
-          setLoadError('Failed to load your profile. Pull to retry.');
+          setLoadError('Could not load your profile. Check your connection and try again.');
         }
       }
     })();
@@ -73,7 +81,7 @@ export function OnboardingStep() {
     return () => {
       cancelled = true;
     };
-  }, [userId, slug, step, stepIndex]);
+  }, [userId, slug, step, stepIndex, loadAttempt]);
 
   const handleContinue = useCallback(async () => {
     if (!step || !userId || stepIndex === undefined) return;
@@ -89,7 +97,7 @@ export function OnboardingStep() {
         // sends the user to /(tabs).
         await refreshOnboardingStatus();
       } else {
-        const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1].slug;
+        const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1];
         router.push(`/onboarding/${nextSlug}` as never);
       }
     } catch (err) {
@@ -115,19 +123,25 @@ export function OnboardingStep() {
       if (stepIndex === ONBOARDING_SEQUENCE.length - 1) {
         await refreshOnboardingStatus();
       } else {
-        const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1].slug;
+        const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1];
         router.push(`/onboarding/${nextSlug}` as never);
       }
     } catch (err) {
       console.error('Step skip failed:', err);
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Try again.';
+      Alert.alert("Couldn't save", msg);
     } finally {
       setBusy(false);
     }
   }, [step, stepIndex, userId, refreshOnboardingStatus]);
 
   const handleBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
-  }, []);
+    if (router.canGoBack()) {
+      router.back();
+    } else if (stepIndex !== undefined && stepIndex > 0) {
+      router.replace(`/onboarding/${ONBOARDING_SEQUENCE[stepIndex - 1]}` as never);
+    }
+  }, [stepIndex]);
 
   // ----- Render guards -----
 
@@ -142,9 +156,18 @@ export function OnboardingStep() {
 
   if (!profile || !userId) {
     return (
-      <OnboardingFrame title={step.title} subtitle={step.subtitle} animationKey={step.slug}>
+      <OnboardingFrame
+        title={step.title}
+        subtitle={step.subtitle}
+        animationKey={step.slug}
+        onContinue={loadError ? () => setLoadAttempt((attempt) => attempt + 1) : undefined}
+        continueLabel="Try again">
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          {loadError ? null : <ActivityIndicator size="large" color={authColors.accent} />}
+          {loadError ? (
+            <ErrorBanner message={loadError} />
+          ) : (
+            <ActivityIndicator size="large" color={authColors.accent} />
+          )}
         </View>
       </OnboardingFrame>
     );
@@ -164,7 +187,7 @@ export function OnboardingStep() {
             if (stepIndex === ONBOARDING_SEQUENCE.length - 1) {
               await refreshOnboardingStatus();
             } else {
-              const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1].slug;
+              const nextSlug = ONBOARDING_SEQUENCE[stepIndex + 1];
               router.push(`/onboarding/${nextSlug}` as never);
             }
           } catch (err) {

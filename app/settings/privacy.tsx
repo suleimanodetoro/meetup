@@ -16,7 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { InitialsAvatar } from '~/components/InitialsAvatar';
 import { router } from 'expo-router';
-import { UserPrivacySettings, BlockedUser } from '~/types/messaging';
+import type { BlockedUser, UpdatePrivacySettingsInput } from '~/types/messaging';
+import type { Database } from '~/types/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
 import { supabase } from '~/utils/supabase';
 import {
@@ -40,26 +41,34 @@ const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private (Only me)' },
 ] as const;
 
+type PrivacySettings = Database['public']['Tables']['user_privacy_settings']['Row'];
+
 export default function PrivacySettingsScreen() {
   const { session } = useAuth();
-  const [settings, setSettings] = useState<UserPrivacySettings | null>(null);
+  const [settings, setSettings] = useState<PrivacySettings | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [blockedLoading, setBlockedLoading] = useState(true);
+  const [blockedError, setBlockedError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const fetchPrivacySettings = useCallback(async () => {
     if (!session?.user?.id) return;
 
+    setLoading(true);
+    setSettingsError(null);
     try {
       const { data, error } = await supabase
         .from('user_privacy_settings')
         .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code === 'PGRST116') {
+      if (error) throw error;
+      if (!data) {
         // No settings exist, create default
-        const defaultSettings: Partial<UserPrivacySettings> = {
+        const defaultSettings = {
           user_id: session.user.id,
           message_privacy: 'everyone',
           profile_visibility: 'public',
@@ -68,18 +77,24 @@ export default function PrivacySettingsScreen() {
           allow_friend_requests: true,
         };
 
-        const { data: newSettings } = await supabase
+        const { data: newSettings, error: insertError } = await supabase
           .from('user_privacy_settings')
           .insert(defaultSettings)
           .select()
           .single();
 
-        setSettings(newSettings as unknown as UserPrivacySettings | null);
-      } else if (data) {
-        setSettings(data as unknown as UserPrivacySettings);
+        if (insertError) throw insertError;
+        if (!newSettings) throw new Error('Privacy settings were not returned');
+        setSettings(newSettings);
+      } else {
+        setSettings(data);
       }
     } catch (error) {
       console.error('Error fetching privacy settings:', error);
+      setSettings(null);
+      setSettingsError(
+        'Could not load your privacy settings. Your saved choices have not changed.'
+      );
     } finally {
       setLoading(false);
     }
@@ -88,20 +103,28 @@ export default function PrivacySettingsScreen() {
   const fetchBlockedUsers = useCallback(async () => {
     if (!session?.user?.id) return;
 
+    setBlockedLoading(true);
+    setBlockedError(null);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('blocked_users')
         .select(
           `
           *,
-          blocked_profile:profiles!blocked_users_blocked_id_fkey(*)
+          blocked_profile:profiles!blocked_users_blocked_id_fkey(id, full_name, avatar_url)
         `
         )
         .eq('blocker_id', session.user.id);
 
-      setBlockedUsers((data || []) as unknown as BlockedUser[]);
+      if (error) throw error;
+      setBlockedUsers(
+        (data ?? []).filter((row) => row.blocked_id && row.blocker_id) as BlockedUser[]
+      );
     } catch (error) {
       console.error('Error fetching blocked users:', error);
+      setBlockedError('Could not load blocked users. Your blocks are still in place.');
+    } finally {
+      setBlockedLoading(false);
     }
   }, [session?.user?.id]);
 
@@ -112,8 +135,11 @@ export default function PrivacySettingsScreen() {
     }
   }, [fetchBlockedUsers, fetchPrivacySettings, session?.user?.id]);
 
-  const updateSetting = async (key: keyof UserPrivacySettings, value: any) => {
-    if (!settings || !session?.user?.id) return;
+  const updateSetting = async <K extends keyof UpdatePrivacySettingsInput>(
+    key: K,
+    value: UpdatePrivacySettingsInput[K]
+  ) => {
+    if (!settings || !session?.user?.id || saving) return;
 
     setSaving(true);
     const previous = settings;
@@ -166,18 +192,8 @@ export default function PrivacySettingsScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={settingsTheme.accent} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const messagePrivacy = settings?.message_privacy || 'everyone';
-  const profileVisibility = settings?.profile_visibility || 'public';
+  const messagePrivacy = settings?.message_privacy;
+  const profileVisibility = settings?.profile_visibility;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -190,74 +206,110 @@ export default function PrivacySettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <SectionHeader title="Who can message me" />
-        <Card>
-          {MESSAGE_OPTIONS.map((option) => (
-            <Row
-              key={option.value}
-              label={option.label}
-              onPress={() => updateSetting('message_privacy', option.value)}
-              right={<Check selected={messagePrivacy === option.value} />}
-            />
-          ))}
-        </Card>
-        <SectionFootnote>Control who can start a conversation with you.</SectionFootnote>
+        {loading ? (
+          <View style={styles.sectionLoading}>
+            <ActivityIndicator size="large" color={settingsTheme.accent} />
+          </View>
+        ) : settingsError || !settings ? (
+          <>
+            <SectionHeader title="Privacy settings unavailable" />
+            <Card>
+              <Row
+                label="Try again"
+                sublabel={settingsError ?? 'Could not load your privacy settings.'}
+                onPress={() => void fetchPrivacySettings()}
+              />
+            </Card>
+          </>
+        ) : (
+          <>
+            <SectionHeader title="Who can message me" />
+            <Card>
+              {MESSAGE_OPTIONS.map((option) => (
+                <Row
+                  key={option.value}
+                  label={option.label}
+                  onPress={() => updateSetting('message_privacy', option.value)}
+                  disabled={saving}
+                  right={<Check selected={messagePrivacy === option.value} />}
+                />
+              ))}
+            </Card>
+            <SectionFootnote>Control who can start a conversation with you.</SectionFootnote>
 
-        <SectionHeader title="Profile visibility" />
-        <Card>
-          {VISIBILITY_OPTIONS.map((option) => (
-            <Row
-              key={option.value}
-              label={option.label}
-              onPress={() => updateSetting('profile_visibility', option.value)}
-              right={<Check selected={profileVisibility === option.value} />}
-            />
-          ))}
-        </Card>
-        <SectionFootnote>Control who can see your profile information.</SectionFootnote>
+            <SectionHeader title="Profile visibility" />
+            <Card>
+              {VISIBILITY_OPTIONS.map((option) => (
+                <Row
+                  key={option.value}
+                  label={option.label}
+                  onPress={() => updateSetting('profile_visibility', option.value)}
+                  disabled={saving}
+                  right={<Check selected={profileVisibility === option.value} />}
+                />
+              ))}
+            </Card>
+            <SectionFootnote>Control who can see your profile information.</SectionFootnote>
 
-        <SectionHeader title="Activity" />
-        <Card>
-          <Row
-            label="Show online status"
-            sublabel="Let others see when you're online"
-            right={
-              <Switch
-                value={settings?.show_online_status || false}
-                onValueChange={(value) => updateSetting('show_online_status', value)}
-                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
-                thumbColor="white"
+            <SectionHeader title="Activity" />
+            <Card>
+              <Row
+                label="Show online status"
+                sublabel="Let others see when you're online"
+                right={
+                  <Switch
+                    value={settings?.show_online_status || false}
+                    disabled={saving}
+                    onValueChange={(value) => updateSetting('show_online_status', value)}
+                    trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                    thumbColor="white"
+                  />
+                }
               />
-            }
-          />
-          <Row
-            label="Read receipts"
-            sublabel="Show when you've read messages"
-            right={
-              <Switch
-                value={settings?.show_read_receipts || false}
-                onValueChange={(value) => updateSetting('show_read_receipts', value)}
-                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
-                thumbColor="white"
+              <Row
+                label="Read receipts"
+                sublabel="Show when you've read messages"
+                right={
+                  <Switch
+                    value={settings?.show_read_receipts || false}
+                    disabled={saving}
+                    onValueChange={(value) => updateSetting('show_read_receipts', value)}
+                    trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                    thumbColor="white"
+                  />
+                }
               />
-            }
-          />
-          <Row
-            label="Friend requests"
-            sublabel="Allow others to send you friend requests"
-            right={
-              <Switch
-                value={settings?.allow_friend_requests || false}
-                onValueChange={(value) => updateSetting('allow_friend_requests', value)}
-                trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
-                thumbColor="white"
+              <Row
+                label="Friend requests"
+                sublabel="Allow others to send you friend requests"
+                right={
+                  <Switch
+                    value={settings?.allow_friend_requests || false}
+                    disabled={saving}
+                    onValueChange={(value) => updateSetting('allow_friend_requests', value)}
+                    trackColor={{ false: '#E0E0E0', true: settingsTheme.accent }}
+                    thumbColor="white"
+                  />
+                }
               />
-            }
-          />
-        </Card>
+            </Card>
+          </>
+        )}
 
         <SectionHeader title="Blocked users" />
-        {blockedUsers.length > 0 ? (
+        {blockedLoading ? (
+          <View style={styles.sectionLoading}>
+            <ActivityIndicator color={settingsTheme.accent} />
+          </View>
+        ) : blockedError ? (
+          <Card>
+            <Row
+              label="Try again"
+              sublabel={blockedError}
+              onPress={() => void fetchBlockedUsers()}
+            />
+          </Card>
+        ) : blockedUsers.length > 0 ? (
           <Card>
             {blockedUsers.map((blocked) => (
               <View key={blocked.id} style={styles.blockedRow}>
@@ -275,7 +327,7 @@ export default function PrivacySettingsScreen() {
                   />
                 )}
                 <Text style={styles.blockedName} numberOfLines={1}>
-                  {blocked.blocked_profile?.full_name || 'Unknown User'}
+                  {blocked.blocked_profile?.full_name || 'Blocked user'}
                 </Text>
                 <Pressable
                   style={styles.unblockButton}
@@ -290,9 +342,7 @@ export default function PrivacySettingsScreen() {
             <Row label="You haven’t blocked anyone" />
           </Card>
         )}
-        <SectionFootnote>
-          Blocked users can’t message you or see your profile.
-        </SectionFootnote>
+        <SectionFootnote>Blocked users can’t message you or see your profile.</SectionFootnote>
       </ScrollView>
     </SafeAreaView>
   );
@@ -303,9 +353,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: settingsTheme.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  sectionLoading: {
+    paddingVertical: 28,
     alignItems: 'center',
   },
   header: {

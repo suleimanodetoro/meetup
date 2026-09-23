@@ -83,14 +83,15 @@ interface EventDetails {
     full_name?: string;
     username?: string;
     avatar_url?: string;
-  };
+  } | null;
   attendees?: {
+    user_id: string;
     user: {
       id: string;
       full_name?: string;
       username?: string;
       avatar_url?: string;
-    };
+    } | null;
   }[];
   venues?: {
     venue_name: string;
@@ -163,6 +164,7 @@ export default function PlanDetailsScreen() {
             avatar_url
           ),
           attendees:attendance(
+            user_id,
             user:profiles(
               id,
               full_name,
@@ -189,7 +191,7 @@ export default function PlanDetailsScreen() {
       setEvent(eventData as unknown as EventDetails);
 
       if (session?.user?.id) {
-        const isUserAttending = eventData.attendees?.some((a) => a.user.id === session.user.id);
+        const isUserAttending = eventData.attendees?.some((a) => a.user_id === session.user.id);
         // The creator is the host of their own sidequest — always a member,
         // even if the attendance row never landed (e.g. an interrupted
         // creation), so they see the host state, not a "Join" button.
@@ -343,9 +345,9 @@ export default function PlanDetailsScreen() {
       // this pairing wasn't dismissed before), the sheet graduates into an
       // add-friend follow-up instead of closing.
       const partner = partnerId
-        ? (event?.attendees ?? []).find((a) => a.user.id === partnerId)
+        ? (event?.attendees ?? []).find((a) => a.user?.id === partnerId)
         : undefined;
-      if (partner && (await shouldPromptAddFriend(partner.user.id))) {
+      if (partner?.user && (await shouldPromptAddFriend(partner.user.id))) {
         setAddFriendPrompt({
           id: partner.user.id,
           name: partner.user.full_name || partner.user.username || 'them',
@@ -376,7 +378,9 @@ export default function PlanDetailsScreen() {
   // Tap "Mark completed": if the roster has other people, ask who it was done
   // with (the ledger pairing); otherwise complete solo straight away.
   const handleMarkCompleted = () => {
-    const others = (event?.attendees ?? []).filter((a) => a.user.id !== session?.user?.id);
+    const others = (event?.attendees ?? []).filter(
+      (a) => a.user && a.user.id !== session?.user?.id
+    );
     if (others.length === 0) {
       completeWith(null);
     } else {
@@ -503,8 +507,8 @@ export default function PlanDetailsScreen() {
   const isCompleted = event.status === 'completed';
   const showMarkCompleted = !isCompleted && isAttending;
   const showCompletionBlock = isCompleted || showMarkCompleted;
-  const partnerCandidates = (event.attendees ?? []).filter(
-    (a) => a.user.id !== session?.user?.id
+  const partnerCandidates = (event.attendees ?? []).flatMap(
+    ({ user }) => user && user.id !== session?.user?.id ? [user] : []
   );
 
   return (
@@ -590,9 +594,9 @@ export default function PlanDetailsScreen() {
               {event.attendees
                 ?.slice(0, 5)
                 .map((attendee, index) =>
-                  attendee.user.avatar_url ? (
+                  attendee.user?.avatar_url ? (
                     <AppImage
-                      key={attendee.user.id}
+                      key={attendee.user_id}
                       source={{ uri: attendee.user.avatar_url }}
                       style={[
                         styles.attendeeAvatar,
@@ -601,9 +605,9 @@ export default function PlanDetailsScreen() {
                     />
                   ) : (
                     <InitialsAvatar
-                      key={attendee.user.id}
-                      name={attendee.user.full_name}
-                      id={attendee.user.id}
+                      key={attendee.user_id}
+                      name={attendee.user?.full_name}
+                      id={attendee.user_id}
                       size={44}
                       style={[
                         styles.attendeeAvatar,
@@ -893,25 +897,25 @@ export default function PlanDetailsScreen() {
 
               {partnerCandidates.map((attendee) => (
                 <Pressable
-                  key={attendee.user.id}
+                  key={attendee.id}
                   style={styles.partnerRow}
-                  onPress={() => completeWith(attendee.user.id)}
+                  onPress={() => completeWith(attendee.id)}
                   disabled={completing}>
-                  {attendee.user.avatar_url ? (
+                  {attendee.avatar_url ? (
                     <AppImage
-                      source={{ uri: attendee.user.avatar_url }}
+                      source={{ uri: attendee.avatar_url }}
                       style={styles.partnerAvatar}
                     />
                   ) : (
                     <InitialsAvatar
-                      name={attendee.user.full_name || attendee.user.username}
-                      id={attendee.user.id}
+                      name={attendee.full_name || attendee.username}
+                      id={attendee.id}
                       size={40}
                       style={styles.partnerAvatar}
                     />
                   )}
                   <Text style={styles.partnerName} numberOfLines={1}>
-                    {attendee.user.full_name || attendee.user.username || 'Someone'}
+                    {attendee.full_name || attendee.username || 'Someone'}
                   </Text>
                   <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
                 </Pressable>

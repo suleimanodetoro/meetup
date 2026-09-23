@@ -43,7 +43,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    'expo-video',
     'expo-web-browser',
     'expo-apple-authentication',
     [

@@ -16,9 +16,12 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DatePicker from 'react-native-date-picker';
+import { uuid } from 'expo-modules-core';
 import { GradientButton } from '~/components/GradientButton';
 import { supabase } from '~/utils/supabase';
 import { useAuth } from '~/contexts/AuthProvider';
+import { getCountryFlag } from '~/utils/countryFlags';
+import { formatCalendarDate } from '~/utils/calendarDate';
 import { getSuggestions } from '~/utils/AddressAutocomplete';
 
 interface Destination {
@@ -27,15 +30,6 @@ interface Destination {
   country_code: string;
   flag: string;
 }
-
-const getCountryFlag = (countryCode: string): string => {
-  if (!countryCode || countryCode.length !== 2) return '🌍';
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map((char) => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-};
 
 export default function AddTripScreen() {
   const { session } = useAuth();
@@ -54,8 +48,8 @@ export default function AddTripScreen() {
   const [searchResults, setSearchResults] = useState<Destination[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Keep a stable token for the autocomplete session (only falls back if no auth session)
-  const fallbackSessionRef = useRef('session-' + Date.now());
+  // Mapbox billing session IDs must never contain an authentication token.
+  const [mapboxSessionToken] = useState(() => uuid.v4());
 
   // Guard against race conditions from overlapping requests
   const lastRequestId = useRef(0);
@@ -71,7 +65,7 @@ export default function AddTripScreen() {
 
     const requestId = ++lastRequestId.current;
     try {
-      const data = await getSuggestions(q, session?.access_token ?? fallbackSessionRef.current, {
+      const data = await getSuggestions(q, mapboxSessionToken, {
         // ✅ these were missing in v2; restores your v1 behavior and English-only results
         types: ['place', 'locality'],
         language: 'en',
@@ -108,7 +102,7 @@ export default function AddTripScreen() {
     } finally {
       if (requestId === lastRequestId.current) setSearching(false);
     }
-  }, [searchQuery, session?.access_token]);
+  }, [searchQuery, mapboxSessionToken]);
 
   // Debounce typing
   useEffect(() => {
@@ -127,8 +121,8 @@ export default function AddTripScreen() {
         city: selectedDestination!.city,
         country: selectedDestination!.country,
         country_code: selectedDestination!.country_code,
-        start_date: startDate!.toISOString().split('T')[0],
-        end_date: endDate!.toISOString().split('T')[0],
+        start_date: formatCalendarDate(startDate!),
+        end_date: formatCalendarDate(endDate!),
       });
       if (error) throw error;
       Alert.alert('Success', 'Trip added successfully!', [

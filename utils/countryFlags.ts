@@ -1,6 +1,12 @@
-// utils/countryFlags.ts
+export type Country = {
+  name: string;
+  code: string;
+  flag: string;
+};
 
-export const COUNTRIES = [
+export type CountryCode = string;
+
+export const COUNTRIES: Country[] = [
   { name: 'Afghanistan', code: 'AF', flag: '🇦🇫' },
   { name: 'Albania', code: 'AL', flag: '🇦🇱' },
   { name: 'Algeria', code: 'DZ', flag: '🇩🇿' },
@@ -168,8 +174,8 @@ export const COUNTRIES = [
  */
 export function getCountryFlag(code: string | null | undefined): string {
   if (!code) return '🏳️';
-  
-  const country = COUNTRIES.find(c => c.code === code.toUpperCase());
+
+  const country = COUNTRIES.find((c) => c.code === code.toUpperCase());
   return country?.flag || '🏳️';
 }
 
@@ -178,10 +184,10 @@ export function getCountryFlag(code: string | null | undefined): string {
  * @param code - ISO country code
  * @returns Country object with name, code, and flag
  */
-export function getCountryByCode(code: string | null | undefined) {
+export function getCountryByCode(code: string | null | undefined): Country | null {
   if (!code) return null;
-  
-  return COUNTRIES.find(c => c.code === code.toUpperCase()) || null;
+
+  return COUNTRIES.find((c) => c.code === code.toUpperCase()) || null;
 }
 
 /**
@@ -189,11 +195,8 @@ export function getCountryByCode(code: string | null | undefined) {
  * @param name - Country name
  * @returns Country object with name, code, and flag
  */
-export function getCountryByName(name: string | null | undefined) {
+export function getCountryByName(name: string | null | undefined): Country | null {
   if (!name) return null;
-  
-  return COUNTRIES.find(c => 
-    c.name.toLowerCase() === name.toLowerCase()
-  ) || null;
-}
 
+  return COUNTRIES.find((c) => c.name.toLowerCase() === name.toLowerCase()) || null;
+}

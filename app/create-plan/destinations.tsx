@@ -14,12 +14,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { uuid } from 'expo-modules-core';
 import { Ionicons } from '@expo/vector-icons';
 import StepperProgress from '~/components/StepperProgress';
 import CreatePlanHeader from '~/components/CreatePlanHeader';
 import { useCreatePlan } from '~/contexts/CreatePlanContext';
+import { getCountryFlag } from '~/utils/countryFlags';
 import { getSuggestions, retrieveDetails } from '~/utils/AddressAutocomplete';
-import { useAuth } from '~/contexts/AuthProvider';
 import { GradientButton } from '~/components/GradientButton';
 
 interface VenueData {
@@ -34,7 +35,7 @@ interface VenueData {
 
 export default function DestinationsScreen() {
   const { formData, updateField, nextStep, canContinue, setStep } = useCreatePlan();
-  const { session } = useAuth();
+  const [mapboxSessionToken, setMapboxSessionToken] = useState(() => uuid.v4());
   const [venues, setVenues] = useState<VenueData[]>(formData.venues);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +49,7 @@ export default function DestinationsScreen() {
     try {
       const data = await getSuggestions(
         searchQuery,
-        session?.access_token || 'session-' + Date.now(),
+        mapboxSessionToken,
         {
           // Filter to actual locations
           types: ['place', 'poi', 'address'],
@@ -73,7 +74,7 @@ export default function DestinationsScreen() {
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, session?.access_token]);
+  }, [searchQuery, mapboxSessionToken]);
 
   useEffect(() => {
     updateField('venues', venues);
@@ -108,7 +109,7 @@ export default function DestinationsScreen() {
       // Retrieve full details to get coordinates
       const details = await retrieveDetails(
         venue.mapbox_id,
-        session?.access_token || 'session-' + Date.now()
+        mapboxSessionToken
       );
 
       const feature = details.features?.[0];
@@ -128,6 +129,8 @@ export default function DestinationsScreen() {
         lng: feature.geometry?.coordinates?.[0],
       };
 
+      // Retrieving a result completes the Mapbox billing session.
+      setMapboxSessionToken(uuid.v4());
       setVenues([...venues, newVenue]);
       setShowSearch(false);
       setSearchQuery('');
@@ -149,19 +152,6 @@ export default function DestinationsScreen() {
       nextStep();
       router.push('/create-plan/interests');
     }
-  };
-
-  const getCountryFlag = (code?: string) => {
-    const flags: Record<string, string> = {
-      GB: '🇬🇧',
-      US: '🇺🇸',
-      FR: '🇫🇷',
-      IE: '🇮🇪',
-      DE: '🇩🇪',
-      ES: '🇪🇸',
-      IT: '🇮🇹',
-    };
-    return flags[code || ''] || '🌍';
   };
 
   return (
