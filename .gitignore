@@ -41,6 +41,7 @@ docs/momentum-engine-v2.md
 docs/pricing-2026-07-launch.md
 docs/android-launch/
 docs/oc3/
+deliverables/
 
 # Account-teardown audit logs (contain deleted-user PII — never commit)
 scripts/admin/logs/

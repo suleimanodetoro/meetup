@@ -10,7 +10,7 @@ dotenv.config({ path: '.env.local', override: true });
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Waypoint',
   slug: 'waypoint',
-  version: '1.1.3',
+  version: '1.1.4',
   scheme: 'waypoint',
   web: {
     bundler: 'metro',
@@ -72,9 +72,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [
-      '@rnmapbox/maps',
+      './plugins/withMapboxDownloadToken',
       {
-        RNMapboxMapsDownloadToken: process.env.MAPBOX_DOWNLOAD_TOKEN || '',
         RNMapboxMapsVersion: '11.13.4',
       },
     ],
@@ -124,7 +123,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // native rebuild (see TODO.md "Sharing / universal links").
     associatedDomains: ['applinks:usewaypoint.app'],
     appStoreUrl: process.env.EXPO_PUBLIC_APP_STORE_URL,
-    buildNumber: '10',
     usesAppleSignIn: true,
     icon: {
       light: './assets/ios-light.png',
